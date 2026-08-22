@@ -27,11 +27,9 @@ public class OrderManager
     public void OnSignal(Signal signal, Contract contract, PriceUpdate lastPrice)
     {
         var active = _store.Load();
-        if (active != null &&
-            (active.Status == TrackedOrderStatus.Submitted || active.Status == TrackedOrderStatus.Filled))
+        if (active is { Status: TrackedOrderStatus.Submitted or TrackedOrderStatus.Filled })
         {
-            _client.NotifySubscriber(
-                $"Signal ignored - order already {active.Status} ({active.Direction} @ {active.EntryLimitPrice:F2}).");
+            _client.NotifySubscriber($"Signal ignored - order already {active.Status} ({active.Direction} @ {active.EntryLimitPrice:F2}).");
             return;
         }
 
@@ -93,7 +91,7 @@ public class OrderManager
     public void OnCandleClosed(Candle candle)
     {
         var tracked = _store.Load();
-        if (tracked == null || tracked.Status != TrackedOrderStatus.Filled)
+        if (tracked is not { Status: TrackedOrderStatus.Filled })
             return;
 
         if (tracked.Direction == TradeDirection.Long)
@@ -185,9 +183,7 @@ public class OrderManager
             _client.NotifySubscriber($"EXIT FILLED - order {status.OrderId} @ {status.AvgFillPrice:F2} | position closed");
             _store.Clear();
         }
-        else if (status.OrderId == tracked.ParentOrderId &&
-                 (status.Status == "Cancelled" || status.Status == "Inactive") &&
-                 tracked.Status == TrackedOrderStatus.Submitted)
+        else if (status.OrderId == tracked.ParentOrderId && status.Status is "Cancelled" or "Inactive" && tracked.Status == TrackedOrderStatus.Submitted)
         {
             tracked.Status = TrackedOrderStatus.Cancelled;
             _store.Save(tracked);

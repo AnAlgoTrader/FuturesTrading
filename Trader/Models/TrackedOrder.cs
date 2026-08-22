@@ -18,20 +18,20 @@ public enum TrackedOrderStatus
 
 public class TrackedOrder
 {
-    public int ParentOrderId { get; set; }
-    public int StopOrderId { get; set; }
-    public string Symbol { get; set; }
-    public TradeDirection Direction { get; set; }
+    public int ParentOrderId { get; init; }
+    public int StopOrderId { get; init; }
+    public string Symbol { get; init; }
+    public TradeDirection Direction { get; init; }
     public TrackedOrderStatus Status { get; set; }
-    public double EntryLimitPrice { get; set; }
+    public double EntryLimitPrice { get; init; }
     public double StopPrice { get; set; }
-    public double ActivationDistance { get; set; }
-    public double TrailDistance { get; set; }
+    public double ActivationDistance { get; init; }
+    public double TrailDistance { get; init; }
     public double BestPrice { get; set; }
     public bool TrailingActive { get; set; }
-    public decimal Quantity { get; set; }
-    public double StdevBps { get; set; }
-    public DateTime CreatedAt { get; set; }
+    public decimal Quantity { get; init; }
+    public double StdevBps { get; init; }
+    public DateTime CreatedAt { get; init; }
     public DateTime FilledAt { get; set; }
     public DateTime ClosedAt { get; set; }
     public double AverageFillPrice { get; set; }
