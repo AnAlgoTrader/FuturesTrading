@@ -4,8 +4,8 @@ namespace Trader.Models;
 
 public class Candle
 {
-    public DateTime Timestamp { get; init; }
-    public double Open { get; set; }
+    public DateTime Timestamp { get; }
+    public double Open { get; }
     public double High { get; set; }
     public double Low { get; set; }
     public double Close { get; set; }
@@ -30,6 +30,5 @@ public class Candle
         TickCount++;
     }
 
-    public override string ToString() =>
-        $"{Timestamp:HH:mm:ss} O:{Open:F2} H:{High:F2} L:{Low:F2} C:{Close:F2} Ticks:{TickCount}";
+    public override string ToString() => $"{Timestamp:HH:mm:ss} O:{Open:F2} H:{High:F2} L:{Low:F2} C:{Close:F2} Ticks:{TickCount}";
 }
