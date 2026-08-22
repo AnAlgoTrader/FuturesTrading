@@ -64,7 +64,6 @@ internal class Program
             if (update.Value.BidPrice <= 0 || update.Value.AskPrice <= 0)
                 return;
             _lastPrice = update.Value;
-            
             aggregator.OnTick(DateTime.Now, _lastPrice);
         };
 
