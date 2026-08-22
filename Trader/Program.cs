@@ -50,7 +50,7 @@ internal class Program
         aggregator.OnCandleClosed += candle =>
         {
             client.NotifySubscriber(candle.ToString());
-            manager.OnCandleClosed(candle);
+            manager.OnCandleClosed(candle, _lastPrice);
             var signal = detector.OnCandleClosed(candle);
             if (signal != null)
             {

@@ -36,6 +36,13 @@ CURRENT STATE (as of Aug 2026)
   (0.5 * legacy 1.5*stdev target distance), resends the STP with a new AuxPrice trailing
   TrailDistance (0.5 * initial stop distance) behind best price; ratchet-only, never loosens.
   Contract cached on first OnSignal and reused for modifications.
+- Max hold: BarsHeld counted per closed candle after fill; at 50 bars -> timed exit.
+- Session boundary: gap > 60 min between consecutive candles = session break
+  (same rule as backtest). Open position force-exited; first bar of new session blocks entries.
+- Timed/forced exits use a marketable LIMIT crossing the spread (SELL@bid close long,
+  BUY@ask close short), never market orders. Flow: status -> Exiting, cancel protective
+  stop, place exit LMT. Rare stop/exit double-fill race surfaces a loud VERIFY message;
+  exit leg dead without fill also alerts loudly.
 - One position at a time: new signals ignored while tracked order is Submitted/Filled.
 - Order state persisted to order_state.json (OrderStore, JSON incl. enum as string);
   OnOrderStatus moves Submitted->Filled->Closed/Cancelled and clears the store on exit/cancel.
@@ -47,16 +54,20 @@ FILES
 - Models/SignalDetector.cs    returns Signal or null per closed candle.
 - Models/Signal.cs      signal DTO: direction, return/stdev bps, ratio, price.
 - Models/OrderManager.cs      signal -> bracket (entry + stop); candle-close trailing stop
-                              modifications; order status state machine.
+                              modifications, max-hold and session-break exits; order status
+                              state machine incl. Exiting race handling.
 - Models/TrackedOrder.cs      persisted position/order state + TradeDirection/Status enums.
 - Models/OrderStore.cs  Load/Save/Clear of TrackedOrder in order_state.json.
 - Models/Logger.cs      timestamped lines to console + trader.log (AutoFlush).
 - STRATEGY.txt          full strategy spec incl. backtest results.
 
-NEXT STEPS (per STRATEGY.txt, in order)
-1. Max hold 50 bars -> market exit.
-2. Session boundary handling: close open position at end of RTH, no entry on first bar of session.
+NEXT STEPS
+- Strategy spec (STRATEGY.txt) fully implemented. Remaining known limitation:
+  restart does not reconcile order_state.json against IB open orders
+  (IbClient.OnOpenOrderUpdate exists, unwired) - a crash between placing and
+  saving could orphan a live bracket; reconcile manually or wire it up.
 
 BACKTEST REFERENCE (net of $12.50 spread/trade, ES; divide by 10 for MES)
 Train Aug'25-Apr'26: $40,544 P&L, 45.3% WR, Sharpe 10.42, max DD $1,265.
 Test  May'26-Aug'26: $197,356 P&L, 79.6% WR, Sharpe 43.3,  max DD $215.
+Trail-only variant:  Train $156,811 (Sharpe 20.58, DD $438); Test $210,003 (Sharpe 45.0, DD $173).

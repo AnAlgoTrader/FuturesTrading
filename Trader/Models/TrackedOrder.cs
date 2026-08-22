@@ -12,23 +12,26 @@ public enum TrackedOrderStatus
 {
     Submitted,
     Filled,
+    Exiting,
     Closed,
     Cancelled
 }
 
 public class TrackedOrder
 {
-    public int ParentOrderId { get; init; }
-    public int StopOrderId { get; init; }
-    public string Symbol { get; init; }
-    public TradeDirection Direction { get; init; }
+    public int ParentOrderId { get; set; }
+    public int StopOrderId { get; set; }
+    public int ExitOrderId { get; set; }
+    public string Symbol { get; set; }
+    public TradeDirection Direction { get; set; }
     public TrackedOrderStatus Status { get; set; }
-    public double EntryLimitPrice { get; init; }
+    public double EntryLimitPrice { get; set; }
     public double StopPrice { get; set; }
-    public double ActivationDistance { get; init; }
-    public double TrailDistance { get; init; }
+    public double ActivationDistance { get; set; }
+    public double TrailDistance { get; set; }
     public double BestPrice { get; set; }
     public bool TrailingActive { get; set; }
+    public int BarsHeld { get; set; }
     public decimal Quantity { get; init; }
     public double StdevBps { get; init; }
     public DateTime CreatedAt { get; init; }

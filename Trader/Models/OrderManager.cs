@@ -13,10 +13,14 @@ public class OrderManager
     private const double StopStdevMultiple = 2.0;
     private const double TrailActivationPct = 0.5;
     private const double TrailDistancePct = 0.5;
+    private const int MaxHoldBars = 50;
+    private const double SessionGapMinutes = 60;
 
     private readonly IbClient _client;
     private readonly OrderStore _store;
     private Contract _contract;
+    private DateTime _previousCandleTimestamp;
+    private bool _isNewSession = true;
 
     public OrderManager(IbClient client, OrderStore store)
     {
@@ -27,9 +31,17 @@ public class OrderManager
     public void OnSignal(Signal signal, Contract contract, PriceUpdate lastPrice)
     {
         var active = _store.Load();
-        if (active is { Status: TrackedOrderStatus.Submitted or TrackedOrderStatus.Filled })
+        if (active != null &&
+            (active.Status == TrackedOrderStatus.Submitted || active.Status == TrackedOrderStatus.Filled))
         {
-            _client.NotifySubscriber($"Signal ignored - order already {active.Status} ({active.Direction} @ {active.EntryLimitPrice:F2}).");
+            _client.NotifySubscriber(
+                $"Signal ignored - order already {active.Status} ({active.Direction} @ {active.EntryLimitPrice:F2}).");
+            return;
+        }
+
+        if (_isNewSession)
+        {
+            _client.NotifySubscriber("Signal ignored - first bar of a new session.");
             return;
         }
 
@@ -88,11 +100,32 @@ public class OrderManager
             $"BRACKET {tracked.Direction} {Quantity} {contract.Symbol} | entry LMT {entryPrice:F2} | stop {stopPrice:F2} | ids {parent.OrderId}/{stop.OrderId}");
     }
 
-    public void OnCandleClosed(Candle candle)
+    public void OnCandleClosed(Candle candle, PriceUpdate lastPrice)
     {
+        if (_previousCandleTimestamp != default &&
+            (candle.Timestamp - _previousCandleTimestamp).TotalMinutes > SessionGapMinutes)
+        {
+            _isNewSession = true;
+            ForceExitIfFilled(lastPrice, "SESSION_END");
+        }
+        else
+        {
+            _isNewSession = false;
+        }
+        _previousCandleTimestamp = candle.Timestamp;
+
         var tracked = _store.Load();
-        if (tracked is not { Status: TrackedOrderStatus.Filled })
+        if (tracked == null || tracked.Status != TrackedOrderStatus.Filled)
             return;
+
+        if (candle.Timestamp > tracked.FilledAt)
+            tracked.BarsHeld++;
+
+        if (tracked.BarsHeld >= MaxHoldBars)
+        {
+            BeginExit(tracked, lastPrice, $"MAX_HOLD ({MaxHoldBars} bars)");
+            return;
+        }
 
         if (tracked.Direction == TradeDirection.Long)
         {
@@ -163,6 +196,12 @@ public class OrderManager
         if (tracked == null)
             return;
 
+        if (tracked.Status == TrackedOrderStatus.Exiting)
+        {
+            HandleExitingStatus(tracked, status);
+            return;
+        }
+
         if (status.OrderId == tracked.ParentOrderId && status.Status == "Filled" &&
             tracked.Status == TrackedOrderStatus.Submitted)
         {
@@ -183,7 +222,9 @@ public class OrderManager
             _client.NotifySubscriber($"EXIT FILLED - order {status.OrderId} @ {status.AvgFillPrice:F2} | position closed");
             _store.Clear();
         }
-        else if (status.OrderId == tracked.ParentOrderId && status.Status is "Cancelled" or "Inactive" && tracked.Status == TrackedOrderStatus.Submitted)
+        else if (status.OrderId == tracked.ParentOrderId &&
+                 (status.Status == "Cancelled" || status.Status == "Inactive") &&
+                 tracked.Status == TrackedOrderStatus.Submitted)
         {
             tracked.Status = TrackedOrderStatus.Cancelled;
             _store.Save(tracked);
@@ -193,6 +234,73 @@ public class OrderManager
         else if (status.Status == "Cancelled" && status.OrderId != tracked.ParentOrderId)
         {
             _client.NotifySubscriber($"Order {status.OrderId} cancelled.");
+        }
+    }
+
+    private void ForceExitIfFilled(PriceUpdate lastPrice, string reason)
+    {
+        var tracked = _store.Load();
+        if (tracked != null && tracked.Status == TrackedOrderStatus.Filled)
+            BeginExit(tracked, lastPrice, reason);
+    }
+
+    private void BeginExit(TrackedOrder tracked, PriceUpdate lastPrice, string reason)
+    {
+        var isLong = tracked.Direction == TradeDirection.Long;
+        var exitAction = isLong ? "SELL" : "BUY";
+        var exitPrice = RoundToTick(isLong ? lastPrice.BidPrice : lastPrice.AskPrice);
+
+        var exitOrder = new Order
+        {
+            OrderId = _client.GetNextValidId(),
+            Action = exitAction,
+            TotalQuantity = tracked.Quantity,
+            OrderType = "LMT",
+            LmtPrice = exitPrice,
+            Tif = "DAY",
+            Transmit = true
+        };
+
+        tracked.Status = TrackedOrderStatus.Exiting;
+        tracked.ExitOrderId = exitOrder.OrderId;
+        _store.Save(tracked);
+
+        _client.CancelOrder(tracked.StopOrderId);
+        _client.PlaceOrder(_contract, exitOrder);
+
+        _client.NotifySubscriber(
+            $"EXITING ({reason}) - cancel stop {tracked.StopOrderId}, exit LMT {exitAction} {exitPrice:F2} id {exitOrder.OrderId}");
+    }
+
+    private void HandleExitingStatus(TrackedOrder tracked, OrderStatus status)
+    {
+        if (status.OrderId == tracked.StopOrderId)
+        {
+            if (status.Status == "Filled")
+            {
+                _client.CancelOrder(tracked.ExitOrderId);
+                _client.NotifySubscriber(
+                    $"EXIT RACE - stop {status.OrderId} filled during timed exit; cancelling exit leg {tracked.ExitOrderId}. Verify position is flat.");
+            }
+            return;
+        }
+
+        if (status.OrderId == tracked.ExitOrderId && status.Status == "Filled")
+        {
+            tracked.Status = TrackedOrderStatus.Closed;
+            tracked.ExitPrice = status.AvgFillPrice;
+            tracked.ClosedAt = DateTime.Now;
+            _store.Save(tracked);
+            _client.NotifySubscriber($"EXIT FILLED - order {status.OrderId} @ {status.AvgFillPrice:F2} | position closed");
+            _store.Clear();
+            return;
+        }
+
+        if (status.OrderId == tracked.ExitOrderId &&
+            (status.Status == "Cancelled" || status.Status == "Inactive"))
+        {
+            _client.NotifySubscriber(
+                $"EXIT LEG DEAD WITHOUT FILL - order {status.OrderId} {status.Status}. Position may still be open, verify and flatten manually.");
         }
     }
 

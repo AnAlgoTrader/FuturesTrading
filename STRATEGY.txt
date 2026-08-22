@@ -23,7 +23,12 @@ HOLD & EXIT
 - Hold for up to 50 bars (~50 minutes).
 - Exit conditions checked on every new 1-minute bar:
   - If price reverses through the current stop -> exit.
-  - If 50 bars elapsed -> exit at market.
+  - If 50 bars elapsed -> timed exit.
+  - At a session break (>60 min candle gap) -> forced exit.
+- All timed/forced exits cross the spread with a marketable LIMIT order
+  (sell at best bid to close long, buy at best ask to close short). Never market orders.
+- The protective stop is cancelled when a timed exit starts; if both stop and exit leg
+  fill (rare race), it is surfaced loudly in the log for manual verification.
 - No take-profit order (removed Aug 2026): winners run until trailed out or timeout.
 
 TRAILING STOP
@@ -34,8 +39,9 @@ TRAILING STOP
   - If price reverses through trailing stop -> exit (locks in remaining profit).
 
 SESSION BOUNDARY
-- Close any open position at the end of the RTH session.
-- Do not enter on the first bar of a new session.
+- Detected from data: a gap of more than 60 minutes between consecutive candles marks
+  a session break (same rule as the backtest's 3600s gap check).
+- Any open position is exited at the break; entries are skipped on the first bar of a new session.
 
 DIRECTION
 - Trade both long and short signals.
