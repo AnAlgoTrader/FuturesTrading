@@ -1,14 +1,18 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
+using Ib.Csharp.Api.Client.Implementation.Model;
 using Trader.Models;
 
 namespace Trader;
 
 internal class Program
 {
+    private static PriceUpdate _lastPrice;
+
     private static async Task Main()
     {
         var logPath = Path.Combine(AppContext.BaseDirectory, "trader.log");
@@ -50,7 +54,7 @@ internal class Program
             if (signal != null)
             {
                 client.NotifySubscriber(signal.ToString());
-                manager.OnSignal(signal, contractDetails.Contract);
+                manager.OnSignal(signal, contractDetails.Contract, _lastPrice);
             }
         };
 
@@ -59,8 +63,9 @@ internal class Program
             var update = marketDataUpdate.First();
             if (update.Value.BidPrice <= 0 || update.Value.AskPrice <= 0)
                 return;
-            var mid = (update.Value.BidPrice + update.Value.AskPrice) / 2;
-            aggregator.OnTick(DateTime.Now, mid);
+            _lastPrice = update.Value;
+            
+            aggregator.OnTick(DateTime.Now, _lastPrice);
         };
 
         client.OnOrderStatusUpdate += status =>

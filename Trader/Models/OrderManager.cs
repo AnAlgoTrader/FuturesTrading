@@ -21,7 +21,7 @@ public class OrderManager
         _store = store;
     }
 
-    public void OnSignal(Signal signal, Contract contract)
+    public void OnSignal(Signal signal, Contract contract, PriceUpdate lastPrice)
     {
         var active = _store.Load();
         if (active != null &&
@@ -32,11 +32,11 @@ public class OrderManager
             return;
         }
 
-        var entryPrice = RoundToTick(signal.Price);
+        var isLong = signal.Direction == "LONG";
+        var entryPrice = isLong ? lastPrice.AskPrice : lastPrice.BidPrice;
         var targetDistance = RoundToTick(TargetStdevMultiple * signal.StdevBps / 10000.0 * entryPrice);
         var stopDistance = RoundToTick(StopStdevMultiple * signal.StdevBps / 10000.0 * entryPrice);
 
-        var isLong = signal.Direction == "LONG";
         var action = isLong ? "BUY" : "SELL";
         var closeAction = isLong ? "SELL" : "BUY";
         var stopPrice = isLong ? RoundToTick(entryPrice - stopDistance) : RoundToTick(entryPrice + stopDistance);
