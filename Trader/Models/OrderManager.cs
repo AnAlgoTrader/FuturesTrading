@@ -11,9 +11,12 @@ public class OrderManager
     private const double TickSize = 0.25;
     private const double TargetStdevMultiple = 1.5;
     private const double StopStdevMultiple = 2.0;
+    private const double TrailActivationPct = 0.5;
+    private const double TrailDistancePct = 0.5;
 
     private readonly IbClient _client;
     private readonly OrderStore _store;
+    private Contract _contract;
 
     public OrderManager(IbClient client, OrderStore store)
     {
@@ -32,15 +35,15 @@ public class OrderManager
             return;
         }
 
+        _contract = contract;
+
         var isLong = signal.Direction == "LONG";
         var entryPrice = isLong ? lastPrice.AskPrice : lastPrice.BidPrice;
-        var targetDistance = RoundToTick(TargetStdevMultiple * signal.StdevBps / 10000.0 * entryPrice);
         var stopDistance = RoundToTick(StopStdevMultiple * signal.StdevBps / 10000.0 * entryPrice);
+        var stopPrice = isLong ? RoundToTick(entryPrice - stopDistance) : RoundToTick(entryPrice + stopDistance);
 
         var action = isLong ? "BUY" : "SELL";
         var closeAction = isLong ? "SELL" : "BUY";
-        var stopPrice = isLong ? RoundToTick(entryPrice - stopDistance) : RoundToTick(entryPrice + stopDistance);
-        var targetPrice = isLong ? RoundToTick(entryPrice + targetDistance) : RoundToTick(entryPrice - targetDistance);
 
         var parent = new Order
         {
@@ -60,16 +63,6 @@ public class OrderManager
             OrderType = "STP",
             AuxPrice = stopPrice,
             ParentId = parent.OrderId,
-            Transmit = false
-        };
-        var target = new Order
-        {
-            OrderId = _client.GetNextValidId(),
-            Action = closeAction,
-            TotalQuantity = Quantity,
-            OrderType = "LMT",
-            LmtPrice = targetPrice,
-            ParentId = parent.OrderId,
             Transmit = true
         };
 
@@ -77,13 +70,13 @@ public class OrderManager
         {
             ParentOrderId = parent.OrderId,
             StopOrderId = stop.OrderId,
-            TargetOrderId = target.OrderId,
             Symbol = contract.Symbol,
             Direction = isLong ? TradeDirection.Long : TradeDirection.Short,
             Status = TrackedOrderStatus.Submitted,
             EntryLimitPrice = entryPrice,
             StopPrice = stopPrice,
-            TargetPrice = targetPrice,
+            ActivationDistance = RoundToTick(TargetStdevMultiple * TrailActivationPct * signal.StdevBps / 10000.0 * entryPrice),
+            TrailDistance = RoundToTick(stopDistance * TrailDistancePct),
             Quantity = Quantity,
             StdevBps = signal.StdevBps,
             CreatedAt = DateTime.Now
@@ -91,11 +84,79 @@ public class OrderManager
 
         _client.PlaceOrder(contract, parent);
         _client.PlaceOrder(contract, stop);
-        _client.PlaceOrder(contract, target);
         _store.Save(tracked);
 
         _client.NotifySubscriber(
-            $"BRACKET {tracked.Direction} {Quantity} {contract.Symbol} | entry LMT {entryPrice:F2} | stop {stopPrice:F2} | target {targetPrice:F2} | ids {parent.OrderId}/{stop.OrderId}/{target.OrderId}");
+            $"BRACKET {tracked.Direction} {Quantity} {contract.Symbol} | entry LMT {entryPrice:F2} | stop {stopPrice:F2} | ids {parent.OrderId}/{stop.OrderId}");
+    }
+
+    public void OnCandleClosed(Candle candle)
+    {
+        var tracked = _store.Load();
+        if (tracked == null || tracked.Status != TrackedOrderStatus.Filled)
+            return;
+
+        if (tracked.Direction == TradeDirection.Long)
+        {
+            if (candle.High > tracked.BestPrice)
+                tracked.BestPrice = candle.High;
+        }
+        else
+        {
+            if (candle.Low < tracked.BestPrice)
+                tracked.BestPrice = candle.Low;
+        }
+
+        var profitMade = tracked.Direction == TradeDirection.Long
+            ? tracked.BestPrice - tracked.AverageFillPrice
+            : tracked.AverageFillPrice - tracked.BestPrice;
+
+        if (!tracked.TrailingActive && profitMade >= tracked.ActivationDistance)
+        {
+            tracked.TrailingActive = true;
+            _client.NotifySubscriber(
+                $"TRAIL ACTIVATED - best {tracked.BestPrice:F2} | profit {profitMade:F2} >= activation {tracked.ActivationDistance:F2}");
+        }
+
+        if (!tracked.TrailingActive)
+        {
+            _store.Save(tracked);
+            return;
+        }
+
+        var newStop = tracked.Direction == TradeDirection.Long
+            ? RoundToTick(tracked.BestPrice - tracked.TrailDistance)
+            : RoundToTick(tracked.BestPrice + tracked.TrailDistance);
+
+        var improves = tracked.Direction == TradeDirection.Long
+            ? newStop > tracked.StopPrice
+            : newStop < tracked.StopPrice;
+
+        if (!improves)
+        {
+            _store.Save(tracked);
+            return;
+        }
+
+        var previousStop = tracked.StopPrice;
+        tracked.StopPrice = newStop;
+        _store.Save(tracked);
+
+        var modify = new Order
+        {
+            OrderId = tracked.StopOrderId,
+            Action = tracked.Direction == TradeDirection.Long ? "SELL" : "BUY",
+            TotalQuantity = tracked.Quantity,
+            OrderType = "STP",
+            AuxPrice = newStop,
+            ParentId = tracked.ParentOrderId,
+            Tif = "DAY",
+            Transmit = true
+        };
+        _client.PlaceOrder(_contract, modify);
+
+        _client.NotifySubscriber(
+            $"TRAIL STOP {previousStop:F2} -> {newStop:F2} | best {tracked.BestPrice:F2}");
     }
 
     public void OnOrderStatus(OrderStatus status)
@@ -109,11 +170,12 @@ public class OrderManager
         {
             tracked.Status = TrackedOrderStatus.Filled;
             tracked.AverageFillPrice = status.AvgFillPrice;
+            tracked.BestPrice = status.AvgFillPrice;
             tracked.FilledAt = DateTime.Now;
             _store.Save(tracked);
             _client.NotifySubscriber($"ENTRY FILLED - order {status.OrderId} @ {status.AvgFillPrice:F2}");
         }
-        else if ((status.OrderId == tracked.StopOrderId || status.OrderId == tracked.TargetOrderId) &&
+        else if (status.OrderId == tracked.StopOrderId &&
                  status.Status == "Filled")
         {
             tracked.Status = TrackedOrderStatus.Closed;

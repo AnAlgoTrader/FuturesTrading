@@ -11,24 +11,27 @@ ENTRY SIGNAL
   - Positive spike -> go LONG.
   - Negative spike -> go SHORT.
 
-STOP & TARGET (time-scaled)
+STOPS (time-scaled)
 - 1-min return stdev is the base unit.
-- Target distance (points) = 1.5 * stdev_bps * sqrt(hold_bars) * price / 10000.
-- Stop distance (points)  = 2.0 * stdev_bps * sqrt(hold_bars) * price / 10000.
+- Initial stop distance (points) = 2.0 * stdev_bps * sqrt(hold_bars) * price / 10000.
+- Trail activation profit        = 0.75 * stdev_bps * sqrt(hold_bars) * price / 10000
+  (= 50% of the legacy 1.5x target distance, kept as the activation scale).
+- Trail distance (points)        = 1.0 * stdev_bps * sqrt(hold_bars) * price / 10000
+  (= 50% of the initial stop distance).
 
 HOLD & EXIT
 - Hold for up to 50 bars (~50 minutes).
 - Exit conditions checked on every new 1-minute bar:
-  - If price hits target -> full win.
-  - If price hits stop   -> loss.
-  - If 50 bars elapsed   -> exit at market.
+  - If price reverses through the current stop -> exit.
+  - If 50 bars elapsed -> exit at market.
+- No take-profit order (removed Aug 2026): winners run until trailed out or timeout.
 
 TRAILING STOP
 - Track best price reached since entry (highest high for long, lowest low for short).
-- Once profit reaches 50% of the target distance:
-  - Tighten stop to trail at 50% of the original stop distance behind the best price.
-  - Update trail as new highs/lows are made.
-  - If price reverses through trailing stop -> exit (often a small win).
+- Once profit reaches the activation level:
+  - Tighten stop to trail the trail distance behind the best price.
+  - Ratchet-only: stop moves with new highs/lows, never loosens.
+  - If price reverses through trailing stop -> exit (locks in remaining profit).
 
 SESSION BOUNDARY
 - Close any open position at the end of the RTH session.
@@ -46,3 +49,8 @@ RISK
 BACKTEST RESULTS (IBKR 1-min data, Aug 2025 - Aug 2026)
 - Train: $40,544 P&L, 45.3% WR, 10.4 Sharpe, $1,265 max DD, 1,438 trades.
 - Test:  $197,356 P&L, 79.6% WR, 43.3 Sharpe, $215 max DD, 1,905 trades.
+
+TAKE-PROFIT COMPARISON (Aug 2026, same winning config with and without TP order)
+- TP + Trail: Train $40,544 (Sharpe 10.4, DD $1,265); Test $197,356 (Sharpe 43.4, DD $215).
+- Trail only: Train $156,811 (Sharpe 20.6, DD $438); Test $210,003 (Sharpe 45.0, DD $173).
+- Decision: drop the take-profit order; trade with the trailing stop only.
