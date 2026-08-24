@@ -53,6 +53,9 @@
     try {
         var container = document.getElementById('chart');
 
+        var MIN_PRICE_SPAN = 8;   // points; keeps the y-axis from zooming into a few ticks
+        var RIGHT_MARGIN_BARS = 15;
+
         var chart = LightweightCharts.createChart(container, {
             width: container.clientWidth || 800,
             height: container.clientHeight || 600,
@@ -72,7 +75,22 @@
             downColor: '#ef5350',
             borderVisible: false,
             wickUpColor: '#26a69a',
-            wickDownColor: '#ef5350'
+            wickDownColor: '#ef5350',
+            autoscaleInfoProvider: function (original) {
+                var info = original();
+                if (info && info.priceRange) {
+                    var min = info.priceRange.minValue;
+                    var max = info.priceRange.maxValue;
+                    if (max - min < MIN_PRICE_SPAN) {
+                        var mid = (min + max) / 2;
+                        info.priceRange = {
+                            minValue: mid - MIN_PRICE_SPAN / 2,
+                            maxValue: mid + MIN_PRICE_SPAN / 2
+                        };
+                    }
+                }
+                return info;
+            }
         });
 
         var hasData = false;
@@ -80,7 +98,10 @@
             series.update({ time: time, open: open, high: high, low: low, close: close });
             if (!hasData) {
                 hasData = true;
-                chart.timeScale().fitContent();
+                chart.timeScale().setVisibleLogicalRange({
+                    from: -(60 - RIGHT_MARGIN_BARS),
+                    to: RIGHT_MARGIN_BARS
+                });
             }
         };
 
