@@ -68,6 +68,8 @@ internal class Program
             manager.OnOrderStatus(status);
         };
 
+        client.OnErrorMessage += (orderId, errorCode, message) => manager.OnOrderRejected(orderId, errorCode, message);
+
         client.SubscribeToMarketData(1005, contractDetails);
 
         var tcs = new TaskCompletionSource();

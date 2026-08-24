@@ -56,6 +56,7 @@ public class MainWindowViewModel : ViewModelBase
         _client.NotifySubscriber($"Using contract - Exchange:{contractDetails.Contract.Exchange} LastDate:{contractDetails.Contract.LastTradeDate}");
 
         _client.OnOrderStatusUpdate += HandleOrderStatus;
+        _client.OnErrorMessage += HandleOrderError;
 
         _aggregator.OnCandleClosed += candle =>
         {
@@ -89,6 +90,12 @@ public class MainWindowViewModel : ViewModelBase
     {
         _client.NotifySubscriber($"OrderStatus - Id:{status.OrderId} Status:{status.Status} Filled:{status.Filled} Avg:{status.AvgFillPrice:F2}");
         _manager.OnOrderStatus(status);
+        NotifyTradeChanged();
+    }
+
+    private void HandleOrderError(int orderId, int errorCode, string message)
+    {
+        _manager.OnOrderRejected(orderId, errorCode, message);
         NotifyTradeChanged();
     }
 

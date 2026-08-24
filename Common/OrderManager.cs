@@ -75,6 +75,7 @@ public class OrderManager
             OrderType = "STP",
             AuxPrice = stopPrice,
             ParentId = parent.OrderId,
+            Tif = "DAY",
             Transmit = true
         };
 
@@ -237,6 +238,36 @@ public class OrderManager
         else if (status.Status == "Cancelled" && status.OrderId != tracked.ParentOrderId)
         {
             _client.NotifySubscriber($"Order {status.OrderId} cancelled.");
+        }
+    }
+
+    public void OnOrderRejected(int orderId, int errorCode, string message)
+    {
+        var tracked = _store.Load();
+        if (tracked == null)
+            return;
+
+        var belongsToBracket = orderId == tracked.ParentOrderId ||
+                               orderId == tracked.StopOrderId ||
+                               (tracked.ExitOrderId != 0 && orderId == tracked.ExitOrderId);
+        if (!belongsToBracket)
+            return;
+
+        if (tracked.Status == TrackedOrderStatus.Submitted)
+        {
+            _store.Clear();
+            _client.NotifySubscriber(
+                $"BRACKET REJECTED - order {orderId} code {errorCode}: {message} | state cleared, engine resumed.");
+        }
+        else if (tracked.Status == TrackedOrderStatus.Exiting && orderId == tracked.ExitOrderId)
+        {
+            _client.NotifySubscriber(
+                $"EXIT ORDER REJECTED - order {orderId} code {errorCode}: {message}. Position may still be open, verify and flatten manually.");
+        }
+        else if (tracked.Status == TrackedOrderStatus.Filled)
+        {
+            _client.NotifySubscriber(
+                $"ORDER REJECTED while position open - order {orderId} code {errorCode}: {message}. Verify protective stop is working.");
         }
     }
 
