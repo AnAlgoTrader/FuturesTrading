@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Common;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Model;
-using Trader.Models;
 
 namespace Trader;
 
@@ -33,12 +31,7 @@ internal class Program
 
         client.Start("127.0.0.1", 4001, 0);
 
-        var contractDataList = await client.GetContractData("MES", "FUT");
-        var contractDetails = contractDataList
-            .OrderBy(x => x.Contract.LastTradeDate)
-            .FirstOrDefault(x =>
-                DateTime.ParseExact(x.Contract.LastTradeDate, "yyyyMMdd",
-                    System.Globalization.CultureInfo.InvariantCulture) > DateTime.Now);
+        var contractDetails = await FuturesContract.GetFrontMonth(client, "MES");
 
         if (contractDetails == null)
         {

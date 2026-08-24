@@ -1,4 +1,4 @@
-namespace Trader.Models;
+namespace Common;
 
 public class Signal
 {

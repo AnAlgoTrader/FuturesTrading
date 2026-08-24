@@ -1,10 +1,9 @@
 using System;
-using Common;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 
-namespace Trader.Models;
+namespace Common;
 
 public class OrderManager
 {

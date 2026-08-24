@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Common;
 
-namespace Trader.Models;
+namespace Common;
 
 public class SignalDetector
 {

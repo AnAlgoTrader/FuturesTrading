@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace Trader.Models;
+namespace Common;
 
 public class Logger : IDisposable
 {
