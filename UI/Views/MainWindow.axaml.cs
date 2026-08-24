@@ -11,7 +11,7 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         var indexPath = Path.Combine(AppContext.BaseDirectory, "wwwroot", "index.html");
-        this.FindControl<NativeWebView>("Chart").Source = new Uri(indexPath);
+        this.FindControl<NativeWebView>("Chart")!.Source = new Uri(indexPath);
     }
 
     private void WebView_NavigationCompleted(object sender, WebViewNavigationCompletedEventArgs e)
