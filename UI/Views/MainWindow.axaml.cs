@@ -16,6 +16,6 @@ public partial class MainWindow : Window
 
     private void WebView_NavigationCompleted(object sender, WebViewNavigationCompletedEventArgs e)
     {
-        Console.WriteLine($"[WebView] Navigation success: {e.IsSuccess} url: {e.Request}");
+        
     }
 }
