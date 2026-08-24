@@ -27,7 +27,8 @@ public class MainWindowViewModel : ViewModelBase
     {
         _logger = new Logger(Path.Combine(AppContext.BaseDirectory, "ui.log"));
         _store = new OrderStore(Path.Combine(AppContext.BaseDirectory, "order_state.json"));
-        _manager = new OrderManager(_client, _store);
+        var journal = new TradeJournal(Path.Combine(AppContext.BaseDirectory, "trade_journal.csv"));
+        _manager = new OrderManager(_client, _store, journal);
 
         _client.OnNotification += msg =>
         {

@@ -18,14 +18,16 @@ public class OrderManager
 
     private readonly IbClient _client;
     private readonly OrderStore _store;
+    private readonly TradeJournal _journal;
     private Contract _contract;
     private DateTime _previousCandleTimestamp;
     private bool _isNewSession = true;
 
-    public OrderManager(IbClient client, OrderStore store)
+    public OrderManager(IbClient client, OrderStore store, TradeJournal journal = null)
     {
         _client = client;
         _store = store;
+        _journal = journal;
     }
 
     public void OnSignal(Signal signal, Contract contract, PriceUpdate lastPrice)
@@ -220,6 +222,7 @@ public class OrderManager
             tracked.ClosedAt = DateTime.Now;
             _store.Save(tracked);
             _client.NotifySubscriber($"EXIT FILLED - order {status.OrderId} @ {status.AvgFillPrice:F2} | position closed");
+            _journal?.Append(tracked);
             _store.Clear();
         }
         else if (status.OrderId == tracked.ParentOrderId &&
@@ -292,6 +295,7 @@ public class OrderManager
             tracked.ClosedAt = DateTime.Now;
             _store.Save(tracked);
             _client.NotifySubscriber($"EXIT FILLED - order {status.OrderId} @ {status.AvgFillPrice:F2} | position closed");
+            _journal?.Append(tracked);
             _store.Clear();
             return;
         }

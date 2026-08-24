@@ -18,8 +18,13 @@ WORKFLOW RULES (IMPORTANT)
   Console + trader.log (Logger class). Keep it that way, one unified pipe.
 
 CURRENT STATE (as of Aug 2026)
+- Common/ shared project: Candle, CandleAggregator, SignalDetector, Signal, OrderManager,
+  TrackedOrder, OrderStore, Logger, FuturesContract (front-month lookup), TradeJournal.
+  Both Trader and UI reference it. Classic style, nullable disabled.
+- Trader console app and UI Avalonia app run the IDENTICAL engine via Common.
+  DO NOT RUN BOTH AT ONCE - same client id 0 on Gateway 4001, would double-trade.
 - Connects to IB Gateway 127.0.0.1:4001, subscribes contract id 1005, MES FUT
-  (front month by LastTradeDate, looked up via GetContractData).
+  (front month by LastTradeDate, looked up via FuturesContract.GetFrontMonth).
 - Pipeline live:
   OnMarketDataPriceUpdate -> mid price (bid+ask)/2 -> CandleAggregator.OnTick
   -> 1-min candle closed -> SignalDetector.OnCandleClosed -> Signal object.
@@ -46,19 +51,24 @@ CURRENT STATE (as of Aug 2026)
 - One position at a time: new signals ignored while tracked order is Submitted/Filled.
 - Order state persisted to order_state.json (OrderStore, JSON incl. enum as string);
   OnOrderStatus moves Submitted->Filled->Closed/Cancelled and clears the store on exit/cancel.
+- UI app: Avalonia + WebView lightweight-charts, live forming candles per tick,
+  entry arrow + trailing stop line from order_state.json transitions,
+  closed trades appended to trade_journal.csv (TradeJournal: symbol, direction,
+  quantity, entry/exit time+price, bars held, PnL in $ via point value MES=5/ES=50).
 FILES
-- Program.cs            wiring: logger, client, aggregator, detector, store, manager,
-                        contract lookup, market data / order status handlers, Ctrl+C exit.
-- Models/Candle.cs      OHLCV + TickCount, incremental Update(price). double types.
-- Models/CandleAggregator.cs  ticks -> minute candles, fires OnCandleClosed on rollover.
-- Models/SignalDetector.cs    returns Signal or null per closed candle.
-- Models/Signal.cs      signal DTO: direction, return/stdev bps, ratio, price.
-- Models/OrderManager.cs      signal -> bracket (entry + stop); candle-close trailing stop
-                              modifications, max-hold and session-break exits; order status
-                              state machine incl. Exiting race handling.
-- Models/TrackedOrder.cs      persisted position/order state + TradeDirection/Status enums.
-- Models/OrderStore.cs  Load/Save/Clear of TrackedOrder in order_state.json.
-- Models/Logger.cs      timestamped lines to console + trader.log (AutoFlush).
+- Common/Candle.cs           OHLCV + TickCount, incremental Update(price). double types.
+- Common/CandleAggregator.cs ticks -> minute candles; OnCandleClosed on rollover,
+                             OnCandleUpdated every tick.
+- Common/SignalDetector.cs   returns Signal or null per closed candle.
+- Common/Signal.cs           signal DTO: direction, return/stdev bps, ratio, price.
+- Common/OrderManager.cs     signal -> bracket (entry + stop); candle-close trailing stop
+                             modifications, max-hold and session-break exits; order status
+                             state machine incl. Exiting race handling; optional TradeJournal.
+- Common/TrackedOrder.cs     persisted position/order state + TradeDirection/Status enums.
+- Common/OrderStore.cs       Load/Save/Clear of TrackedOrder in order_state.json.
+- Common/TradeJournal.cs     CSV trade log appended when a position closes.
+- Common/FuturesContract.cs  front-month FUT lookup by LastTradeDate.
+- Common/Logger.cs           timestamped lines to console + log file (AutoFlush).
 - STRATEGY.txt          full strategy spec incl. backtest results.
 
 NEXT STEPS
