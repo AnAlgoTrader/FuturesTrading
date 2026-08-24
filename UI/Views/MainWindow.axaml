@@ -13,4 +13,5 @@
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
+    <NativeWebView Source="https://avaloniaui.net/"  NavigationCompleted="WebView_NavigationCompleted" />
 </Window>

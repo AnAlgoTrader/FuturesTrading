@@ -8,4 +8,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
     }
+
+    private void WebView_NavigationCompleted(object sender, WebViewNavigationCompletedEventArgs e)
+    {
+        
+    }
 }
