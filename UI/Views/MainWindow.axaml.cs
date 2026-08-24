@@ -12,6 +12,7 @@ namespace UI.Views;
 public partial class MainWindow : Window
 {
     private readonly NativeWebView _chart;
+    private MainWindowViewModel _viewModel;
     private bool _chartReady;
 
     public MainWindow()
@@ -20,11 +21,17 @@ public partial class MainWindow : Window
 
         var indexPath = Path.Combine(AppContext.BaseDirectory, "wwwroot", "index.html");
         _chart = this.FindControl<NativeWebView>("Chart");
-        _chart.Source = new Uri(indexPath);
         _chart.NavigationCompleted += (_, e) => _chartReady = e.IsSuccess;
+        _chart.Source = new Uri(indexPath);
 
-        if (DataContext is MainWindowViewModel vm)
-            vm.OnCandleClosed += PushCandle;
+        DataContextChanged += (_, _) =>
+        {
+            if (_viewModel != null)
+                _viewModel.OnCandleUpdated -= PushCandle;
+            _viewModel = DataContext as MainWindowViewModel;
+            if (_viewModel != null)
+                _viewModel.OnCandleUpdated += PushCandle;
+        };
     }
 
     private void PushCandle(Candle candle)

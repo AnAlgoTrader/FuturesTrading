@@ -13,11 +13,11 @@ public class MainWindowViewModel : ViewModelBase
     private readonly IbClient _client = new();
     private readonly CandleAggregator _aggregator = new();
 
-    public event Action<Candle> OnCandleClosed;
+    public event Action<Candle> OnCandleUpdated;
 
     public MainWindowViewModel()
     {
-        _aggregator.OnCandleClosed += candle => OnCandleClosed?.Invoke(candle);
+        _aggregator.OnCandleUpdated += candle => OnCandleUpdated?.Invoke(candle);
         _ = InitAndSubscribe();
     }
 
@@ -40,7 +40,6 @@ public class MainWindowViewModel : ViewModelBase
         var update = marketDataUpdate.First();
         if (update.Value.BidPrice <= 0 || update.Value.AskPrice <= 0)
             return;
-        Console.WriteLine($"Bid:{update.Value.BidPrice} Ask:{update.Value.AskPrice}");
         _aggregator.OnTick(DateTime.Now, update.Value);
     }
 }

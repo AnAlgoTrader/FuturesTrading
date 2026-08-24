@@ -8,6 +8,7 @@ public class CandleAggregator
     private Candle _currentCandle;
 
     public event Action<Candle> OnCandleClosed;
+    public event Action<Candle> OnCandleUpdated;
 
     public void OnTick(DateTime timestamp, PriceUpdate price)
     {
@@ -19,6 +20,7 @@ public class CandleAggregator
         if (_currentCandle == null)
         {
             _currentCandle = new Candle(minute, mid);
+            OnCandleUpdated?.Invoke(_currentCandle);
             return;
         }
 
@@ -27,8 +29,10 @@ public class CandleAggregator
             _currentCandle.IsComplete = true;
             OnCandleClosed?.Invoke(_currentCandle);
             _currentCandle = new Candle(minute, mid);
+            OnCandleUpdated?.Invoke(_currentCandle);
             return;
         }
         _currentCandle.Update(mid);
+        OnCandleUpdated?.Invoke(_currentCandle);
     }
 }
