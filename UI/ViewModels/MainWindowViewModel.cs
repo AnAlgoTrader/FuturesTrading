@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Common;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Model;
+using IBApi;
 
 namespace UI.ViewModels;
 
@@ -57,7 +58,12 @@ public class MainWindowViewModel : ViewModelBase
 
         _client.NotifySubscriber($"Using contract - Exchange:{contractDetails.Contract.Exchange} LastDate:{contractDetails.Contract.LastTradeDate}");
 
-        await HistoricalSeeder.SeedFromHistory(_client, contractDetails.Contract, _detector);
+        var bars = await HistoricalSeeder.SeedFromHistory(_client, contractDetails.Contract, _detector);
+        if (bars != null)
+        {
+            foreach (var bar in bars.Where(b => b.Open > 0 && b.Close > 0))
+                OnCandleUpdated?.Invoke(ToCandle(bar));
+        }
 
         _client.OnOrderStatusUpdate += HandleOrderStatus;
         _client.OnErrorMessage += HandleOrderError;
@@ -101,6 +107,13 @@ public class MainWindowViewModel : ViewModelBase
     {
         _manager.OnOrderRejected(orderId, errorCode, message);
         NotifyTradeChanged();
+    }
+
+    private static Candle ToCandle(Bar bar)
+    {
+        var time = DateTimeOffset.FromUnixTimeSeconds(long.Parse(bar.Time)).LocalDateTime;
+        var minute = new DateTime(time.Year, time.Month, time.Day, time.Hour, time.Minute, 0);
+        return new Candle(minute, bar.Open, bar.High, bar.Low, bar.Close);
     }
 
     private void NotifyTradeChanged()

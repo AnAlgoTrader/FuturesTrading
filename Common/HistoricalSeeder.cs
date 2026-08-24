@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
@@ -13,7 +14,7 @@ public static class HistoricalSeeder
     private const string BarSize = "1 min";
     private const int TimeoutMs = 20000;
 
-    public static async Task SeedFromHistory(IbClient client, Contract contract, SignalDetector detector)
+    public static async Task<List<Bar>> SeedFromHistory(IbClient client, Contract contract, SignalDetector detector)
     {
         try
         {
@@ -22,10 +23,12 @@ public static class HistoricalSeeder
             detector.Seed(closes);
             client.NotifySubscriber(
                 $"Warmup seeded - {closes.Count} historical bars | detector {(detector.Ready ? "READY" : "still warming up on live bars")}");
+            return bars;
         }
         catch (Exception e)
         {
             client.NotifySubscriber($"Historical warmup failed - {e.Message} | detector needs 60 live bars before signaling.");
+            return null;
         }
     }
 }

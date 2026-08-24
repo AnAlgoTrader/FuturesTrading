@@ -22,6 +22,15 @@ public class Candle
         TickCount = 1;
     }
 
+    public Candle(DateTime timestamp, double open, double high, double low, double close)
+    {
+        Timestamp = timestamp;
+        Open = open;
+        High = high;
+        Low = low;
+        Close = close;
+    }
+
     public void Update(double price)
     {
         if (price > High) High = price;
