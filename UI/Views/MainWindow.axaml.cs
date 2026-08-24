@@ -27,11 +27,41 @@ public partial class MainWindow : Window
         DataContextChanged += (_, _) =>
         {
             if (_viewModel != null)
+            {
                 _viewModel.OnCandleUpdated -= PushCandle;
+                _viewModel.OnTrackedOrderChanged -= PushTrackedOrder;
+            }
             _viewModel = DataContext as MainWindowViewModel;
             if (_viewModel != null)
+            {
                 _viewModel.OnCandleUpdated += PushCandle;
+                _viewModel.OnTrackedOrderChanged += PushTrackedOrder;
+            }
         };
+    }
+
+    private void PushTrackedOrder(TrackedOrder tracked)
+    {
+        if (!_chartReady)
+            return;
+
+        string script;
+        if (tracked == null || tracked.FilledAt == default ||
+            (tracked.Status != TrackedOrderStatus.Filled && tracked.Status != TrackedOrderStatus.Exiting))
+        {
+            script = "window.updateTrade(null)";
+        }
+        else
+        {
+            var filledMinute = new DateTime(tracked.FilledAt.Year, tracked.FilledAt.Month, tracked.FilledAt.Day,
+                tracked.FilledAt.Hour, tracked.FilledAt.Minute, 0);
+            var time = new DateTimeOffset(filledMinute).ToUnixTimeSeconds();
+            var dir = tracked.Direction == TradeDirection.Long ? "LONG" : "SHORT";
+            var entry = tracked.AverageFillPrice > 0 ? tracked.AverageFillPrice : tracked.EntryLimitPrice;
+            script = $"window.updateTrade({{hasTrade:true,dir:'{dir}',entry:{Price(entry)},entryTime:{time},stop:{Price(tracked.StopPrice)}}})";
+        }
+
+        Dispatcher.UIThread.Post(() => _ = InvokeScript(script));
     }
 
     private void PushCandle(Candle candle)

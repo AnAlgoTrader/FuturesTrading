@@ -94,14 +94,66 @@
         });
 
         var hasData = false;
+        var knownTimes = {};
+        var tradeMarkers = LightweightCharts.createSeriesMarkers(series, []);
+        var tradeLine = null;
+        var pendingMarker = null;
+
+        function removeTradeLine() {
+            if (tradeLine) {
+                series.removePriceLine(tradeLine);
+                tradeLine = null;
+            }
+        }
+
         window.pushCandle = function (time, open, high, low, close) {
             series.update({ time: time, open: open, high: high, low: low, close: close });
+            knownTimes[time] = true;
+            if (pendingMarker && knownTimes[pendingMarker.time]) {
+                tradeMarkers.setMarkers([pendingMarker]);
+                pendingMarker = null;
+            }
             if (!hasData) {
                 hasData = true;
                 chart.timeScale().setVisibleLogicalRange({
                     from: -(60 - RIGHT_MARGIN_BARS),
                     to: RIGHT_MARGIN_BARS
                 });
+            }
+        };
+
+        window.updateTrade = function (s) {
+            if (!s || !s.hasTrade) {
+                tradeMarkers.setMarkers([]);
+                removeTradeLine();
+                return;
+            }
+
+            var marker = {
+                time: s.entryTime,
+                position: s.dir === 'LONG' ? 'belowBar' : 'aboveBar',
+                shape: s.dir === 'LONG' ? 'arrowUp' : 'arrowDown',
+                color: s.dir === 'LONG' ? '#26a69a' : '#ef5350',
+                text: (s.dir === 'LONG' ? 'L ' : 'S ') + s.entry.toFixed(2)
+            };
+            if (knownTimes[s.entryTime]) {
+                pendingMarker = null;
+                tradeMarkers.setMarkers([marker]);
+            } else {
+                pendingMarker = marker;
+            }
+
+            if (!tradeLine) {
+                tradeLine = series.createPriceLine({
+                    price: s.stop,
+                    color: '#f0b90b',
+                    lineWidth: 1,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: 'stop'
+                });
+            } else {
+                tradeLine.applyOptions({ price: s.stop });
             }
         };
 
