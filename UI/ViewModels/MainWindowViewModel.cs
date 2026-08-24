@@ -9,6 +9,8 @@ namespace UI.ViewModels;
 
 public class MainWindowViewModel : ViewModelBase
 {
+    private readonly IbClient _client = new();
+
     public MainWindowViewModel()
     {
         _ = InitAndSubscribe();
@@ -16,17 +18,16 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task InitAndSubscribe()
     {
-        using var client = new IbClient();
-        client.OnNotification += Console.WriteLine;
-        client.OnMarketDataPriceUpdate += HandleMarketUpdate;
-        
-        client.Start("127.0.0.1", 4001, 0);
-        
-        var contractDataList = await client.GetContractData("MES", "FUT");
+        _client.OnNotification += Console.WriteLine;
+        _client.OnMarketDataPriceUpdate += HandleMarketUpdate;
+
+        _client.Start("127.0.0.1", 4001, 0);
+
+        var contractDataList = await _client.GetContractData("MES", "FUT");
         var contractDetails = contractDataList.OrderBy(x => x.Contract.LastTradeDate)
             .FirstOrDefault(x => DateTime.ParseExact(x.Contract.LastTradeDate, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture) > DateTime.Now);
-        
-        client.SubscribeToMarketData(1005, contractDetails);
+
+        _client.SubscribeToMarketData(1005, contractDetails);
     }
 
     private void HandleMarketUpdate(Dictionary<int, PriceUpdate> marketDataUpdate)
