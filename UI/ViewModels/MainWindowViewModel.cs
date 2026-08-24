@@ -57,6 +57,8 @@ public class MainWindowViewModel : ViewModelBase
 
         _client.NotifySubscriber($"Using contract - Exchange:{contractDetails.Contract.Exchange} LastDate:{contractDetails.Contract.LastTradeDate}");
 
+        await HistoricalSeeder.SeedFromHistory(_client, contractDetails.Contract, _detector);
+
         _client.OnOrderStatusUpdate += HandleOrderStatus;
         _client.OnErrorMessage += HandleOrderError;
 

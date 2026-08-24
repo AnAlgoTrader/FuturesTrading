@@ -44,6 +44,8 @@ internal class Program
 
         client.NotifySubscriber($"Using contract - Exchange:{contractDetails.Contract.Exchange} LastDate:{contractDetails.Contract.LastTradeDate}");
 
+        await HistoricalSeeder.SeedFromHistory(client, contractDetails.Contract, detector);
+
         aggregator.OnCandleClosed += candle =>
         {
             client.NotifySubscriber(candle.ToString());

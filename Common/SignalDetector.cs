@@ -18,21 +18,18 @@ public class SignalDetector
         _entryThreshold = entryThreshold;
     }
 
+    public bool Ready => _logReturns.Count >= 60;
+
+    public void Seed(IEnumerable<double> closes)
+    {
+        foreach (var close in closes)
+            TryAddClose(close, out _);
+    }
+
     public Signal OnCandleClosed(Candle candle)
     {
-        if (!_hasPreviousClose)
-        {
-            _previousClose = candle.Close;
-            _hasPreviousClose = true;
+        if (!TryAddClose(candle.Close, out var logReturn))
             return null;
-        }
-
-        var logReturn = Math.Log(candle.Close / _previousClose);
-        _previousClose = candle.Close;
-
-        _logReturns.Add(logReturn);
-        if (_logReturns.Count > _windowSize)
-            _logReturns.RemoveAt(0);
 
         if (_logReturns.Count < 60)
             return null;
@@ -54,5 +51,31 @@ public class SignalDetector
         }
 
         return null;
+    }
+
+    private bool TryAddClose(double close, out double logReturn)
+    {
+        logReturn = 0;
+
+        if (!_hasPreviousClose)
+        {
+            if (close <= 0)
+                return false;
+            _previousClose = close;
+            _hasPreviousClose = true;
+            return false;
+        }
+
+        if (close <= 0)
+            return false;
+
+        logReturn = Math.Log(close / _previousClose);
+        _previousClose = close;
+
+        _logReturns.Add(logReturn);
+        if (_logReturns.Count > _windowSize)
+            _logReturns.RemoveAt(0);
+
+        return true;
     }
 }
