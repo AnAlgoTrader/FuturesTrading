@@ -25,9 +25,11 @@ public class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel()
     {
-        _logger = new Logger(Path.Combine(AppContext.BaseDirectory, "ui.log"));
-        _store = new OrderStore(Path.Combine(AppContext.BaseDirectory, "order_state.json"));
-        var journal = new TradeJournal(Path.Combine(AppContext.BaseDirectory, "trade_journal.csv"));
+        var dataDir = "/home/oce/LocalDB/logs/futures";
+        Directory.CreateDirectory(dataDir);
+        _logger = new Logger(Path.Combine(dataDir, "ui.log"));
+        _store = new OrderStore(Path.Combine(dataDir, "order_state.json"));
+        var journal = new TradeJournal(Path.Combine(dataDir, "trade_journal.csv"));
         _manager = new OrderManager(_client, _store, journal);
 
         _client.OnNotification += msg =>

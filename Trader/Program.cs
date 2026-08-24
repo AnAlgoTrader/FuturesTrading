@@ -14,7 +14,10 @@ internal class Program
 
     private static async Task Main()
     {
-        var logPath = Path.Combine(AppContext.BaseDirectory, "trader.log");
+        var dataDir = "/home/oce/LocalDB/logs/futures";
+        Directory.CreateDirectory(dataDir);
+
+        var logPath = Path.Combine(dataDir, "trader.log");
         using var logger = new Logger(logPath);
 
         using var client = new IbClient();
@@ -26,7 +29,7 @@ internal class Program
 
         var aggregator = new CandleAggregator();
         var detector = new SignalDetector(windowSize: 1000, entryThreshold: 2.0);
-        var store = new OrderStore(Path.Combine(AppContext.BaseDirectory, "order_state.json"));
+        var store = new OrderStore(Path.Combine(dataDir, "order_state.json"));
         var manager = new OrderManager(client, store);
 
         client.Start("127.0.0.1", 4001, 0);
