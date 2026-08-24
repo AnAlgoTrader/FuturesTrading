@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ib.Csharp.Api.Client", "..\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UI", "UI\UI.csproj", "{AFE06CB4-A697-4505-A60F-20EEEB95945E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "Common\Common.csproj", "{655871D8-D830-434D-BA25-6CBA4FABAABF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{AFE06CB4-A697-4505-A60F-20EEEB95945E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AFE06CB4-A697-4505-A60F-20EEEB95945E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AFE06CB4-A697-4505-A60F-20EEEB95945E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{655871D8-D830-434D-BA25-6CBA4FABAABF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{655871D8-D830-434D-BA25-6CBA4FABAABF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{655871D8-D830-434D-BA25-6CBA4FABAABF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{655871D8-D830-434D-BA25-6CBA4FABAABF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
