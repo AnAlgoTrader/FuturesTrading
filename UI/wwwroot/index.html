@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>MES Chart</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #131722;
+            overflow: hidden;
+        }
+
+        #chart {
+            width: 100%;
+            height: 100%;
+        }
+
+        #status {
+            position: fixed;
+            top: 8px;
+            left: 8px;
+            z-index: 10;
+            color: #d1d4dc;
+            font: 14px monospace;
+        }
+    </style>
+</head>
+<body>
+<div id="chart"></div>
+<div id="status">Loading chart...</div>
+<script src="js/lightweight-charts.standalone.production.js"></script>
+<script>
+(function () {
+    var status = document.getElementById('status');
+
+    function fail(message) {
+        status.style.color = '#ef5350';
+        status.textContent = message;
+    }
+
+    window.onerror = function (message, source, line, column) {
+        fail('JS ERROR: ' + message + ' (' + (source || '?') + ':' + line + ':' + column + ')');
+    };
+
+    if (typeof LightweightCharts === 'undefined') {
+        fail('FAILED: lightweight-charts script did not load.');
+        return;
+    }
+
+    try {
+        var container = document.getElementById('chart');
+
+        function generateSampleData() {
+            var bars = [];
+            var price = 6847.25;
+            var seed = 42;
+            function rnd() {
+                seed = (seed * 1103515245 + 12345) % 2147483648;
+                return seed / 2147483648;
+            }
+            var startMinute = Math.floor(Date.now() / 60000) - 800;
+            for (var i = 0; i < 800; i++) {
+                var open = price;
+                var close = +(open + (rnd() - 0.5) * 6).toFixed(2);
+                var high = +(Math.max(open, close) + rnd() * 2).toFixed(2);
+                var low = +(Math.min(open, close) - rnd() * 2).toFixed(2);
+                bars.push({ time: (startMinute + i) * 60, open: open, high: high, low: low, close: close });
+                price = close;
+            }
+            return bars;
+        }
+
+        var chart = LightweightCharts.createChart(container, {
+            width: container.clientWidth || 800,
+            height: container.clientHeight || 600,
+            layout: { background: { color: '#131722' }, textColor: '#d1d4dc' },
+            grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            rightPriceScale: { borderColor: '#2a2e39' },
+            timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false }
+        });
+
+        window.addEventListener('resize', function () {
+            chart.resize(container.clientWidth, container.clientHeight);
+        });
+
+        var series = chart.addSeries(LightweightCharts.CandlestickSeries, {
+            upColor: '#26a69a',
+            downColor: '#ef5350',
+            borderVisible: false,
+            wickUpColor: '#26a69a',
+            wickDownColor: '#ef5350'
+        });
+        series.setData(generateSampleData());
+        chart.timeScale().fitContent();
+
+        status.style.display = 'none';
+    } catch (err) {
+        fail('CHART ERROR: ' + (err && err.message ? err.message : err));
+    }
+})();
+</script>
+</body>
+</html>
