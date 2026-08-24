@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Common;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Model;
 
@@ -10,9 +11,13 @@ namespace UI.ViewModels;
 public class MainWindowViewModel : ViewModelBase
 {
     private readonly IbClient _client = new();
+    private readonly CandleAggregator _aggregator = new();
+
+    public event Action<Candle> OnCandleClosed;
 
     public MainWindowViewModel()
     {
+        _aggregator.OnCandleClosed += candle => OnCandleClosed?.Invoke(candle);
         _ = InitAndSubscribe();
     }
 
@@ -36,5 +41,6 @@ public class MainWindowViewModel : ViewModelBase
         if (update.Value.BidPrice <= 0 || update.Value.AskPrice <= 0)
             return;
         Console.WriteLine($"Bid:{update.Value.BidPrice} Ask:{update.Value.AskPrice}");
+        _aggregator.OnTick(DateTime.Now, update.Value);
     }
 }

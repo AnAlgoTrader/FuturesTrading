@@ -2,8 +2,12 @@
 
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <Nullable>disable</Nullable>
     </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client.csproj" />
+    </ItemGroup>
 
 </Project>

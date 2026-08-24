@@ -1,6 +1,6 @@
 using System;
 
-namespace Trader.Models;
+namespace Common;
 
 public class Candle
 {

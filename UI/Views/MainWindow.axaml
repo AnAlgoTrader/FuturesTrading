@@ -13,5 +13,5 @@
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
-    <NativeWebView x:Name="Chart" NavigationCompleted="WebView_NavigationCompleted"/>
+    <NativeWebView x:Name="Chart"/>
 </Window>

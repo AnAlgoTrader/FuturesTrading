@@ -1,7 +1,7 @@
 using System;
 using Ib.Csharp.Api.Client.Implementation.Model;
 
-namespace Trader.Models;
+namespace Common;
 
 public class CandleAggregator
 {
@@ -12,7 +12,7 @@ public class CandleAggregator
     public void OnTick(DateTime timestamp, PriceUpdate price)
     {
         var mid = (price.BidPrice + price.AskPrice) / 2;
-        
+
         var minute = new DateTime(timestamp.Year, timestamp.Month, timestamp.Day,
             timestamp.Hour, timestamp.Minute, 0);
 
