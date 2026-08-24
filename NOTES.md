@@ -33,13 +33,12 @@ CURRENT STATE (as of Aug 2026)
 - REAL ORDERS ARE PLACED. OrderManager.OnSignal submits a 1-lot bracket per signal:
   parent LMT entry crossing the spread - best ask for LONG, best bid for SHORT
   (Program tracks the latest PriceUpdate and passes it in),
-  child STP stop (2.0*stdev distance), tick-rounded (0.25), DAY TIF.
+  child STP stop (fixed 10-point distance from entry), tick-rounded (0.25), DAY TIF.
   NO take-profit order: trailing stop only. Backtest showed the target was capping
   profits - trail-only nearly quadrupled train P&L with lower drawdown (see STRATEGY.txt).
 - Trailing stop (OrderManager.OnCandleClosed, every closed candle while position Filled):
-  tracks best price since fill; once profit >= ActivationDistance
-  (0.5 * legacy 1.5*stdev target distance), resends the STP with a new AuxPrice trailing
-  TrailDistance (0.5 * initial stop distance) behind best price; ratchet-only, never loosens.
+  tracks best price since fill; once PnL turns positive, resends the STP with a new
+  AuxPrice trailing 5 points behind best price; ratchet-only, never loosens.
   Contract cached on first OnSignal and reused for modifications.
 - Max hold: BarsHeld counted per closed candle after fill; at 50 bars -> timed exit.
 - Session boundary: gap > 60 min between consecutive candles = session break

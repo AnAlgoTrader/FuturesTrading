@@ -27,7 +27,6 @@ public class TrackedOrder
     public TrackedOrderStatus Status { get; set; }
     public double EntryLimitPrice { get; set; }
     public double StopPrice { get; set; }
-    public double ActivationDistance { get; set; }
     public double TrailDistance { get; set; }
     public double BestPrice { get; set; }
     public bool TrailingActive { get; set; }

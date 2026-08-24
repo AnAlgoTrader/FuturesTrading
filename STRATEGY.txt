@@ -11,13 +11,10 @@ ENTRY SIGNAL
   - Positive spike -> go LONG.
   - Negative spike -> go SHORT.
 
-STOPS (time-scaled)
-- 1-min return stdev is the base unit.
-- Initial stop distance (points) = 2.0 * stdev_bps * sqrt(hold_bars) * price / 10000.
-- Trail activation profit        = 0.75 * stdev_bps * sqrt(hold_bars) * price / 10000
-  (= 50% of the legacy 1.5x target distance, kept as the activation scale).
-- Trail distance (points)        = 1.0 * stdev_bps * sqrt(hold_bars) * price / 10000
-  (= 50% of the initial stop distance).
+STOPS
+- Initial stop distance = 10 points from entry (fixed, Aug 2026; replaced the 2*stdev formula).
+- Trail activation      = first positive PnL.
+- Trail distance        = 5 points behind best price (fixed).
 
 HOLD & EXIT
 - Hold for up to 50 bars (~50 minutes).
@@ -33,7 +30,7 @@ HOLD & EXIT
 
 TRAILING STOP
 - Track best price reached since entry (highest high for long, lowest low for short).
-- Once profit reaches the activation level:
+- Once PnL turns positive:
   - Tighten stop to trail the trail distance behind the best price.
   - Ratchet-only: stop moves with new highs/lows, never loosens.
   - If price reverses through trailing stop -> exit (locks in remaining profit).

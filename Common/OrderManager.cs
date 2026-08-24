@@ -9,10 +9,8 @@ public class OrderManager
 {
     private const decimal Quantity = 1m;
     private const double TickSize = 0.25;
-    private const double TargetStdevMultiple = 1.5;
-    private const double StopStdevMultiple = 2.0;
-    private const double TrailActivationPct = 0.5;
-    private const double TrailDistancePct = 0.5;
+    private const double InitialStopPoints = 10.0;
+    private const double TrailDistancePoints = 5.0;
     private const int MaxHoldBars = 50;
     private const double SessionGapMinutes = 60;
 
@@ -51,7 +49,7 @@ public class OrderManager
 
         var isLong = signal.Direction == "LONG";
         var entryPrice = isLong ? lastPrice.AskPrice : lastPrice.BidPrice;
-        var stopDistance = RoundToTick(StopStdevMultiple * signal.StdevBps / 10000.0 * entryPrice);
+        var stopDistance = InitialStopPoints;
         var stopPrice = isLong ? RoundToTick(entryPrice - stopDistance) : RoundToTick(entryPrice + stopDistance);
 
         var action = isLong ? "BUY" : "SELL";
@@ -88,8 +86,7 @@ public class OrderManager
             Status = TrackedOrderStatus.Submitted,
             EntryLimitPrice = entryPrice,
             StopPrice = stopPrice,
-            ActivationDistance = RoundToTick(TargetStdevMultiple * TrailActivationPct * signal.StdevBps / 10000.0 * entryPrice),
-            TrailDistance = RoundToTick(stopDistance * TrailDistancePct),
+            TrailDistance = TrailDistancePoints,
             Quantity = Quantity,
             StdevBps = signal.StdevBps,
             CreatedAt = DateTime.Now
@@ -145,11 +142,11 @@ public class OrderManager
             ? tracked.BestPrice - tracked.AverageFillPrice
             : tracked.AverageFillPrice - tracked.BestPrice;
 
-        if (!tracked.TrailingActive && profitMade >= tracked.ActivationDistance)
+        if (!tracked.TrailingActive && profitMade > 0)
         {
             tracked.TrailingActive = true;
             _client.NotifySubscriber(
-                $"TRAIL ACTIVATED - best {tracked.BestPrice:F2} | profit {profitMade:F2} >= activation {tracked.ActivationDistance:F2}");
+                $"TRAIL ACTIVATED - best {tracked.BestPrice:F2} | profit {profitMade:F2} | trail {tracked.TrailDistance:F2}");
         }
 
         if (!tracked.TrailingActive)
