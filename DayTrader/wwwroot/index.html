@@ -95,8 +95,8 @@
 
         var hasData = false;
 
-        window.pushCandle = function (time, open, high, low, close) {
-            series.update({ time: time, open: open, high: high, low: low, close: close });
+        window.pushCandle = function (time, open, high, low, close, color) {
+            series.update({ time: time, open: open, high: high, low: low, close: close, color: color });
             if (!hasData) {
                 hasData = true;
                 chart.timeScale().setVisibleLogicalRange({

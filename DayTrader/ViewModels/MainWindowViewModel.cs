@@ -13,7 +13,7 @@ public class MainWindowViewModel : ViewModelBase
     private readonly TickBarAggregator _aggregator = new();
     private readonly BetterVolumeClassifier _volumeClassifier = new(lookback: 20);
 
-    public event Action<Bar> OnBarPush;
+    public event Action<Bar, string> OnBarPush;
 
     public MainWindowViewModel()
     {
@@ -49,13 +49,11 @@ public class MainWindowViewModel : ViewModelBase
     private void OnBarClosed(Bar bar)
     {
         var result = _volumeClassifier.Classify(bar);
-        //TODO it should push the candle with the color
-        //OnBarPush?.Invoke(bar);
+        OnBarPush?.Invoke(bar, result.Signal.ToColor());
     }
 
     private void OnBarUpdated(Bar bar)
     {
-        //TODO it should push the candle with the normal color always, at this point there isn't any classification
-        OnBarPush?.Invoke(bar);
+        OnBarPush?.Invoke(bar, VolumeSignal.Normal.ToColor());
     }
 }

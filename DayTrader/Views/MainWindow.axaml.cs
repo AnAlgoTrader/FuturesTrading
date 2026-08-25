@@ -35,13 +35,13 @@ public partial class MainWindow : Window
         };
     }
 
-    private void PushCandle(Bar bar)
+    private void PushCandle(Bar bar, string color)
     {
         if (!_chartReady)
             return;
 
         var script = $"window.pushCandle({bar.ChartTime}, {Price(bar.Open)}, {Price(bar.High)}, " +
-                     $"{Price(bar.Low)}, {Price(bar.Close)})";
+                     $"{Price(bar.Low)}, {Price(bar.Close)}, '{color}')";
         Dispatcher.UIThread.Post(() => _ = InvokeScript(script));
     }
 

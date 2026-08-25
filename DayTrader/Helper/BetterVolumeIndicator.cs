@@ -18,12 +18,19 @@ public static class VolumeSignalExtensions
 {
     private static readonly Dictionary<VolumeSignal, string> Colors = new()
     {
+        // gray — unremarkable bar
         [VolumeSignal.Normal] = "#888888",
+        // red — high vol, widespread, closed up
         [VolumeSignal.ClimaxUp] = "#e74c3c",
+        // white — high vol, widespread, closed down
         [VolumeSignal.ClimaxDown] = "#ecf0f1",
+        // green — high vol, narrow spread (indecision)
         [VolumeSignal.Churn] = "#2ecc71",
+        // yellow — lowest vol in window (apathy)
         [VolumeSignal.LowVolume] = "#f1c40f",
+        // purple — high vol, strong delta, price pinned
         [VolumeSignal.Absorption] = "#9b59b6",
+        // blue — N bars in a row leaning one way
         [VolumeSignal.StackedImbalance] = "#3498db"
     };
 
