@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using Common;
 
 namespace DayTrader.Helper;
 
@@ -45,7 +47,7 @@ public class ClassificationResult
     public VolumeSignal Signal { get; set; }
     public Bar Bar { get; set; }
     public decimal CumulativeDelta { get; set; }
-    public bool DeltaConfirmed { get; set; } // true if price move and delta agree
+    public bool DeltaConfirmed { get; set; }
 }
 
 /// <summary>
@@ -56,6 +58,7 @@ public class ClassificationResult
 /// </summary>
 public class BetterVolumeClassifier
 {
+    private readonly Logger _logger;
     private readonly int _lookback;
     private readonly double _churnSpreadMultiplier;
     private readonly double _absorptionDeltaRatioThreshold;
@@ -69,6 +72,7 @@ public class BetterVolumeClassifier
     private int _consecutiveSellImbalance;
 
     public BetterVolumeClassifier(
+        Logger logger,
         int lookback = 8,
         double churnSpreadMultiplier = 1.5,
         double absorptionDeltaRatioThreshold = 0.6,
@@ -76,6 +80,7 @@ public class BetterVolumeClassifier
         int stackedImbalanceCount = 3,
         double stackedImbalanceDeltaRatioThreshold = 0.5)
     {
+        _logger = logger;
         _lookback = lookback;
         _churnSpreadMultiplier = churnSpreadMultiplier;
         _absorptionDeltaRatioThreshold = absorptionDeltaRatioThreshold;
@@ -103,7 +108,8 @@ public class BetterVolumeClassifier
         if (_window.Count < _lookback)
         {
             result.Signal = VolumeSignal.Normal;
-            return result; // not enough history yet
+            _logger.WriteLine($"[CLASSIFY] Warming up: window={_window.Count}/{_lookback}");
+            return result;
         }
 
         var volumes = _window.Select(b => b.Volume).ToList();
@@ -120,8 +126,10 @@ public class BetterVolumeClassifier
         bool isVeryNarrowSpread = bar.Spread <= avgSpread * _absorptionSpreadMaxMultiplier;
         bool isStrongDelta = System.Math.Abs(bar.DeltaRatio) >= _absorptionDeltaRatioThreshold;
 
-        // Absorption checked first -- most information-dense signal,
-        // would otherwise get masked by the churn check below.
+        _logger.WriteLine($"[CLASSIFY] MaxVol:{maxVol} MinVol:{minVol} AvgSpread:{avgSpread:F4} | " +
+                          $"HiVol:{isHighestVolume} LoVol:{isLowestVolume} Wide:{isWideSpread} Narrow:{isNarrowSpread} VeryNarrow:{isVeryNarrowSpread} StrongDelta:{isStrongDelta} " +
+                          $"BuyStreak:{_consecutiveBuyImbalance} SellStreak:{_consecutiveSellImbalance}");
+
         if (isHighestVolume && isStrongDelta && isVeryNarrowSpread)
         {
             result.Signal = VolumeSignal.Absorption;
