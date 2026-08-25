@@ -21,7 +21,7 @@ public partial class MainWindow : Window
 
         var indexPath = Path.Combine(AppContext.BaseDirectory, "wwwroot", "index.html");
         _chart = this.FindControl<NativeWebView>("Chart");
-        _chart.NavigationCompleted += (_, e) => _chartReady = e.IsSuccess;
+        _chart!.NavigationCompleted += (_, e) => _chartReady = e.IsSuccess;
         _chart.Source = new Uri(indexPath);
 
         DataContextChanged += (_, _) =>
