@@ -23,7 +23,7 @@ public class MainWindowViewModel : ViewModelBase
         var dataDir = "/home/oce/LocalDB/logs/futures";
         Directory.CreateDirectory(dataDir);
         _logger = new Logger(Path.Combine(dataDir, "daytrader.log"));
-        _volumeClassifier = new BetterVolumeClassifier(_logger, lookback: 5);
+        _volumeClassifier = new BetterVolumeClassifier(_logger, lookback: 20);
 
         _ = InitAndSubscribe();
     }
