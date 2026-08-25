@@ -201,6 +201,45 @@ public class BetterVolumeClassifier
             return result;
         }
 
+        // Percentile fallback: if no absolute threshold fired, check relative position
+        var sortedVol = volumes.OrderBy(v => v).ToList();
+        int p80Idx = (int)(sortedVol.Count * 0.8);
+        int p20Idx = (int)(sortedVol.Count * 0.2);
+        bool isTop20Volume = bar.Volume >= sortedVol[p80Idx];
+        bool isBottom20Volume = bar.Volume <= sortedVol[p20Idx];
+
+        if (isTop20Volume && isStrongDelta && isVeryNarrowSpread)
+        {
+            result.Signal = VolumeSignal.Absorption;
+            result.DeltaConfirmed = true;
+            _logger.WriteLine($"[CLASSIFY] Percentile Absorption hit");
+            return result;
+        }
+
+        if (isTop20Volume && isWideSpread)
+        {
+            bool priceUp = bar.Close > bar.Open;
+            bool deltaAgrees = priceUp ? bar.Delta > 0 : bar.Delta < 0;
+            result.Signal = priceUp ? VolumeSignal.ClimaxUp : VolumeSignal.ClimaxDown;
+            result.DeltaConfirmed = deltaAgrees;
+            _logger.WriteLine($"[CLASSIFY] Percentile Climax hit");
+            return result;
+        }
+
+        if (isTop20Volume && isNarrowSpread)
+        {
+            result.Signal = VolumeSignal.Churn;
+            _logger.WriteLine($"[CLASSIFY] Percentile Churn hit");
+            return result;
+        }
+
+        if (isBottom20Volume)
+        {
+            result.Signal = VolumeSignal.LowVolume;
+            _logger.WriteLine($"[CLASSIFY] Percentile LowVolume hit");
+            return result;
+        }
+
         result.Signal = VolumeSignal.Normal;
         return result;
     }
