@@ -40,6 +40,36 @@ public static class VolumeSignalExtensions
     {
         return Colors.GetValueOrDefault(signal, "transparent");
     }
+
+    public static string GetName(this VolumeSignal signal)
+    {
+        return signal switch
+        {
+            VolumeSignal.Normal => "Normal",
+            VolumeSignal.ClimaxUp => "Climax Up",
+            VolumeSignal.ClimaxDown => "Climax Down",
+            VolumeSignal.Churn => "Churn",
+            VolumeSignal.LowVolume => "Low Volume",
+            VolumeSignal.Absorption => "Absorption",
+            VolumeSignal.StackedImbalance => "Stacked Imbalance",
+            _ => "Unknown"
+        };
+    }
+
+    public static string GetDescription(this VolumeSignal signal)
+    {
+        return signal switch
+        {
+            VolumeSignal.Normal => "Unremarkable bar",
+            VolumeSignal.ClimaxUp => "High volume, wide spread, closed up — exhaustion buying",
+            VolumeSignal.ClimaxDown => "High volume, wide spread, closed down — exhaustion selling",
+            VolumeSignal.Churn => "High volume, narrow spread — indecision, accumulation/distribution",
+            VolumeSignal.LowVolume => "Lowest volume in window — apathy, volatility expansion ahead",
+            VolumeSignal.Absorption => "High volume, strong delta, price pinned — one side absorbing the other",
+            VolumeSignal.StackedImbalance => "N consecutive bars leaning one way — sustained directional pressure",
+            _ => ""
+        };
+    }
 }
 
 public class ClassificationResult
@@ -48,6 +78,8 @@ public class ClassificationResult
     public Bar Bar { get; set; }
     public decimal CumulativeDelta { get; set; }
     public bool DeltaConfirmed { get; set; }
+    public int BuyStreak { get; set; }
+    public int SellStreak { get; set; }
 }
 
 /// <summary>
@@ -102,7 +134,9 @@ public class BetterVolumeClassifier
         var result = new ClassificationResult
         {
             Bar = bar,
-            CumulativeDelta = _cumulativeDelta
+            CumulativeDelta = _cumulativeDelta,
+            BuyStreak = _consecutiveBuyImbalance,
+            SellStreak = _consecutiveSellImbalance
         };
 
         if (_window.Count < _lookback)

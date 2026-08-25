@@ -8,16 +8,35 @@
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="DayTrader"
-        WindowState="Maximized">
+        WindowState="Maximized"
+        Background="#131722">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="5*"></RowDefinition>
-            <RowDefinition Height="95*"></RowDefinition>
+            <RowDefinition Height="5*"/>
+            <RowDefinition Height="95*"/>
         </Grid.RowDefinitions>
+        <Grid Grid.Row="0" ColumnDefinitions="*,*">
+            <Border Grid.Column="0" BorderBrush="#2a2e39" BorderThickness="0,0,1,0" Padding="10,6">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Border Width="12" Height="12" CornerRadius="6" VerticalAlignment="Center"
+                            Background="{Binding SignalColor}"/>
+                    <TextBlock Text="{Binding SignalName}" Foreground="#d1d4dc" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding SignalDescription}" Foreground="#787b86" FontSize="12" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Padding="10,6">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock Text="{Binding DeltaValue}" Foreground="#d1d4dc" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding DeltaRatioDisplay}" Foreground="#d1d4dc" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding DeltaStatus}" Foreground="{Binding DeltaStatusColor}" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding StreakInfo}" Foreground="#787b86" FontSize="12" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+        </Grid>
         <NativeWebView Grid.Row="1" x:Name="Chart"/>
     </Grid>
 </Window>
