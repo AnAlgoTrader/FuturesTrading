@@ -13,9 +13,11 @@ public class MainWindowViewModel : ViewModelBase
     private readonly TickBarAggregator _aggregator = new();
     private readonly BetterVolumeClassifier _volumeClassifier = new(lookback: 20);
 
+    public event Action<Bar> OnBarPush;
+
     public MainWindowViewModel()
     {
-        //_ = InitAndSubscribe();
+        _ = InitAndSubscribe();
     }
 
     private async Task InitAndSubscribe()
@@ -51,6 +53,7 @@ public class MainWindowViewModel : ViewModelBase
 
     private void OnBarUpdated(Bar bar)
     {
+        OnBarPush?.Invoke(bar);
         Console.WriteLine($"Time:{bar.StartTime} Open:{bar.Open}");
     }
 }
