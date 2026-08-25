@@ -49,10 +49,13 @@ public class MainWindowViewModel : ViewModelBase
     private void OnBarClosed(Bar bar)
     {
         var result = _volumeClassifier.Classify(bar);
+        //TODO it should push the candle with the color
+        //OnBarPush?.Invoke(bar);
     }
 
     private void OnBarUpdated(Bar bar)
     {
+        //TODO it should push the candle with the normal color always, at this point there isn't any classification
         OnBarPush?.Invoke(bar);
     }
 }

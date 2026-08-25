@@ -10,8 +10,27 @@ public enum VolumeSignal
     ClimaxDown,
     Churn,
     LowVolume,
-    Absorption, // high volume, strong one-sided delta, price barely moves
-    StackedImbalance // N consecutive bars with same-direction delta imbalance
+    Absorption,
+    StackedImbalance
+}
+
+public static class VolumeSignalExtensions
+{
+    private static readonly Dictionary<VolumeSignal, string> Colors = new()
+    {
+        [VolumeSignal.Normal] = "#888888",
+        [VolumeSignal.ClimaxUp] = "#e74c3c",
+        [VolumeSignal.ClimaxDown] = "#ecf0f1",
+        [VolumeSignal.Churn] = "#2ecc71",
+        [VolumeSignal.LowVolume] = "#f1c40f",
+        [VolumeSignal.Absorption] = "#9b59b6",
+        [VolumeSignal.StackedImbalance] = "#3498db"
+    };
+
+    public static string ToColor(this VolumeSignal signal)
+    {
+        return Colors.GetValueOrDefault(signal, "transparent");
+    }
 }
 
 public class ClassificationResult
