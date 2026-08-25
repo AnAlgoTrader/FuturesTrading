@@ -27,7 +27,7 @@ public class Bar
 
     public double Spread => High - Low;
     public decimal Delta => BuyVolume - SellVolume;
-    public decimal DeltaRatio => Volume == 0 ? 0 : Delta / Volume;
+    public double DeltaRatio => Volume == 0 ? 0 : (double)Delta / (double)Volume;
 
     public void Apply(ClassifiedTrade trade)
     {
