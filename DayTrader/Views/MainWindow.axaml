@@ -13,5 +13,6 @@
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
+    <NativeWebView x:Name="Chart"/>
 
 </Window>
