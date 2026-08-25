@@ -54,6 +54,5 @@ public class MainWindowViewModel : ViewModelBase
     private void OnBarUpdated(Bar bar)
     {
         OnBarPush?.Invoke(bar);
-        Console.WriteLine($"Time:{bar.StartTime} Open:{bar.Open}");
     }
 }
