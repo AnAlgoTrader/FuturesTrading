@@ -59,13 +59,13 @@ public static class VolumeSignalExtensions
     {
         return signal switch
         {
-            VolumeSignal.Normal => "Unremarkable bar",
-            VolumeSignal.ClimaxUp => "High volume, wide spread, closed up — exhaustion buying",
-            VolumeSignal.ClimaxDown => "High volume, wide spread, closed down — exhaustion selling",
-            VolumeSignal.Churn => "High volume, narrow spread — indecision, accumulation/distribution",
-            VolumeSignal.LowVolume => "Lowest volume in window — apathy, volatility expansion ahead",
-            VolumeSignal.Absorption => "High volume, strong delta, price pinned — one side absorbing the other",
-            VolumeSignal.StackedImbalance => "N consecutive bars leaning one way — sustained directional pressure",
+            VolumeSignal.Normal => "Volume and spread are within normal ranges — no anomaly detected",
+            VolumeSignal.ClimaxUp => "High volume with wide upward spread — indicates aggressive buying that may signal a buying climax or blow-off top",
+            VolumeSignal.ClimaxDown => "High volume with wide downward spread — indicates panic selling that may signal a selling climax or capitulation low",
+            VolumeSignal.Churn => "High volume with narrow spread — indicates heavy turnover with minimal price progress, signaling accumulation or distribution",
+            VolumeSignal.LowVolume => "Lowest volume in lookback window — indicates low market participation, often preceding a breakout or volatility expansion",
+            VolumeSignal.Absorption => "High volume with strong delta and narrow spread — indicates passive limit orders are absorbing aggressive market orders",
+            VolumeSignal.StackedImbalance => "Multiple consecutive bars with one-sided delta — indicates sustained directional order flow pressure",
             _ => ""
         };
     }
@@ -82,7 +82,23 @@ public class ClassificationResult
 
     public string SignalColor => Signal.ToColor();
     public string SignalName => Signal.GetName();
-    public string SignalDescription => Signal.GetDescription();
+    public string SignalDescription
+    {
+        get
+        {
+            if (Signal == VolumeSignal.StackedImbalance)
+            {
+                int count = Math.Max(BuyStreak, SellStreak);
+                if (count > 0)
+                {
+                    string side = BuyStreak > SellStreak ? "buying" : "selling";
+                    return $"{count} consecutive bars with heavy {side} imbalance — indicates sustained directional order flow pressure";
+                }
+            }
+
+            return Signal.GetDescription();
+        }
+    }
     public string DeltaDisplay => $"Delta: {Bar?.Delta ?? 0}";
     public string DeltaRatioDisplay => $"Ratio: {Bar?.DeltaRatio ?? 0:F4}";
     public string DeltaStatus => DeltaConfirmed switch
