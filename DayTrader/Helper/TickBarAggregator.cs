@@ -91,6 +91,11 @@ public class TickBarAggregator
         _minUpdateInterval = minUpdateInterval;
     }
 
+    public void SetLastChartTime(long chartTime)
+    {
+        _lastChartTime = chartTime;
+    }
+
     /// <summary>Wire this to classifier.OnTradeClassified.</summary>
     public void OnTrade(ClassifiedTrade trade)
     {

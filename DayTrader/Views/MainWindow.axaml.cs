@@ -12,6 +12,7 @@ namespace DayTrader.Views;
 public partial class MainWindow : Window
 {
     private readonly NativeWebView _chart;
+    private readonly System.Collections.Generic.List<(Bar Bar, string Color)> _pendingCandles = new();
     private MainWindowViewModel _viewModel;
     private bool _chartReady;
 
@@ -21,7 +22,14 @@ public partial class MainWindow : Window
 
         var indexPath = Path.Combine(AppContext.BaseDirectory, "wwwroot", "index.html");
         _chart = this.FindControl<NativeWebView>("Chart");
-        _chart!.NavigationCompleted += (_, e) => _chartReady = e.IsSuccess;
+        _chart!.NavigationCompleted += (_, e) =>
+        {
+            _chartReady = e.IsSuccess;
+            if (_chartReady)
+            {
+                FlushPendingCandles();
+            }
+        };
         _chart.Source = new Uri(indexPath);
 
         DataContextChanged += (_, _) =>
@@ -38,11 +46,32 @@ public partial class MainWindow : Window
     private void PushCandle(Bar bar, string color)
     {
         if (!_chartReady)
+        {
+            lock (_pendingCandles)
+            {
+                _pendingCandles.Add((bar, color));
+            }
             return;
+        }
 
         var script = $"window.pushCandle({bar.ChartTime}, {Price(bar.Open)}, {Price(bar.High)}, " +
                      $"{Price(bar.Low)}, {Price(bar.Close)}, '{color}')";
         Dispatcher.UIThread.Post(() => _ = InvokeScript(script));
+    }
+
+    private void FlushPendingCandles()
+    {
+        System.Collections.Generic.List<(Bar Bar, string Color)> candles;
+        lock (_pendingCandles)
+        {
+            candles = new System.Collections.Generic.List<(Bar Bar, string Color)>(_pendingCandles);
+            _pendingCandles.Clear();
+        }
+
+        foreach (var (bar, color) in candles)
+        {
+            PushCandle(bar, color);
+        }
     }
 
     private Task<string> InvokeScript(string script)

@@ -61,8 +61,32 @@ public class MainWindowViewModel : ViewModelBase
         var futuresContract = await ContractHelper.GetFrontMonth(_client, "NQ");
         _logger.WriteLine($"Futures contract  Symbol:{futuresContract.Contract.Symbol} Exchange:{futuresContract.Contract.Exchange} LastDate:{futuresContract.Contract.LastTradeDate}");
 
-        var historicalData = await _client.GetHistoricalData(1104, futuresContract!.Contract, $"1 {nameof(Duration.D)}", $"1 {nameof(BarSize.secs)}", "TRADES", 10000);
-        
+        try
+        {
+            var historicalData = await _client.GetHistoricalData(1104, futuresContract!.Contract, $"1 {nameof(Duration.D)}", $"1 {nameof(BarSize.secs)}", "TRADES", 15000);
+            if (historicalData is { Count: > 0 })
+            {
+                var historicalBars = HistoricalSeeder.BuildTickBars(historicalData, ticksPerBar: 1000);
+                _logger.WriteLine($"[SEED] Received {historicalData.Count} 1-sec bars => built {historicalBars.Count} 1000-tick candles.");
+
+                foreach (var histBar in historicalBars)
+                {
+                    var result = _volumeClassifier.Classify(histBar);
+                    OnBarPush?.Invoke(histBar, result.Signal.ToColor());
+                    Classification = result;
+                }
+
+                if (historicalBars.Count > 0)
+                {
+                    _aggregator.SetLastChartTime(historicalBars[^1].ChartTime);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.WriteLine($"[SEED] Historical data warmup failed: {ex.Message}");
+        }
+
         _client.SubscribeToPriceTickByTick(1105, futuresContract.Contract);
         _client.SubscribeToTradesTickByTick(1106, futuresContract.Contract);
     }
