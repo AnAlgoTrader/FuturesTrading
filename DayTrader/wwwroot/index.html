@@ -16,6 +16,7 @@
         #chart {
             width: 100%;
             height: 100%;
+            position: relative;
         }
 
         #status {
@@ -26,10 +27,27 @@
             color: #d1d4dc;
             font: 14px monospace;
         }
+
+        #tooltip {
+            position: absolute;
+            display: none;
+            padding: 8px 12px;
+            box-sizing: border-box;
+            font-size: 12px;
+            z-index: 1000;
+            pointer-events: none;
+            border-radius: 4px;
+            background: #1e222d;
+            border: 1px solid #2a2e39;
+            font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif;
+            color: #d1d4dc;
+        }
     </style>
 </head>
 <body>
-<div id="chart"></div>
+<div id="chart">
+    <div id="tooltip">Dummy tooltip</div>
+</div>
 <div id="status">Loading chart...</div>
 <script src="js/lightweight-charts.standalone.production.js"></script>
 <script>
@@ -52,6 +70,7 @@
 
     try {
         var container = document.getElementById('chart');
+        var toolTip = document.getElementById('tooltip');
 
         var MIN_PRICE_SPAN = 8;
         var RIGHT_MARGIN_BARS = 15;
@@ -61,7 +80,11 @@
             height: container.clientHeight || 600,
             layout: { background: { color: '#131722' }, textColor: '#d1d4dc' },
             grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } },
-            crosshair: { mode: LightweightCharts.CrosshairMode.Hidden },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+                vertLine: { visible: false, labelVisible: false },
+                horzLine: { visible: false, labelVisible: false }
+            },
             rightPriceScale: { borderColor: '#2a2e39' },
             timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false }
         });
@@ -105,6 +128,25 @@
                 });
             }
         };
+
+        chart.subscribeCrosshairMove(function (param) {
+            if (!param || param.point === undefined || !param.time ||
+                param.point.x < 0 || param.point.x > container.clientWidth ||
+                param.point.y < 0 || param.point.y > container.clientHeight) {
+                toolTip.style.display = 'none';
+                return;
+            }
+
+            var data = param.seriesData.get(series);
+            if (!data) {
+                toolTip.style.display = 'none';
+                return;
+            }
+
+            toolTip.style.display = 'block';
+            toolTip.style.left = param.point.x + 'px';
+            toolTip.style.top = param.point.y + 'px';
+        });
 
         status.style.display = 'none';
     } catch (err) {
