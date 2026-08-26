@@ -74,31 +74,12 @@ public static class VolumeSignalExtensions
 public class ClassificationResult
 {
     public VolumeSignal Signal { get; set; } = VolumeSignal.Normal;
-    public Bar Bar { get; set; }
+    public Bar Bar { get; init; }
     public decimal CumulativeDelta { get; set; }
     public bool? DeltaConfirmed { get; set; }
-    public int BuyStreak { get; set; }
-    public int SellStreak { get; set; }
-
-    public string SignalColor => Signal.ToColor();
-    public string SignalName => Signal.GetName();
-    public string SignalDescription
-    {
-        get
-        {
-            if (Signal == VolumeSignal.StackedImbalance)
-            {
-                int count = Math.Max(BuyStreak, SellStreak);
-                if (count > 0)
-                {
-                    string side = BuyStreak > SellStreak ? "buying" : "selling";
-                    return $"{count} consecutive bars with heavy {side} imbalance — indicates sustained directional order flow pressure";
-                }
-            }
-
-            return Signal.GetDescription();
-        }
-    }
+    public int BuyStreak { get; init; }
+    public int SellStreak { get; init; }
+    
     public string DeltaDisplay => $"Delta: {Bar?.Delta ?? 0}";
     public string DeltaRatioDisplay => $"Ratio: {Bar?.DeltaRatio ?? 0:F4}";
     public string DeltaStatus => DeltaConfirmed switch
@@ -136,7 +117,7 @@ public class ClassificationResult
 public class BetterVolumeClassifier
 {
     private readonly Logger _logger;
-    private readonly int _lookback;
+    private readonly int _lookBack;
     private readonly double _churnSpreadMultiplier;
     private readonly double _absorptionDeltaRatioThreshold;
     private readonly double _absorptionSpreadMaxMultiplier;
@@ -151,7 +132,7 @@ public class BetterVolumeClassifier
 
     public BetterVolumeClassifier(
         Logger logger,
-        int lookback = 8,
+        int lookBack = 8,
         double churnSpreadMultiplier = 1.5,
         double absorptionDeltaRatioThreshold = 0.6,
         double absorptionSpreadMaxMultiplier = 0.5,
@@ -159,7 +140,7 @@ public class BetterVolumeClassifier
         double stackedImbalanceDeltaRatioThreshold = 0.5)
     {
         _logger = logger;
-        _lookback = lookback;
+        _lookBack = lookBack;
         _churnSpreadMultiplier = churnSpreadMultiplier;
         _absorptionDeltaRatioThreshold = absorptionDeltaRatioThreshold;
         _absorptionSpreadMaxMultiplier = absorptionSpreadMaxMultiplier;
@@ -192,7 +173,7 @@ public class BetterVolumeClassifier
         TrackImbalanceStreak(bar);
 
         _window.Enqueue(bar);
-        if (_window.Count > _lookback)
+        if (_window.Count > _lookBack)
             _window.Dequeue();
 
         var result = new ClassificationResult
@@ -203,10 +184,10 @@ public class BetterVolumeClassifier
             SellStreak = _consecutiveSellImbalance
         };
 
-        if (_window.Count < _lookback)
+        if (_window.Count < _lookBack)
         {
             result.Signal = VolumeSignal.Normal;
-            _logger.WriteLine($"[CLASSIFY] Warming up: window={_window.Count}/{_lookback}");
+            _logger.WriteLine($"[CLASSIFY] Warming up: window={_window.Count}/{_lookBack}");
             return result;
         }
 
@@ -222,7 +203,7 @@ public class BetterVolumeClassifier
         bool isWideSpread = bar.Spread >= avgSpread * _churnSpreadMultiplier;
         bool isNarrowSpread = bar.Spread < avgSpread;
         bool isVeryNarrowSpread = bar.Spread <= avgSpread * _absorptionSpreadMaxMultiplier;
-        bool isStrongDelta = System.Math.Abs(bar.DeltaRatio) >= _absorptionDeltaRatioThreshold;
+        bool isStrongDelta = Math.Abs(bar.DeltaRatio) >= _absorptionDeltaRatioThreshold;
 
         _logger.WriteLine($"[CLASSIFY] MaxVol:{maxVol} MinVol:{minVol} AvgSpread:{avgSpread:F4} | " +
                           $"HiVol:{isHighestVolume} LoVol:{isLowestVolume} Wide:{isWideSpread} Narrow:{isNarrowSpread} VeryNarrow:{isVeryNarrowSpread} StrongDelta:{isStrongDelta} " +
