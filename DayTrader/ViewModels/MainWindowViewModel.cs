@@ -41,29 +41,26 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task InitAndSubscribe()
     {
-        _classifier.OnTradeClassified += _aggregator.OnTrade;
-        _aggregator.OnBarUpdated += OnBarUpdated;
-        _aggregator.OnBarClosed += OnBarClosed;
         _client.OnNotification += msg => _logger.WriteLine($"[IB] {msg}");
-        _client.OnMarketDataPriceTickByTickUpdate += priceUpdate =>
-        {
-            _classifier.OnQuote(priceUpdate.Time, priceUpdate.Bid, priceUpdate.Ask);
-            _classifier.Pump();
-        };
-        _client.OnMarketDataTradeTickByTickUpdate += tradeUpdate =>
-        {
-            if (tradeUpdate.TickAttribLast.PastLimit) return;
-            _classifier.OnTrade(tradeUpdate.Time, tradeUpdate.Price, tradeUpdate.Size);
-            _classifier.Pump();
-        };
         _client.Start("127.0.0.1", 4001, 0);
 
         var futuresContract = await ContractHelper.GetFrontMonth(_client, "NQ");
         _logger.WriteLine($"Futures contract  Symbol:{futuresContract.Contract.Symbol} Exchange:{futuresContract.Contract.Exchange} LastDate:{futuresContract.Contract.LastTradeDate}");
 
+        // 1. Fetch historical data and wait for it to complete
         try
         {
-            var historicalData = await _client.GetHistoricalData(1104, futuresContract!.Contract, $"1 {nameof(Duration.D)}", $"1 {nameof(BarSize.secs)}", "TRADES", 15000);
+            _logger.WriteLine("[SEED] Requesting historical data...");
+            // IB supports up to 1800 S for 1-sec bars. useRth: false ensures non-RTH futures data is included.
+            var historicalData = await _client.GetHistoricalData(
+                1104,
+                futuresContract.Contract,
+                $"1 {nameof(Duration.D)}",
+                $"5 {nameof(BarSize.secs)}",
+                "TRADES",
+                20000,
+                useRth: false);
+
             if (historicalData is { Count: > 0 })
             {
                 var historicalBars = HistoricalSeeder.BuildTickBars(historicalData, ticksPerBar: 1000);
@@ -81,12 +78,34 @@ public class MainWindowViewModel : ViewModelBase
                     _aggregator.SetLastChartTime(historicalBars[^1].ChartTime);
                 }
             }
+            else
+            {
+                _logger.WriteLine("[SEED] No historical bars returned.");
+            }
         }
         catch (Exception ex)
         {
             _logger.WriteLine($"[SEED] Historical data warmup failed: {ex.Message}");
         }
 
+        // 2. Wire up live stream handlers after historical data has finished processing
+        _classifier.OnTradeClassified += _aggregator.OnTrade;
+        _aggregator.OnBarUpdated += OnBarUpdated;
+        _aggregator.OnBarClosed += OnBarClosed;
+        _client.OnMarketDataPriceTickByTickUpdate += priceUpdate =>
+        {
+            _classifier.OnQuote(priceUpdate.Time, priceUpdate.Bid, priceUpdate.Ask);
+            _classifier.Pump();
+        };
+        _client.OnMarketDataTradeTickByTickUpdate += tradeUpdate =>
+        {
+            if (tradeUpdate.TickAttribLast.PastLimit) return;
+            _classifier.OnTrade(tradeUpdate.Time, tradeUpdate.Price, tradeUpdate.Size);
+            _classifier.Pump();
+        };
+
+        // 3. Subscribe to live tick-by-tick market data
+        _logger.WriteLine("[LIVE] Subscribing to live tick market data...");
         _client.SubscribeToPriceTickByTick(1105, futuresContract.Contract);
         _client.SubscribeToTradesTickByTick(1106, futuresContract.Contract);
     }
