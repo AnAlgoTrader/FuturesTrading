@@ -45,6 +45,16 @@
         #tooltip .signal-name {
             color: #d1d4dc;
             font: 600 13px/1.4 sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #tooltip .signal-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            flex-shrink: 0;
         }
 
         #tooltip .signal-desc {
@@ -57,7 +67,7 @@
 <body>
 <div id="chart">
     <div id="tooltip">
-        <div class="signal-name"></div>
+        <div class="signal-name"><span class="signal-dot"></span><span class="signal-text"></span></div>
         <div class="signal-desc"></div>
     </div>
 </div>
@@ -67,17 +77,18 @@
 (function () {
     var status = document.getElementById('status');
     var toolTip = document.getElementById('tooltip');
-    var tooltipName = toolTip.querySelector('.signal-name');
+    var tooltipDot = toolTip.querySelector('.signal-dot');
+    var tooltipText = toolTip.querySelector('.signal-text');
     var tooltipDesc = toolTip.querySelector('.signal-desc');
 
     var SIGNAL_INFO = {
-        '#888888': { name: 'Normal', desc: 'Volume and spread are within normal ranges \u2014 no anomaly detected' },
-        '#e74c3c': { name: 'Climax Up', desc: 'High volume with wide upward spread \u2014 indicates aggressive buying that may signal a buying climax or blow-off top' },
-        '#ecf0f1': { name: 'Climax Down', desc: 'High volume with wide downward spread \u2014 indicates panic selling that may signal a selling climax or capitulation low' },
-        '#2ecc71': { name: 'Churn', desc: 'High volume with narrow spread \u2014 indicates heavy turnover with minimal price progress, signaling accumulation or distribution' },
-        '#f1c40f': { name: 'Low Volume', desc: 'Lowest volume in lookback window \u2014 indicates low market participation, often preceding a breakout or volatility expansion' },
-        '#9b59b6': { name: 'Absorption', desc: 'High volume with strong delta and narrow spread \u2014 indicates passive limit orders are absorbing aggressive market orders' },
-        '#3498db': { name: 'Stacked Imbalance', desc: 'Multiple consecutive bars with one-sided delta \u2014 indicates sustained directional order flow pressure' }
+        '#787b86': { name: 'Normal', desc: 'Volume and spread are within normal ranges \u2014 no anomaly detected' },
+        '#26a69a': { name: 'Climax Up', desc: 'High volume with wide upward spread \u2014 indicates aggressive buying that may signal a buying climax or blow-off top' },
+        '#ef5350': { name: 'Climax Down', desc: 'High volume with wide downward spread \u2014 indicates panic selling that may signal a selling climax or capitulation low' },
+        '#ff9800': { name: 'Churn', desc: 'High volume with narrow spread \u2014 indicates heavy turnover with minimal price progress, signaling accumulation or distribution' },
+        '#fdd835': { name: 'Low Volume', desc: 'Lowest volume in lookback window \u2014 indicates low market participation, often preceding a breakout or volatility expansion' },
+        '#ab47bc': { name: 'Absorption', desc: 'High volume with strong delta and narrow spread \u2014 indicates passive limit orders are absorbing aggressive market orders' },
+        '#00b0ff': { name: 'Stacked Imbalance', desc: 'Multiple consecutive bars with one-sided delta \u2014 indicates sustained directional order flow pressure' }
     };
 
     function fail(message) {
@@ -175,7 +186,8 @@
                 return;
             }
 
-            tooltipName.textContent = info.name;
+            tooltipDot.style.backgroundColor = data.color;
+            tooltipText.textContent = info.name;
             tooltipDesc.textContent = info.desc;
             toolTip.style.display = 'block';
             toolTip.style.left = param.point.x + 'px';

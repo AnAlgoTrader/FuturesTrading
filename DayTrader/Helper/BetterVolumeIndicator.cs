@@ -19,20 +19,20 @@ public static class VolumeSignalExtensions
 {
     private static readonly Dictionary<VolumeSignal, string> Colors = new()
     {
-        // gray — unremarkable bar
-        [VolumeSignal.Normal] = "#888888",
-        // red — high vol, widespread, closed up
-        [VolumeSignal.ClimaxUp] = "#e74c3c",
-        // white — high vol, widespread, closed down
-        [VolumeSignal.ClimaxDown] = "#ecf0f1",
-        // green — high vol, narrow spread (indecision)
-        [VolumeSignal.Churn] = "#2ecc71",
-        // yellow — lowest vol in window (apathy)
-        [VolumeSignal.LowVolume] = "#f1c40f",
-        // purple — high vol, strong delta, price pinned
-        [VolumeSignal.Absorption] = "#9b59b6",
-        // blue — N bars in a row leaning one way
-        [VolumeSignal.StackedImbalance] = "#3498db"
+        // slate gray — unremarkable bar
+        [VolumeSignal.Normal] = "#787b86",
+        // vibrant green — high vol, widespread, closed up (climax buying)
+        [VolumeSignal.ClimaxUp] = "#26a69a",
+        // vibrant red — high vol, widespread, closed down (climax selling)
+        [VolumeSignal.ClimaxDown] = "#ef5350",
+        // orange / amber — high vol, narrow spread (indecision / churn)
+        [VolumeSignal.Churn] = "#ff9800",
+        // yellow / gold — lowest vol in window (apathy)
+        [VolumeSignal.LowVolume] = "#fdd835",
+        // purple / magenta — high vol, strong delta, price pinned (absorption)
+        [VolumeSignal.Absorption] = "#ab47bc",
+        // cyan / electric blue — N bars in a row leaning one way (stacked imbalance)
+        [VolumeSignal.StackedImbalance] = "#00b0ff"
     };
 
     public static string ToColor(this VolumeSignal signal)
