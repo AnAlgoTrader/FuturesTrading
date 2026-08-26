@@ -51,7 +51,6 @@ public class MainWindowViewModel : ViewModelBase
         try
         {
             _logger.WriteLine("[SEED] Requesting historical data...");
-            // IB supports up to 1800 S for 1-sec bars. useRth: false ensures non-RTH futures data is included.
             var historicalData = await _client.GetHistoricalData(
                 1104,
                 futuresContract.Contract,
@@ -64,7 +63,7 @@ public class MainWindowViewModel : ViewModelBase
             if (historicalData is { Count: > 0 })
             {
                 var historicalBars = HistoricalSeeder.BuildTickBars(historicalData, ticksPerBar: 1000);
-                _logger.WriteLine($"[SEED] Received {historicalData.Count} 1-sec bars => built {historicalBars.Count} 1000-tick candles.");
+                _logger.WriteLine($"[SEED] Received {historicalData.Count} 5-sec bars => built {historicalBars.Count} 1000-tick candles.");
 
                 foreach (var histBar in historicalBars)
                 {
