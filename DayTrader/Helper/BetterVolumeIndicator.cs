@@ -102,6 +102,7 @@ public class BetterVolumeClassifier
     private decimal _cumulativeDelta;
     private int _consecutiveBuyImbalance;
     private int _consecutiveSellImbalance;
+    private long _previousBarEndTime;
 
     public BetterVolumeClassifier(
         Logger logger,
@@ -121,9 +122,27 @@ public class BetterVolumeClassifier
         _stackedImbalanceDeltaRatioThreshold = stackedImbalanceDeltaRatioThreshold;
     }
 
+    public void ResetCumulativeDelta()
+    {
+        _cumulativeDelta = 0;
+        _consecutiveBuyImbalance = 0;
+        _consecutiveSellImbalance = 0;
+        _logger.WriteLine("[CLASSIFY] Cumulative Delta and streaks reset.");
+    }
+
     /// <summary>Call this from TickBarAggregator.OnBarClosed only.</summary>
     public ClassificationResult Classify(Bar bar)
     {
+        const long sessionGapSeconds = 1800;
+        if (_previousBarEndTime > 0 && (bar.StartTime - _previousBarEndTime) > sessionGapSeconds)
+        {
+            _cumulativeDelta = 0;
+            _consecutiveBuyImbalance = 0;
+            _consecutiveSellImbalance = 0;
+            _logger.WriteLine("[CLASSIFY] Session break detected (gap > 30m) - Cumulative Delta and streaks reset.");
+        }
+        _previousBarEndTime = bar.EndTime;
+
         _cumulativeDelta += bar.Delta;
         TrackImbalanceStreak(bar);
 
@@ -171,14 +190,6 @@ public class BetterVolumeClassifier
             return result;
         }
 
-        if (_consecutiveBuyImbalance >= _stackedImbalanceCount ||
-            _consecutiveSellImbalance >= _stackedImbalanceCount)
-        {
-            result.Signal = VolumeSignal.StackedImbalance;
-            result.DeltaConfirmed = true;
-            return result;
-        }
-
         if (isHighestVolume && isWideSpread)
         {
             bool priceUp = bar.Close > bar.Open;
@@ -186,6 +197,14 @@ public class BetterVolumeClassifier
 
             result.Signal = priceUp ? VolumeSignal.ClimaxUp : VolumeSignal.ClimaxDown;
             result.DeltaConfirmed = deltaAgrees;
+            return result;
+        }
+
+        if (_consecutiveBuyImbalance >= _stackedImbalanceCount ||
+            _consecutiveSellImbalance >= _stackedImbalanceCount)
+        {
+            result.Signal = VolumeSignal.StackedImbalance;
+            result.DeltaConfirmed = true;
             return result;
         }
 
