@@ -57,7 +57,7 @@ public class MainWindowViewModel : ViewModelBase
                 $"1 {nameof(Duration.D)}",
                 $"5 {nameof(BarSize.secs)}",
                 "TRADES",
-                20000,
+                60000,
                 useRth: false);
 
             if (historicalData is { Count: > 0 })
