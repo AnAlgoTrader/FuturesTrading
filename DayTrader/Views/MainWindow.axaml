@@ -37,8 +37,9 @@
                 <TextBlock Text="{Binding DeltaStatus}" Foreground="{Binding DeltaStatusColor}" FontSize="12" VerticalAlignment="Center" />
                 <TextBlock Text="{Binding StreakInfo}" Foreground="#787b86" FontSize="12" VerticalAlignment="Center" />
             </StackPanel>
-            <StackPanel>
-                
+            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8" Margin="0,0,16,0">
+                <Button Content="Buy" Command="{Binding OnBuy}" Background="#26a69a" Foreground="White" FontWeight="SemiBold" Padding="16,6" CornerRadius="4" />
+                <Button Content="Sell" Command="{Binding OnSell}" Background="#ef5350" Foreground="White" FontWeight="SemiBold" Padding="16,6" CornerRadius="4" />
             </StackPanel>
         </Grid>
         <NativeWebView Grid.Row="1" x:Name="Chart" />

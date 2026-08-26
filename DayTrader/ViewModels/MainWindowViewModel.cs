@@ -140,4 +140,16 @@ public class MainWindowViewModel : ViewModelBase
     {
         OnBarPush?.Invoke(bar, VolumeSignal.Normal.ToColor());
     }
+
+    public void OnBuy()
+    {
+        Console.WriteLine("[TRADE] Buy button clicked");
+        _logger.WriteLine("[TRADE] Buy button clicked");
+    }
+
+    public void OnSell()
+    {
+        Console.WriteLine("[TRADE] Sell button clicked");
+        _logger.WriteLine("[TRADE] Sell button clicked");
+    }
 }
