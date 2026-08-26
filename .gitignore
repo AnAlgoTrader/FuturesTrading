@@ -4,8 +4,6 @@
 /.idea
 /UI/bin/Debug
 /UI/obj
-/Common/obj
-/Common/bin
 /UI/bin/Release
 /DayTrader/bin
 /DayTrader/obj

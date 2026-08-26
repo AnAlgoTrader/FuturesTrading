@@ -2,8 +2,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ib.Csharp.Api.Client", "..\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client.csproj", "{B0AE1954-67E6-4AD6-937D-237D7FC55C93}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "Common\Common.csproj", "{655871D8-D830-434D-BA25-6CBA4FABAABF}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DayTrader", "DayTrader\DayTrader.csproj", "{5C438AB3-E0DB-4F0A-A72F-944B252FBB15}"
 EndProject
 Global
@@ -16,13 +14,12 @@ Global
 		{B0AE1954-67E6-4AD6-937D-237D7FC55C93}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B0AE1954-67E6-4AD6-937D-237D7FC55C93}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B0AE1954-67E6-4AD6-937D-237D7FC55C93}.Release|Any CPU.Build.0 = Release|Any CPU
-		{655871D8-D830-434D-BA25-6CBA4FABAABF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{655871D8-D830-434D-BA25-6CBA4FABAABF}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{655871D8-D830-434D-BA25-6CBA4FABAABF}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{655871D8-D830-434D-BA25-6CBA4FABAABF}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5C438AB3-E0DB-4F0A-A72F-944B252FBB15}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{5C438AB3-E0DB-4F0A-A72F-944B252FBB15}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5C438AB3-E0DB-4F0A-A72F-944B252FBB15}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5C438AB3-E0DB-4F0A-A72F-944B252FBB15}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 EndGlobal

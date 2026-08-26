@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace Common;
+namespace DayTrader.Helper;
 
 public class Logger : IDisposable
 {
