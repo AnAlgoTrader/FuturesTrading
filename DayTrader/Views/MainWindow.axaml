@@ -27,15 +27,15 @@
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
                 <Border Width="12" Height="12" CornerRadius="6" VerticalAlignment="Center"
-                        Background="{Binding SignalColor}" />
-                <TextBlock Text="{Binding SignalName}" Foreground="#d1d4dc" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding SignalDescription}" Foreground="#787b86" FontSize="12" VerticalAlignment="Center" />
+                        Background="{Binding Classification.SignalColor}" />
+                <TextBlock Text="{Binding Classification.SignalName}" Foreground="#d1d4dc" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Classification.SignalDescription}" Foreground="#787b86" FontSize="12" VerticalAlignment="Center" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
-                <TextBlock Text="{Binding DeltaValue}" Foreground="#d1d4dc" FontSize="12" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding DeltaRatioDisplay}" Foreground="#d1d4dc" FontSize="12" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding DeltaStatus}" Foreground="{Binding DeltaStatusColor}" FontSize="12" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding StreakInfo}" Foreground="#787b86" FontSize="12" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Classification.DeltaDisplay}" Foreground="#d1d4dc" FontSize="12" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Classification.DeltaRatioDisplay}" Foreground="#d1d4dc" FontSize="12" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Classification.DeltaStatus}" Foreground="{Binding Classification.DeltaStatusColor}" FontSize="12" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Classification.StreakInfo}" Foreground="#787b86" FontSize="12" VerticalAlignment="Center" />
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8" Margin="0,0,16,0">
                 <Button Content="Buy" Command="{Binding OnBuy}" Background="#26a69a" Foreground="White" FontWeight="SemiBold" Padding="16,6" CornerRadius="4" />

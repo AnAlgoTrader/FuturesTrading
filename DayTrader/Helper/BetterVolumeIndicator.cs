@@ -73,12 +73,32 @@ public static class VolumeSignalExtensions
 
 public class ClassificationResult
 {
-    public VolumeSignal Signal { get; set; }
+    public VolumeSignal Signal { get; set; } = VolumeSignal.Normal;
     public Bar Bar { get; set; }
     public decimal CumulativeDelta { get; set; }
     public bool DeltaConfirmed { get; set; }
     public int BuyStreak { get; set; }
     public int SellStreak { get; set; }
+
+    public string SignalColor => Signal.ToColor();
+    public string SignalName => Signal.GetName();
+    public string SignalDescription => Signal.GetDescription();
+    public string DeltaDisplay => $"Delta: {Bar?.Delta ?? 0}";
+    public string DeltaRatioDisplay => $"Ratio: {Bar?.DeltaRatio ?? 0:F4}";
+    public string DeltaStatus => DeltaConfirmed ? "Confirmed" : "Divergent";
+    public string DeltaStatusColor => DeltaConfirmed ? "#26a69a" : "#ef5350";
+
+    public string StreakInfo => BuyStreak > 0
+        ? $"Buy streak: {BuyStreak}"
+        : SellStreak > 0
+            ? $"Sell streak: {SellStreak}"
+            : "";
+
+    public static ClassificationResult Default => new()
+    {
+        Signal = VolumeSignal.Normal,
+        Bar = new Bar()
+    };
 }
 
 /// <summary>

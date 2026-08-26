@@ -18,60 +18,11 @@ public class MainWindowViewModel : ViewModelBase
 
     public event Action<Bar, string> OnBarPush;
 
-    private string _signalColor = "#888888";
-    public string SignalColor
+    private ClassificationResult _classification = ClassificationResult.Default;
+    public ClassificationResult Classification
     {
-        get => _signalColor;
-        set => this.RaiseAndSetIfChanged(ref _signalColor, value);
-    }
-
-    private string _signalName = "Normal";
-    public string SignalName
-    {
-        get => _signalName;
-        set => this.RaiseAndSetIfChanged(ref _signalName, value);
-    }
-
-    private string _signalDescription = "Unremarkable bar";
-    public string SignalDescription
-    {
-        get => _signalDescription;
-        set => this.RaiseAndSetIfChanged(ref _signalDescription, value);
-    }
-
-    private string _deltaValue = "Delta: 0";
-    public string DeltaValue
-    {
-        get => _deltaValue;
-        set => this.RaiseAndSetIfChanged(ref _deltaValue, value);
-    }
-
-    private string _deltaRatio = "Ratio: 0.0000";
-    public string DeltaRatioDisplay
-    {
-        get => _deltaRatio;
-        set => this.RaiseAndSetIfChanged(ref _deltaRatio, value);
-    }
-
-    private string _deltaStatus = "";
-    public string DeltaStatus
-    {
-        get => _deltaStatus;
-        set => this.RaiseAndSetIfChanged(ref _deltaStatus, value);
-    }
-
-    private string _deltaStatusColor = "#787b86";
-    public string DeltaStatusColor
-    {
-        get => _deltaStatusColor;
-        set => this.RaiseAndSetIfChanged(ref _deltaStatusColor, value);
-    }
-
-    private string _streakInfo = "";
-    public string StreakInfo
-    {
-        get => _streakInfo;
-        set => this.RaiseAndSetIfChanged(ref _streakInfo, value);
+        get => _classification;
+        set => this.RaiseAndSetIfChanged(ref _classification, value);
     }
 
     public MainWindowViewModel()
@@ -120,20 +71,7 @@ public class MainWindowViewModel : ViewModelBase
                           $"O:{bar.Open} H:{bar.High} L:{bar.Low} C:{bar.Close} Ticks:{bar.TickCount} => Signal:{result.Signal} Color:{result.Signal.ToColor()}");
         OnBarPush?.Invoke(bar, result.Signal.ToColor());
 
-        SignalColor = result.Signal.ToColor();
-        SignalName = result.Signal.GetName();
-        SignalDescription = result.Signal.GetDescription();
-        DeltaValue = $"Delta: {bar.Delta}";
-        DeltaRatioDisplay = $"Ratio: {bar.DeltaRatio:F4}";
-        DeltaStatus = result.DeltaConfirmed ? "Confirmed" : "Divergent";
-        DeltaStatusColor = result.DeltaConfirmed ? "#26a69a" : "#ef5350";
-
-        if (result.BuyStreak > 0)
-            StreakInfo = $"Buy streak: {result.BuyStreak}";
-        else if (result.SellStreak > 0)
-            StreakInfo = $"Sell streak: {result.SellStreak}";
-        else
-            StreakInfo = "";
+        Classification = result;
     }
 
     private void OnBarUpdated(Bar bar)
