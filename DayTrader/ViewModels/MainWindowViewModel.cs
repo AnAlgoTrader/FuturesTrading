@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using DayTrader.Helper;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Helper;
+using Ib.Csharp.Api.Client.Implementation.Model;
 using ReactiveUI;
 
 namespace DayTrader.ViewModels;
@@ -60,6 +61,8 @@ public class MainWindowViewModel : ViewModelBase
         var futuresContract = await ContractHelper.GetFrontMonth(_client, "NQ");
         _logger.WriteLine($"Futures contract  Symbol:{futuresContract.Contract.Symbol} Exchange:{futuresContract.Contract.Exchange} LastDate:{futuresContract.Contract.LastTradeDate}");
 
+        var historicalData = await _client.GetHistoricalData(1104, futuresContract!.Contract, $"1 {nameof(Duration.D)}", $"1 {nameof(BarSize.secs)}", "TRADES", 10000);
+        
         _client.SubscribeToPriceTickByTick(1105, futuresContract.Contract);
         _client.SubscribeToTradesTickByTick(1106, futuresContract.Contract);
     }
