@@ -80,7 +80,7 @@ public class MainWindowViewModel : ViewModelBase
         var dataDir = "/home/oce/LocalDB/logs/futures";
         Directory.CreateDirectory(dataDir);
         _logger = new Logger(Path.Combine(dataDir, "daytrader.log"));
-        _volumeClassifier = new BetterVolumeClassifier(_logger, lookback: 10,
+        _volumeClassifier = new BetterVolumeClassifier(_logger, lookback: 20,
             churnSpreadMultiplier: 1.1,
             absorptionDeltaRatioThreshold: 0.3,
             absorptionSpreadMaxMultiplier: 0.8);
@@ -107,11 +107,11 @@ public class MainWindowViewModel : ViewModelBase
         };
         _client.Start("127.0.0.1", 4001, 0);
 
-        var esFutures = await ContractHelper.GetFrontMonth(_client, "ES");
-        _logger.WriteLine($"ES contract - Exchange:{esFutures.Contract.Exchange} LastDate:{esFutures.Contract.LastTradeDate}");
+        var futuresContract = await ContractHelper.GetFrontMonth(_client, "NQ");
+        _logger.WriteLine($"Futures contract  Symbol:{futuresContract.Contract.Symbol} Exchange:{futuresContract.Contract.Exchange} LastDate:{futuresContract.Contract.LastTradeDate}");
 
-        _client.SubscribeToPriceTickByTick(1105, esFutures.Contract);
-        _client.SubscribeToTradesTickByTick(1106, esFutures.Contract);
+        _client.SubscribeToPriceTickByTick(1105, futuresContract.Contract);
+        _client.SubscribeToTradesTickByTick(1106, futuresContract.Contract);
     }
 
     private void OnBarClosed(Bar bar)
