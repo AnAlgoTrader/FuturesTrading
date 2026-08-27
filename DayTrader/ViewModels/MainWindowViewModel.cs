@@ -39,19 +39,20 @@ public class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel()
     {
         _logger = new Logger();
-        _orderHelper = new OrderHelper();
+        _orderHelper = new OrderHelper(_logger);
         
         _volumeClassifier = new BetterVolumeClassifier(_logger, lookBack: 20,
             churnSpreadMultiplier: 1.1,
             absorptionDeltaRatioThreshold: 0.3,
             absorptionSpreadMaxMultiplier: 0.8);
 
-        _ = _orderHelper.ReadCurrentOrders();
         _ = InitAndSubscribe();
     }
 
     private async Task InitAndSubscribe()
     {
+        await _orderHelper.ReadCurrentOrders();
+
         _client.OnNotification += msg => _logger.WriteLine($"[IB] {msg}");
         _client.Start("127.0.0.1", 4001, 0);
 
