@@ -31,6 +31,15 @@ public partial class MainWindow : Window
                 FlushPendingCandles();
             }
         };
+
+        _chart.WebMessageReceived += (_, e) =>
+        {
+            if (e.Body != null && e.Body.Contains("closeTrade"))
+            {
+                Dispatcher.UIThread.Post(() => _ = _viewModel?.CloseActiveTrade());
+            }
+        };
+
         _chart.Source = new Uri(indexPath);
 
         DataContextChanged += (_, _) =>

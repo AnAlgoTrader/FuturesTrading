@@ -218,4 +218,22 @@ public class MainWindowViewModel : ViewModelBase
         _client.PlaceOrder(_tradingContract?.Contract, order);
         _logger.WriteLine($"[TRADE] OrderId:{order.OrderId} - Action:{order.Action} - Quantity:{order.TotalQuantity} - EntryPrice:{order.LmtPrice}");
     }
+
+    public async Task CloseActiveTrade()
+    {
+        var orders = _orderHelper.Orders;
+        if (orders != null && orders.Count == 1 && string.Equals(orders[0].Status, "Filled", StringComparison.OrdinalIgnoreCase))
+        {
+            var order = orders[0];
+            _logger.WriteLine($"[TRADE] CloseActiveTrade requested for {order.Action} order {order.OrderId}");
+            if (string.Equals(order.Action, "BUY", StringComparison.OrdinalIgnoreCase))
+            {
+                await OnSell();
+            }
+            else if (string.Equals(order.Action, "SELL", StringComparison.OrdinalIgnoreCase))
+            {
+                await OnBuy();
+            }
+        }
+    }
 }
