@@ -69,11 +69,11 @@ public class MainWindowViewModel : ViewModelBase
             var order = orders[0];
             var entryPrice = order.LmtPrice;
             var isBuy = string.Equals(order.Action, "BUY", StringComparison.OrdinalIgnoreCase);
-            var color = isBuy ? "#26a69a" : "#ef5350";
 
             var evalPrice = _currentMarketPrice > 0 ? _currentMarketPrice : entryPrice;
             double pnlPoints = isBuy ? (evalPrice - entryPrice) : (entryPrice - evalPrice);
             double pnlDollar = pnlPoints * 2.0 * (double)order.TotalQuantity;
+            var color = pnlDollar >= 0 ? "#26a69a" : "#ef5350";
 
             string sign = pnlDollar >= 0 ? "+" : "";
             string pnlTitle = $"{sign}${pnlDollar:F2} ({sign}{pnlPoints:F2} pts)";
