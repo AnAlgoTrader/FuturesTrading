@@ -13,6 +13,7 @@ public partial class MainWindow : Window
 {
     private readonly NativeWebView _chart;
     private readonly System.Collections.Generic.List<(Bar Bar, string Color)> _pendingCandles = new();
+    private (double Price, string Color, string Title)? _pendingOrderLine;
     private MainWindowViewModel _viewModel;
     private bool _chartReady;
 
@@ -35,11 +36,17 @@ public partial class MainWindow : Window
         DataContextChanged += (_, _) =>
         {
             if (_viewModel != null)
+            {
                 _viewModel.OnBarPush -= PushCandle;
+                _viewModel.OnOrderPriceLine -= SetOrderPriceLine;
+            }
 
             _viewModel = DataContext as MainWindowViewModel;
             if (_viewModel != null)
+            {
                 _viewModel.OnBarPush += PushCandle;
+                _viewModel.OnOrderPriceLine += SetOrderPriceLine;
+            }
         };
     }
 
@@ -59,6 +66,18 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() => _ = InvokeScript(script));
     }
 
+    private void SetOrderPriceLine(double price, string color, string title)
+    {
+        if (!_chartReady)
+        {
+            _pendingOrderLine = (price, color, title);
+            return;
+        }
+
+        var script = $"window.setOrderLine({Price(price)}, '{color}', '{title}')";
+        Dispatcher.UIThread.Post(() => _ = InvokeScript(script));
+    }
+
     private void FlushPendingCandles()
     {
         System.Collections.Generic.List<(Bar Bar, string Color)> candles;
@@ -71,6 +90,12 @@ public partial class MainWindow : Window
         foreach (var (bar, color) in candles)
         {
             PushCandle(bar, color);
+        }
+
+        if (_pendingOrderLine.HasValue)
+        {
+            SetOrderPriceLine(_pendingOrderLine.Value.Price, _pendingOrderLine.Value.Color, _pendingOrderLine.Value.Title);
+            _pendingOrderLine = null;
         }
     }
 

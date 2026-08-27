@@ -24,6 +24,7 @@ public class MainWindowViewModel : ViewModelBase
     private readonly Logger _logger;
 
     public event Action<Bar, string> OnBarPush;
+    public event Action<double, string, string> OnOrderPriceLine;
 
     private ClassificationResult _classification = ClassificationResult.Default;
     private PriceUpdate _bestPrice;
@@ -40,6 +41,7 @@ public class MainWindowViewModel : ViewModelBase
     {
         _logger = new Logger();
         _orderHelper = new OrderHelper(_logger);
+        _orderHelper.OnOrdersChanged += HandleOrdersChanged;
         
         _volumeClassifier = new BetterVolumeClassifier(_logger, lookBack: 20,
             churnSpreadMultiplier: 1.1,
@@ -47,6 +49,21 @@ public class MainWindowViewModel : ViewModelBase
             absorptionSpreadMaxMultiplier: 0.8);
 
         _ = InitAndSubscribe();
+    }
+
+    private void HandleOrdersChanged(IReadOnlyList<OrderPersistence> orders)
+    {
+        if (orders != null && orders.Count == 1 && string.Equals(orders[0].Status, "Filled", StringComparison.OrdinalIgnoreCase))
+        {
+            var order = orders[0];
+            var color = string.Equals(order.Action, "BUY", StringComparison.OrdinalIgnoreCase) ? "#26a69a" : "#ef5350";
+            var title = $"{order.Action} {order.TotalQuantity} @ {order.LmtPrice:F2}";
+            OnOrderPriceLine?.Invoke(order.LmtPrice, color, title);
+        }
+        else
+        {
+            OnOrderPriceLine?.Invoke(0, string.Empty, string.Empty);
+        }
     }
 
     private async Task InitAndSubscribe()

@@ -81,6 +81,8 @@
     var tooltipText = toolTip.querySelector('.signal-text');
     var tooltipDesc = toolTip.querySelector('.signal-desc');
 
+    var activePriceLine = null;
+
     var SIGNAL_INFO = {
         '#787b86': { name: 'Normal', desc: 'Volume and spread are within normal ranges \u2014 no anomaly detected' },
         '#26a69a': { name: 'Climax Up', desc: 'High volume with wide upward spread \u2014 indicates aggressive buying that may signal a buying climax or blow-off top' },
@@ -107,7 +109,6 @@
 
     try {
         var container = document.getElementById('chart');
-        var toolTip = document.getElementById('tooltip');
 
         var MIN_PRICE_SPAN = 8;
         var RIGHT_MARGIN_BARS = 15;
@@ -162,6 +163,26 @@
                 chart.timeScale().setVisibleLogicalRange({
                     from: -(60 - RIGHT_MARGIN_BARS),
                     to: RIGHT_MARGIN_BARS
+                });
+            }
+        };
+
+        window.setOrderLine = function (price, color, title) {
+            if (activePriceLine) {
+                try {
+                    series.removePriceLine(activePriceLine);
+                } catch (e) {}
+                activePriceLine = null;
+            }
+
+            if (price && price > 0) {
+                activePriceLine = series.createPriceLine({
+                    price: price,
+                    color: color || '#26a69a',
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: title || ''
                 });
             }
         };

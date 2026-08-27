@@ -18,6 +18,8 @@ public class OrderHelper
     private readonly Logger _logger;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
+    public event Action<IReadOnlyList<OrderPersistence>> OnOrdersChanged;
+
     public IReadOnlyList<OrderPersistence> Orders
     {
         get
@@ -51,6 +53,7 @@ public class OrderHelper
             });
             _logger?.WriteLine($"[ORDER] Persisted OrderId:{order.OrderId} Action:{order.Action} Qty:{order.TotalQuantity} LmtPrice:{order.LmtPrice}");
             await SaveCurrentOrdersInternal();
+            OnOrdersChanged?.Invoke(_orders.ToList());
         }
         catch (Exception ex)
         {
@@ -92,6 +95,8 @@ public class OrderHelper
             {
                 await SaveCurrentOrdersInternal();
             }
+
+            OnOrdersChanged?.Invoke(_orders.ToList());
         }
         catch (Exception ex)
         {
@@ -122,6 +127,7 @@ public class OrderHelper
 
             CleanOrdersInternal();
             await SaveCurrentOrdersInternal();
+            OnOrdersChanged?.Invoke(_orders.ToList());
         }
         catch (Exception ex)
         {
