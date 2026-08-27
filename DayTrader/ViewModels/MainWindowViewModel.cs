@@ -15,6 +15,8 @@ namespace DayTrader.ViewModels;
 
 public class MainWindowViewModel : ViewModelBase
 {
+    private const decimal OrderQuantity = 5;
+
     private readonly IbClient _client = new();
     private readonly BufferedLeeReadyClassifier _classifier = new();
     private readonly TickBarAggregator _aggregator = new();
@@ -191,7 +193,7 @@ public class MainWindowViewModel : ViewModelBase
         {
             OrderId = _client.GetNextValidId(),
             Action = "BUY",
-            TotalQuantity = 1,
+            TotalQuantity = OrderQuantity,
             OrderType = "LMT",
             LmtPrice = _bestPrice.AskPrice,
             Transmit = true,
@@ -208,7 +210,7 @@ public class MainWindowViewModel : ViewModelBase
         {
             OrderId = _client.GetNextValidId(),
             Action = "SELL",
-            TotalQuantity = 1,
+            TotalQuantity = OrderQuantity,
             OrderType = "LMT",
             LmtPrice = _bestPrice.BidPrice,
             Transmit = true,
