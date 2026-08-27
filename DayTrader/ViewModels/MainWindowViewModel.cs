@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using DayTrader.Helper;
 using DayTrader.Models;
@@ -31,6 +29,8 @@ public class MainWindowViewModel : ViewModelBase
     private ContractDetails _tradingContract;
     private readonly OrderHelper _orderHelper;
 
+    private double _currentMarketPrice;
+
     public ClassificationResult Classification
     {
         get => _classification;
@@ -53,12 +53,32 @@ public class MainWindowViewModel : ViewModelBase
 
     private void HandleOrdersChanged(IReadOnlyList<OrderPersistence> orders)
     {
+        UpdateOrderLine(_currentMarketPrice);
+    }
+
+    private void UpdateOrderLine(double currentPrice)
+    {
+        if (currentPrice > 0)
+        {
+            _currentMarketPrice = currentPrice;
+        }
+
+        var orders = _orderHelper.Orders;
         if (orders != null && orders.Count == 1 && string.Equals(orders[0].Status, "Filled", StringComparison.OrdinalIgnoreCase))
         {
             var order = orders[0];
-            var color = string.Equals(order.Action, "BUY", StringComparison.OrdinalIgnoreCase) ? "#26a69a" : "#ef5350";
-            var title = $"{order.Action} {order.TotalQuantity} @ {order.LmtPrice:F2}";
-            OnOrderPriceLine?.Invoke(order.LmtPrice, color, title);
+            var entryPrice = order.LmtPrice;
+            var isBuy = string.Equals(order.Action, "BUY", StringComparison.OrdinalIgnoreCase);
+            var color = isBuy ? "#26a69a" : "#ef5350";
+
+            var evalPrice = _currentMarketPrice > 0 ? _currentMarketPrice : entryPrice;
+            double pnlPoints = isBuy ? (evalPrice - entryPrice) : (entryPrice - evalPrice);
+            double pnlDollar = pnlPoints * 2.0 * (double)order.TotalQuantity;
+
+            string sign = pnlDollar >= 0 ? "+" : "";
+            string pnlTitle = $"{sign}${pnlDollar:F2} ({sign}{pnlPoints:F2} pts)";
+
+            OnOrderPriceLine?.Invoke(entryPrice, color, pnlTitle);
         }
         else
         {
@@ -156,11 +176,13 @@ public class MainWindowViewModel : ViewModelBase
         OnBarPush?.Invoke(bar, result.Signal.ToColor());
 
         Classification = result;
+        UpdateOrderLine(bar.Close);
     }
 
     private void OnBarUpdated(Bar bar)
     {
         OnBarPush?.Invoke(bar, VolumeSignal.Normal.ToColor());
+        UpdateOrderLine(bar.Close);
     }
 
     public async Task OnBuy()

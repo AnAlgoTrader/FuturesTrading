@@ -168,22 +168,29 @@
         };
 
         window.setOrderLine = function (price, color, title) {
-            if (activePriceLine) {
-                try {
-                    series.removePriceLine(activePriceLine);
-                } catch (e) {}
-                activePriceLine = null;
+            if (!price || price <= 0) {
+                if (activePriceLine) {
+                    try {
+                        series.removePriceLine(activePriceLine);
+                    } catch (e) {}
+                    activePriceLine = null;
+                }
+                return;
             }
 
-            if (price && price > 0) {
-                activePriceLine = series.createPriceLine({
-                    price: price,
-                    color: color || '#26a69a',
-                    lineWidth: 2,
-                    lineStyle: LightweightCharts.LineStyle.Dashed,
-                    axisLabelVisible: true,
-                    title: title || ''
-                });
+            var lineOptions = {
+                price: price,
+                color: color || '#26a69a',
+                lineWidth: 2,
+                lineStyle: LightweightCharts.LineStyle.Dashed,
+                axisLabelVisible: true,
+                title: title || ''
+            };
+
+            if (!activePriceLine) {
+                activePriceLine = series.createPriceLine(lineOptions);
+            } else {
+                activePriceLine.applyOptions(lineOptions);
             }
         };
 
