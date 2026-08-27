@@ -5,10 +5,13 @@ namespace DayTrader.Helper;
 
 public class Logger : IDisposable
 {
+    public const string DATA_DIR = "/home/oce/LocalDB/logs/futures";
     private readonly StreamWriter _writer;
 
-    public Logger(string filePath)
+    public Logger()
     {
+        Directory.CreateDirectory(DATA_DIR);
+        var filePath = Path.Combine(DATA_DIR, "daytrader.log");
         _writer = new StreamWriter(filePath, append: false) { AutoFlush = true };
     }
 

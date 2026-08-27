@@ -1,11 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using DayTrader.Helper;
+using DayTrader.Models;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Helper;
 using Ib.Csharp.Api.Client.Implementation.Model;
+using IBApi;
 using ReactiveUI;
+using Bar = DayTrader.Helper.Bar;
 
 namespace DayTrader.ViewModels;
 
@@ -20,6 +26,10 @@ public class MainWindowViewModel : ViewModelBase
     public event Action<Bar, string> OnBarPush;
 
     private ClassificationResult _classification = ClassificationResult.Default;
+    private PriceUpdate _bestPrice;
+    private ContractDetails _tradingContract;
+    private readonly OrderHelper _orderHelper;
+
     public ClassificationResult Classification
     {
         get => _classification;
@@ -28,14 +38,15 @@ public class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel()
     {
-        var dataDir = "/home/oce/LocalDB/logs/futures";
-        Directory.CreateDirectory(dataDir);
-        _logger = new Logger(Path.Combine(dataDir, "daytrader.log"));
+        _logger = new Logger();
+        _orderHelper = new OrderHelper();
+        
         _volumeClassifier = new BetterVolumeClassifier(_logger, lookBack: 20,
             churnSpreadMultiplier: 1.1,
             absorptionDeltaRatioThreshold: 0.3,
             absorptionSpreadMaxMultiplier: 0.8);
 
+        _ = _orderHelper.ReadCurrentOrders();
         _ = InitAndSubscribe();
     }
 
@@ -45,6 +56,7 @@ public class MainWindowViewModel : ViewModelBase
         _client.Start("127.0.0.1", 4001, 0);
 
         var futuresContract = await ContractHelper.GetFrontMonth(_client, "NQ");
+        _tradingContract = await ContractHelper.GetFrontMonth(_client, "MNQ");
         _logger.WriteLine($"Futures contract  Symbol:{futuresContract.Contract.Symbol} Exchange:{futuresContract.Contract.Exchange} LastDate:{futuresContract.Contract.LastTradeDate}");
 
         // 1. Fetch historical data and wait for it to complete
@@ -102,11 +114,20 @@ public class MainWindowViewModel : ViewModelBase
             _classifier.OnTrade(tradeUpdate.Time, tradeUpdate.Price, tradeUpdate.Size);
             _classifier.Pump();
         };
+        _client.OnMarketDataPriceUpdate += priceUpdate =>
+        {
+            _bestPrice = priceUpdate.First().Value;
+        };
+        _client.OnOrderStatusUpdate += async status =>
+        {
+            await _orderHelper.UpdateOrderStatus(status);
+        };
 
         // 3. Subscribe to live tick-by-tick market data
         _logger.WriteLine("[LIVE] Subscribing to live tick market data...");
         _client.SubscribeToPriceTickByTick(1105, futuresContract.Contract);
         _client.SubscribeToTradesTickByTick(1106, futuresContract.Contract);
+        _client.SubscribeToMarketData(1107, futuresContract);
     }
 
     private void OnBarClosed(Bar bar)
@@ -124,15 +145,37 @@ public class MainWindowViewModel : ViewModelBase
         OnBarPush?.Invoke(bar, VolumeSignal.Normal.ToColor());
     }
 
-    public void OnBuy()
+    public async Task OnBuy()
     {
-        Console.WriteLine("[TRADE] Buy button clicked");
-        _logger.WriteLine("[TRADE] Buy button clicked");
+        var order = new Order
+        {
+            OrderId = _client.GetNextValidId(),
+            Action = "BUY",
+            TotalQuantity = 1,
+            OrderType = "LMT",
+            LmtPrice = _bestPrice.AskPrice,
+            Transmit = true,
+            Tif = "GTC"
+        };
+        await _orderHelper.PersistOrder(order);
+        _client.PlaceOrder(_tradingContract?.Contract, order);
+        _logger.WriteLine($"[TRADE] OrderId:{order.OrderId} - Action:{order.Action} - Quantity:{order.TotalQuantity} - EntryPrice:{order.LmtPrice}");
     }
 
-    public void OnSell()
+    public async Task OnSell()
     {
-        Console.WriteLine("[TRADE] Sell button clicked");
-        _logger.WriteLine("[TRADE] Sell button clicked");
+        var order = new Order
+        {
+            OrderId = _client.GetNextValidId(),
+            Action = "SELL",
+            TotalQuantity = 1,
+            OrderType = "LMT",
+            LmtPrice = _bestPrice.BidPrice,
+            Transmit = true,
+            Tif = "GTC"
+        };
+        await _orderHelper.PersistOrder(order);
+        _client.PlaceOrder(_tradingContract?.Contract, order);
+        _logger.WriteLine($"[TRADE] OrderId:{order.OrderId} - Action:{order.Action} - Quantity:{order.TotalQuantity} - EntryPrice:{order.LmtPrice}");
     }
 }

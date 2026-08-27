@@ -1,0 +1,11 @@
+namespace DayTrader.Models;
+
+public class OrderPersistence
+{
+    public int OrderId { get; set; }
+    public string Action { get; set; }
+    public decimal TotalQuantity { get; set; }
+    public string OrderType { get; set; }
+    public double LmtPrice { get; set; }
+    public string Status { get; set; }
+}
