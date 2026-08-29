@@ -74,12 +74,22 @@ public static class VolumeSignalExtensions
 public class ClassificationResult
 {
     public VolumeSignal Signal { get; set; } = VolumeSignal.Normal;
+
+    /// <summary>
+    /// Hysteresis-filtered signal. Identical to Signal unless the classifier was
+    /// constructed with minSignalPersistence > 1, in which case a non-Normal signal
+    /// only "confirms" here once it has appeared on that many consecutive closed bars.
+    /// Use this instead of Signal if you're triggering trades directly off the
+    /// indicator rather than just eyeballing it, to avoid acting on single-bar flicker.
+    /// </summary>
+    public VolumeSignal StableSignal { get; set; } = VolumeSignal.Normal;
+
     public Bar Bar { get; init; }
     public decimal CumulativeDelta { get; set; }
     public bool? DeltaConfirmed { get; set; }
     public int BuyStreak { get; init; }
     public int SellStreak { get; init; }
-    
+
     public string DeltaDisplay => $"Delta: {Bar?.Delta ?? 0}";
     public string DeltaRatioDisplay => $"Ratio: {Bar?.DeltaRatio ?? 0:F4}";
     public string DeltaStatus => DeltaConfirmed switch
@@ -104,6 +114,7 @@ public class ClassificationResult
     public static ClassificationResult Default => new()
     {
         Signal = VolumeSignal.Normal,
+        StableSignal = VolumeSignal.Normal,
         Bar = new Bar()
     };
 }
@@ -113,6 +124,23 @@ public class ClassificationResult
 /// (subscribe to TickBarAggregator.OnBarClosed) -- classifying a
 /// still-forming bar would rank incomplete volume/spread numbers against
 /// a window of complete ones.
+///
+///  - Volume/spread reference stats (max/min/avg) are computed from the PRIOR
+///    N bars only, before the current bar is enqueued. Previously the current
+///    bar's own spread/volume was folded into the average it was being judged
+///    against, which slightly dampened how extreme a genuine climax/churn bar
+///    could look.
+///  - The rolling window (not just cumulative delta and streaks) is cleared on
+///    a session gap, so volume/spread stats never span two different trading
+///    sessions (e.g. overnight Globex vs. RTH open) that have structurally
+///    different volume regimes.
+///  - The absolute-extreme and percentile-fallback checks now share one
+///    helper (TryClassifyByVolumeExtreme) instead of duplicating the same
+///    Absorption/Climax/Churn/LowVolume logic twice.
+///  - Optional signal hysteresis via minSignalPersistence: a non-Normal
+///    signal only "confirms" into StableSignal once it has repeated for that
+///    many consecutive bars, to reduce bar-to-bar flicker if you're acting on
+///    signals directly. Defaults to 1 (no behavior change / same as before).
 /// </summary>
 public class BetterVolumeClassifier
 {
@@ -123,6 +151,7 @@ public class BetterVolumeClassifier
     private readonly double _absorptionSpreadMaxMultiplier;
     private readonly int _stackedImbalanceCount;
     private readonly double _stackedImbalanceDeltaRatioThreshold;
+    private readonly int _minSignalPersistence;
 
     private readonly Queue<Bar> _window = new();
     private decimal _cumulativeDelta;
@@ -130,14 +159,19 @@ public class BetterVolumeClassifier
     private int _consecutiveSellImbalance;
     private long _previousBarEndTime;
 
+    private VolumeSignal _lastRawSignal = VolumeSignal.Normal;
+    private VolumeSignal _stableSignal = VolumeSignal.Normal;
+    private int _pendingStreak;
+
     public BetterVolumeClassifier(
         Logger logger,
-        int lookBack = 8,
+        int lookBack = 20,
         double churnSpreadMultiplier = 1.5,
         double absorptionDeltaRatioThreshold = 0.6,
         double absorptionSpreadMaxMultiplier = 0.5,
         int stackedImbalanceCount = 3,
-        double stackedImbalanceDeltaRatioThreshold = 0.5)
+        double stackedImbalanceDeltaRatioThreshold = 0.5,
+        int minSignalPersistence = 1)
     {
         _logger = logger;
         _lookBack = lookBack;
@@ -146,6 +180,7 @@ public class BetterVolumeClassifier
         _absorptionSpreadMaxMultiplier = absorptionSpreadMaxMultiplier;
         _stackedImbalanceCount = stackedImbalanceCount;
         _stackedImbalanceDeltaRatioThreshold = stackedImbalanceDeltaRatioThreshold;
+        _minSignalPersistence = Math.Max(1, minSignalPersistence);
     }
 
     public void ResetCumulativeDelta()
@@ -153,28 +188,34 @@ public class BetterVolumeClassifier
         _cumulativeDelta = 0;
         _consecutiveBuyImbalance = 0;
         _consecutiveSellImbalance = 0;
-        _logger.WriteLine("[CLASSIFY] Cumulative Delta and streaks reset.");
+        _lastRawSignal = VolumeSignal.Normal;
+        _stableSignal = VolumeSignal.Normal;
+        _pendingStreak = 0;
+        _logger.WriteLine("[CLASSIFY] Cumulative Delta, streaks, and signal state reset.");
     }
 
-    /// <summary>Call this from TickBarAggregator.OnBarClosed only.</summary>
+    /// <summary>
+    /// Call this from TickBarAggregator.OnBarClosed only.
+    /// </summary>
     public ClassificationResult Classify(Bar bar)
     {
         const long sessionGapSeconds = 1800;
-        if (_previousBarEndTime > 0 && (bar.StartTime - _previousBarEndTime) > sessionGapSeconds)
+        bool sessionBreak = _previousBarEndTime > 0 && (bar.StartTime - _previousBarEndTime) > sessionGapSeconds;
+        if (sessionBreak)
         {
             _cumulativeDelta = 0;
             _consecutiveBuyImbalance = 0;
             _consecutiveSellImbalance = 0;
-            _logger.WriteLine("[CLASSIFY] Session break detected (gap > 30m) - Cumulative Delta and streaks reset.");
+            // Clear the window too: a rolling max/min/avg that spans the session
+            // boundary would mix overnight-thin volume with RTH-open volume, which
+            // are not comparable baselines.
+            _window.Clear();
+            _logger.WriteLine("[CLASSIFY] Session break detected (gap > 30m) - Cumulative Delta, streaks, and window reset.");
         }
         _previousBarEndTime = bar.EndTime;
 
         _cumulativeDelta += bar.Delta;
         TrackImbalanceStreak(bar);
-
-        _window.Enqueue(bar);
-        if (_window.Count > _lookBack)
-            _window.Dequeue();
 
         var result = new ClassificationResult
         {
@@ -188,9 +229,11 @@ public class BetterVolumeClassifier
         {
             result.Signal = VolumeSignal.Normal;
             _logger.WriteLine($"[CLASSIFY] Warming up: window={_window.Count}/{_lookBack}");
-            return result;
+            return FinalizeClassification();
         }
 
+        // Reference stats come from the PRIOR _lookBack bars only — the current
+        // bar has not been enqueued yet, so it can't inflate/deflate its own baseline.
         var volumes = _window.Select(b => b.Volume).ToList();
         var spreads = _window.Select(b => b.Spread).ToList();
 
@@ -209,21 +252,10 @@ public class BetterVolumeClassifier
                           $"HiVol:{isHighestVolume} LoVol:{isLowestVolume} Wide:{isWideSpread} Narrow:{isNarrowSpread} VeryNarrow:{isVeryNarrowSpread} StrongDelta:{isStrongDelta} " +
                           $"BuyStreak:{_consecutiveBuyImbalance} SellStreak:{_consecutiveSellImbalance}");
 
-        if (isHighestVolume && isStrongDelta && isVeryNarrowSpread)
+        if (TryClassifyByVolumeExtreme(bar, isHighestVolume, isLowestVolume, isWideSpread, isNarrowSpread,
+                isVeryNarrowSpread, isStrongDelta, result, percentileTier: false))
         {
-            result.Signal = VolumeSignal.Absorption;
-            result.DeltaConfirmed = true;
-            return result;
-        }
-
-        if (isHighestVolume && isWideSpread)
-        {
-            bool priceUp = bar.Close > bar.Open;
-            bool deltaAgrees = priceUp ? bar.Delta > 0 : bar.Delta < 0;
-
-            result.Signal = priceUp ? VolumeSignal.ClimaxUp : VolumeSignal.ClimaxDown;
-            result.DeltaConfirmed = deltaAgrees;
-            return result;
+            return FinalizeClassification();
         }
 
         if (_consecutiveBuyImbalance >= _stackedImbalanceCount ||
@@ -231,19 +263,7 @@ public class BetterVolumeClassifier
         {
             result.Signal = VolumeSignal.StackedImbalance;
             result.DeltaConfirmed = true;
-            return result;
-        }
-
-        if (isHighestVolume && isNarrowSpread)
-        {
-            result.Signal = VolumeSignal.Churn;
-            return result;
-        }
-
-        if (isLowestVolume)
-        {
-            result.Signal = VolumeSignal.LowVolume;
-            return result;
+            return FinalizeClassification();
         }
 
         // Percentile fallback: if no absolute threshold fired, check relative position
@@ -253,40 +273,106 @@ public class BetterVolumeClassifier
         bool isTop20Volume = bar.Volume >= sortedVol[p80Idx];
         bool isBottom20Volume = bar.Volume <= sortedVol[p20Idx];
 
-        if (isTop20Volume && isStrongDelta && isVeryNarrowSpread)
+        if (TryClassifyByVolumeExtreme(bar, isTop20Volume, isBottom20Volume, isWideSpread, isNarrowSpread,
+                isVeryNarrowSpread, isStrongDelta, result, percentileTier: true))
+        {
+            return FinalizeClassification();
+        }
+
+        result.Signal = VolumeSignal.Normal;
+        return FinalizeClassification();
+
+        ClassificationResult FinalizeClassification()
+        {
+            _window.Enqueue(bar);
+            if (_window.Count > _lookBack)
+                _window.Dequeue();
+
+            ApplyHysteresis(result);
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Shared by the absolute-extreme check and the top/bottom-20% percentile
+    /// fallback so both tiers apply exactly the same Absorption/Climax/Churn/
+    /// LowVolume rules instead of two hand-maintained copies of the same logic.
+    /// Returns true (and sets result.Signal/DeltaConfirmed) if a signal fired.
+    /// </summary>
+    private bool TryClassifyByVolumeExtreme(
+        Bar bar,
+        bool isHighVolume,
+        bool isLowVolume,
+        bool isWideSpread,
+        bool isNarrowSpread,
+        bool isVeryNarrowSpread,
+        bool isStrongDelta,
+        ClassificationResult result,
+        bool percentileTier)
+    {
+        string tierTag = percentileTier ? "[CLASSIFY] Percentile " : null;
+
+        if (isHighVolume && isStrongDelta && isVeryNarrowSpread)
         {
             result.Signal = VolumeSignal.Absorption;
             result.DeltaConfirmed = true;
-            _logger.WriteLine($"[CLASSIFY] Percentile Absorption hit");
-            return result;
+            if (tierTag != null) _logger.WriteLine(tierTag + "Absorption hit");
+            return true;
         }
 
-        if (isTop20Volume && isWideSpread)
+        if (isHighVolume && isWideSpread)
         {
             bool priceUp = bar.Close > bar.Open;
             bool deltaAgrees = priceUp ? bar.Delta > 0 : bar.Delta < 0;
             result.Signal = priceUp ? VolumeSignal.ClimaxUp : VolumeSignal.ClimaxDown;
             result.DeltaConfirmed = deltaAgrees;
-            _logger.WriteLine($"[CLASSIFY] Percentile Climax hit");
-            return result;
+            if (tierTag != null) _logger.WriteLine(tierTag + "Climax hit");
+            return true;
         }
 
-        if (isTop20Volume && isNarrowSpread)
+        if (isHighVolume && isNarrowSpread)
         {
             result.Signal = VolumeSignal.Churn;
-            _logger.WriteLine($"[CLASSIFY] Percentile Churn hit");
-            return result;
+            if (tierTag != null) _logger.WriteLine(tierTag + "Churn hit");
+            return true;
         }
 
-        if (isBottom20Volume)
+        if (isLowVolume)
         {
             result.Signal = VolumeSignal.LowVolume;
-            _logger.WriteLine($"[CLASSIFY] Percentile LowVolume hit");
-            return result;
+            if (tierTag != null) _logger.WriteLine(tierTag + "LowVolume hit");
+            return true;
         }
 
-        result.Signal = VolumeSignal.Normal;
-        return result;
+        return false;
+    }
+
+    /// <summary>
+    /// Filters Signal into StableSignal. With the default minSignalPersistence
+    /// of 1 this is a no-op (StableSignal always equals Signal). With a higher
+    /// value, a non-Normal signal must repeat on N consecutive closed bars
+    /// before StableSignal picks it up, which cuts down on single-bar flicker
+    /// if you're triggering trades off the indicator directly. Normal always
+    /// reflects immediately, since there's no risk in "confirming" a null signal.
+    /// </summary>
+    private void ApplyHysteresis(ClassificationResult result)
+    {
+        if (_minSignalPersistence <= 1)
+        {
+            result.StableSignal = result.Signal;
+            return;
+        }
+
+        _pendingStreak = result.Signal == _lastRawSignal ? _pendingStreak + 1 : 1;
+        _lastRawSignal = result.Signal;
+
+        if (result.Signal == VolumeSignal.Normal || _pendingStreak >= _minSignalPersistence)
+        {
+            _stableSignal = result.Signal;
+        }
+        // else: not yet confirmed for N consecutive bars — StableSignal holds its previous value.
+
+        result.StableSignal = _stableSignal;
     }
 
     private void TrackImbalanceStreak(Bar bar)
