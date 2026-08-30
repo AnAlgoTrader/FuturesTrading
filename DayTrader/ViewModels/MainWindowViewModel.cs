@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using DayTrader.Helper;
 using DayTrader.Models;
@@ -32,6 +34,14 @@ public class MainWindowViewModel : ViewModelBase
     private readonly OrderHelper _orderHelper;
 
     private double _currentMarketPrice;
+    private int _isClosingTrade;
+
+    private double Multiplier =>
+        _tradingContract?.Contract?.Multiplier != null &&
+        double.TryParse(_tradingContract.Contract.Multiplier, NumberStyles.Any, CultureInfo.InvariantCulture, out var mult) &&
+        mult > 0
+            ? mult
+            : 1.0;
 
     public ClassificationResult Classification
     {
@@ -65,16 +75,15 @@ public class MainWindowViewModel : ViewModelBase
             _currentMarketPrice = currentPrice;
         }
 
-        var orders = _orderHelper.Orders;
-        if (orders != null && orders.Count == 1 && string.Equals(orders[0].Status, "Filled", StringComparison.OrdinalIgnoreCase))
+        var position = _orderHelper.GetPosition();
+        if (position.NetQuantity != 0)
         {
-            var order = orders[0];
-            var entryPrice = order.LmtPrice;
-            var isBuy = string.Equals(order.Action, "BUY", StringComparison.OrdinalIgnoreCase);
+            var entryPrice = position.AveragePrice;
+            var isBuy = position.NetQuantity > 0;
 
             var evalPrice = _currentMarketPrice > 0 ? _currentMarketPrice : entryPrice;
             double pnlPoints = isBuy ? (evalPrice - entryPrice) : (entryPrice - evalPrice);
-            double pnlDollar = pnlPoints * 2.0 * (double)order.TotalQuantity;
+            double pnlDollar = pnlPoints * Multiplier * (double)position.Quantity;
             var color = pnlDollar >= 0 ? "#26a69a" : "#ef5350";
 
             string sign = pnlDollar >= 0 ? "+" : "";
@@ -97,7 +106,7 @@ public class MainWindowViewModel : ViewModelBase
 
         var futuresContract = await ContractHelper.GetFrontMonth(_client, "NQ");
         _tradingContract = await ContractHelper.GetFrontMonth(_client, "MNQ");
-        _logger.WriteLine($"Futures contract  Symbol:{futuresContract.Contract.Symbol} Exchange:{futuresContract.Contract.Exchange} LastDate:{futuresContract.Contract.LastTradeDate}");
+        _logger.WriteLine($"Futures contract  Symbol:{futuresContract.Contract.Symbol} Exchange:{futuresContract.Contract.Exchange} LastDate:{futuresContract.Contract.LastTradeDate} Multiplier:{_tradingContract?.Contract?.Multiplier}");
 
         // 1. Fetch historical data and wait for it to complete
         try
@@ -187,15 +196,19 @@ public class MainWindowViewModel : ViewModelBase
         UpdateOrderLine(bar.Close);
     }
 
-    public async Task OnBuy()
+    public async Task OnBuy(decimal quantity = OrderQuantity)
     {
+        double limitPrice = _bestPrice != null && _bestPrice.AskPrice > 0
+            ? _bestPrice.AskPrice
+            : _currentMarketPrice;
+
         var order = new Order
         {
             OrderId = _client.GetNextValidId(),
             Action = "BUY",
-            TotalQuantity = OrderQuantity,
+            TotalQuantity = quantity,
             OrderType = "LMT",
-            LmtPrice = _bestPrice.AskPrice,
+            LmtPrice = limitPrice,
             Transmit = true,
             Tif = "GTC"
         };
@@ -204,15 +217,19 @@ public class MainWindowViewModel : ViewModelBase
         _logger.WriteLine($"[TRADE] OrderId:{order.OrderId} - Action:{order.Action} - Quantity:{order.TotalQuantity} - EntryPrice:{order.LmtPrice}");
     }
 
-    public async Task OnSell()
+    public async Task OnSell(decimal quantity = OrderQuantity)
     {
+        double limitPrice = _bestPrice != null && _bestPrice.BidPrice > 0
+            ? _bestPrice.BidPrice
+            : _currentMarketPrice;
+
         var order = new Order
         {
             OrderId = _client.GetNextValidId(),
             Action = "SELL",
-            TotalQuantity = OrderQuantity,
+            TotalQuantity = quantity,
             OrderType = "LMT",
-            LmtPrice = _bestPrice.BidPrice,
+            LmtPrice = limitPrice,
             Transmit = true,
             Tif = "GTC"
         };
@@ -223,19 +240,34 @@ public class MainWindowViewModel : ViewModelBase
 
     public async Task CloseActiveTrade()
     {
-        var orders = _orderHelper.Orders;
-        if (orders != null && orders.Count == 1 && string.Equals(orders[0].Status, "Filled", StringComparison.OrdinalIgnoreCase))
+        if (Interlocked.CompareExchange(ref _isClosingTrade, 1, 0) != 0)
         {
-            var order = orders[0];
-            _logger.WriteLine($"[TRADE] CloseActiveTrade requested for {order.Action} order {order.OrderId}");
-            if (string.Equals(order.Action, "BUY", StringComparison.OrdinalIgnoreCase))
+            _logger.WriteLine("[TRADE] CloseActiveTrade ignored: close operation already in progress.");
+            return;
+        }
+
+        try
+        {
+            var position = _orderHelper.GetPosition();
+            if (position.NetQuantity == 0)
             {
-                await OnSell();
+                _logger.WriteLine("[TRADE] CloseActiveTrade requested but net position is flat.");
+                return;
             }
-            else if (string.Equals(order.Action, "SELL", StringComparison.OrdinalIgnoreCase))
+
+            _logger.WriteLine($"[TRADE] CloseActiveTrade requested for net {position.Quantity} {position.Direction} position.");
+            if (position.NetQuantity > 0)
             {
-                await OnBuy();
+                await OnSell(position.Quantity);
             }
+            else
+            {
+                await OnBuy(position.Quantity);
+            }
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _isClosingTrade, 0);
         }
     }
 }
