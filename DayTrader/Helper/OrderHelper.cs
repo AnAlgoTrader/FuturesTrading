@@ -13,20 +13,40 @@ namespace DayTrader.Helper;
 
 public class OrderHelper
 {
-    private List<OrderPersistence> _orders = new();
+    private List<OrderPersistence> _activeOrders = new();
+    private PositionSummary _position = new();
     private readonly string _ordersPath;
+    private readonly string _positionPath;
     private readonly Logger _logger;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
     public event Action<IReadOnlyList<OrderPersistence>> OnOrdersChanged;
+    public event Action<PositionSummary> OnPositionChanged;
 
-    public IReadOnlyList<OrderPersistence> Orders
+    public IReadOnlyList<OrderPersistence> ActiveOrders
     {
         get
         {
-            lock (_orders)
+            lock (_activeOrders)
             {
-                return _orders.ToList();
+                return _activeOrders.ToList();
+            }
+        }
+    }
+
+    public PositionSummary Position
+    {
+        get
+        {
+            lock (_position)
+            {
+                return new PositionSummary
+                {
+                    NetQuantity = _position.NetQuantity,
+                    Direction = _position.Direction,
+                    Quantity = _position.Quantity,
+                    AveragePrice = _position.AveragePrice
+                };
             }
         }
     }
@@ -35,14 +55,15 @@ public class OrderHelper
     {
         _logger = logger;
         _ordersPath = Path.Combine(Logger.DATA_DIR, "orders.json");
+        _positionPath = Path.Combine(Logger.DATA_DIR, "position.json");
     }
-    
+
     public async Task PersistOrder(Order order)
     {
         await _lock.WaitAsync();
         try
         {
-            _orders.Add(new OrderPersistence
+            _activeOrders.Add(new OrderPersistence
             {
                 OrderId = order.OrderId,
                 Action = order.Action,
@@ -52,8 +73,8 @@ public class OrderHelper
                 Status = "Unknown"
             });
             _logger?.WriteLine($"[ORDER] Persisted OrderId:{order.OrderId} Action:{order.Action} Qty:{order.TotalQuantity} LmtPrice:{order.LmtPrice}");
-            await SaveCurrentOrdersInternal();
-            OnOrdersChanged?.Invoke(_orders.ToList());
+            await SaveActiveOrdersInternal();
+            OnOrdersChanged?.Invoke(ActiveOrders);
         }
         catch (Exception ex)
         {
@@ -64,44 +85,24 @@ public class OrderHelper
             _lock.Release();
         }
     }
-    
-    public async Task ReadCurrentOrders()
+
+    public async Task ReadCurrentState()
     {
         await _lock.WaitAsync();
         try
         {
             Directory.CreateDirectory(Logger.DATA_DIR);
-            if (File.Exists(_ordersPath))
-            {
-                var json = await File.ReadAllTextAsync(_ordersPath);
-                if (!string.IsNullOrWhiteSpace(json))
-                {
-                    _orders = JsonSerializer.Deserialize<List<OrderPersistence>>(json) ?? new List<OrderPersistence>();
-                }
-                else
-                {
-                    _orders = new List<OrderPersistence>();
-                }
-            }
-            else
-            {
-                _orders = new List<OrderPersistence>();
-            }
-
-            _logger?.WriteLine($"[ORDER] Loaded {_orders.Count} existing order(s) from {_ordersPath}");
-
-            bool cleaned = CleanOrdersInternal();
-            if (cleaned)
-            {
-                await SaveCurrentOrdersInternal();
-            }
-
-            OnOrdersChanged?.Invoke(_orders.ToList());
+            _activeOrders = await ReadOrdersInternal();
+            _position = await ReadPositionInternal();
+            _logger?.WriteLine($"[ORDER] Loaded {_activeOrders.Count} active order(s) and position ({Describe(_position)})");
+            OnOrdersChanged?.Invoke(ActiveOrders);
+            OnPositionChanged?.Invoke(Position);
         }
         catch (Exception ex)
         {
-            _logger?.WriteLine($"[ORDER] Error reading orders: {ex.Message}");
-            _orders = new List<OrderPersistence>();
+            _logger?.WriteLine($"[ORDER] Error reading state: {ex.Message}");
+            _activeOrders = new List<OrderPersistence>();
+            _position = new PositionSummary();
         }
         finally
         {
@@ -114,20 +115,34 @@ public class OrderHelper
         await _lock.WaitAsync();
         try
         {
-            var order = _orders.FirstOrDefault(o => o.OrderId == status.OrderId);
-            if (order != null)
-            {
-                order.Status = status.Status;
-                _logger?.WriteLine($"[ORDER] Status updated: OrderId:{status.OrderId} -> {status.Status}");
-            }
-            else
+            var order = _activeOrders.FirstOrDefault(o => o.OrderId == status.OrderId);
+            if (order == null)
             {
                 _logger?.WriteLine($"[ORDER] Received status for untracked OrderId:{status.OrderId} ({status.Status})");
+                return;
             }
 
-            CleanOrdersInternal();
-            await SaveCurrentOrdersInternal();
-            OnOrdersChanged?.Invoke(_orders.ToList());
+            order.Status = status.Status;
+            order.AvgFillPrice = status.AvgFillPrice > 0 ? status.AvgFillPrice : order.AvgFillPrice;
+            order.FilledQuantity = status.Filled > 0 ? status.Filled : order.FilledQuantity;
+            _logger?.WriteLine($"[ORDER] Status updated: OrderId:{status.OrderId} -> {status.Status} FillQty:{order.FilledQuantity} AvgFill:{order.AvgFillPrice:F2}");
+
+            if (IsTerminalStatus(status.Status))
+            {
+                if (string.Equals(status.Status, "Filled", StringComparison.OrdinalIgnoreCase) &&
+                    order.FilledQuantity > 0)
+                {
+                    var fillPrice = order.AvgFillPrice > 0 ? order.AvgFillPrice : order.LmtPrice;
+                    ApplyFillInternal(order.Action, order.FilledQuantity, fillPrice);
+                    _logger?.WriteLine($"[POSITION] Fill applied. {Describe(_position)}");
+                    await SavePositionInternal();
+                }
+
+                _activeOrders.Remove(order);
+                await SaveActiveOrdersInternal();
+                OnOrdersChanged?.Invoke(ActiveOrders);
+                OnPositionChanged?.Invoke(Position);
+            }
         }
         catch (Exception ex)
         {
@@ -139,31 +154,80 @@ public class OrderHelper
         }
     }
 
-    private bool CleanOrdersInternal()
+    /// <summary>
+    /// Applies a fill (with sign from action) to the aggregated net position,
+    /// updating the average entry price as the position grows, shrinks, or flips.
+    /// </summary>
+    private void ApplyFillInternal(string action, decimal filledQty, double fillPrice)
     {
-        if (_orders.Count == 0)
-            return false;
+        decimal sign = string.Equals(action, "BUY", StringComparison.OrdinalIgnoreCase) ? 1 : -1;
+        if (filledQty <= 0 || fillPrice <= 0)
+            return;
 
-        var filledOrders = _orders.Where(o => string.Equals(o.Status, "Filled", StringComparison.OrdinalIgnoreCase)).ToList();
-        var pendingOrders = _orders.Where(o => !IsTerminalStatus(o.Status)).ToList();
+        var q = _position.NetQuantity;
+        var a = _position.AveragePrice;
+        var newQ = q + sign * filledQty;
 
-        // If there are pending orders still active, do not clean yet
-        if (pendingOrders.Count > 0)
-            return false;
-
-        // Calculate total filled Buy qty vs total filled Sell qty
-        decimal buyFilledQty = filledOrders.Where(o => string.Equals(o.Action, "BUY", StringComparison.OrdinalIgnoreCase)).Sum(o => o.TotalQuantity);
-        decimal sellFilledQty = filledOrders.Where(o => string.Equals(o.Action, "SELL", StringComparison.OrdinalIgnoreCase)).Sum(o => o.TotalQuantity);
-
-        // If a full round-trip occurred (buys equal sells > 0) or all orders were cancelled/inactive
-        if ((buyFilledQty > 0 && buyFilledQty == sellFilledQty) || (filledOrders.Count == 0 && _orders.Count > 0))
+        double newAvg;
+        if (q == 0)
         {
-            _logger?.WriteLine($"[ORDER] Orders cleaned: Round-trip complete (BUY:{buyFilledQty}, SELL:{sellFilledQty}). Resetting active orders.");
-            _orders.Clear();
-            return true;
+            newAvg = fillPrice;
+        }
+        else if (newQ == 0)
+        {
+            newAvg = 0;
+        }
+        else if (Math.Sign(newQ) == Math.Sign(q))
+        {
+            newAvg = Math.Abs(newQ) > Math.Abs(q)
+                ? (a * (double)Math.Abs(q) + fillPrice * (double)filledQty) / (double)Math.Abs(newQ)
+                : a;
+        }
+        else
+        {
+            newAvg = fillPrice;
         }
 
-        return false;
+        _position.NetQuantity = newQ;
+        _position.AveragePrice = newAvg;
+        _position.Quantity = Math.Abs(newQ);
+        _position.Direction = newQ > 0 ? "BUY" : newQ < 0 ? "SELL" : "";
+    }
+
+    private async Task SaveActiveOrdersInternal()
+    {
+        Directory.CreateDirectory(Logger.DATA_DIR);
+        var json = JsonSerializer.Serialize(_activeOrders, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(_ordersPath, json);
+    }
+
+    private async Task SavePositionInternal()
+    {
+        Directory.CreateDirectory(Logger.DATA_DIR);
+        var json = JsonSerializer.Serialize(_position, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(_positionPath, json);
+    }
+
+    private async Task<List<OrderPersistence>> ReadOrdersInternal()
+    {
+        if (File.Exists(_ordersPath))
+        {
+            var json = await File.ReadAllTextAsync(_ordersPath);
+            if (!string.IsNullOrWhiteSpace(json))
+                return JsonSerializer.Deserialize<List<OrderPersistence>>(json) ?? new List<OrderPersistence>();
+        }
+        return new List<OrderPersistence>();
+    }
+
+    private async Task<PositionSummary> ReadPositionInternal()
+    {
+        if (File.Exists(_positionPath))
+        {
+            var json = await File.ReadAllTextAsync(_positionPath);
+            if (!string.IsNullOrWhiteSpace(json))
+                return JsonSerializer.Deserialize<PositionSummary>(json) ?? new PositionSummary();
+        }
+        return new PositionSummary();
     }
 
     private static bool IsTerminalStatus(string status)
@@ -171,10 +235,11 @@ public class OrderHelper
         return status is "Filled" or "Cancelled" or "Inactive" or "ApiCancelled";
     }
 
-    private async Task SaveCurrentOrdersInternal()
+    private static string Describe(PositionSummary p)
     {
-        Directory.CreateDirectory(Logger.DATA_DIR);
-        var json = JsonSerializer.Serialize(_orders, new JsonSerializerOptions { WriteIndented = true });
-        await File.WriteAllTextAsync(_ordersPath, json);
+        double totalDollar = p.NetQuantity != 0 ? (double)p.NetQuantity * p.AveragePrice * 2.0 : 0;
+        return p.NetQuantity == 0
+            ? "FLAT"
+            : $"{p.Direction} {Math.Abs(p.NetQuantity)} @ {p.AveragePrice:F2} (notional ${totalDollar:F2})";
     }
 }

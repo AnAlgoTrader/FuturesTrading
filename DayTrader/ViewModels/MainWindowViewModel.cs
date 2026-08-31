@@ -1,9 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using DayTrader.Helper;
-using DayTrader.Models;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Helper;
 using Ib.Csharp.Api.Client.Implementation.Model;
@@ -15,7 +13,7 @@ namespace DayTrader.ViewModels;
 
 public class MainWindowViewModel : ViewModelBase
 {
-    private const decimal OrderQuantity = 5;
+    private const decimal OrderQuantity = 1;
 
     private readonly IbClient _client = new();
     private readonly BufferedLeeReadyClassifier _classifier = new();
@@ -43,19 +41,15 @@ public class MainWindowViewModel : ViewModelBase
     {
         _logger = new Logger();
         _orderHelper = new OrderHelper(_logger);
-        _orderHelper.OnOrdersChanged += HandleOrdersChanged;
-        
+        _orderHelper.OnOrdersChanged += _ => UpdateOrderLine(_currentMarketPrice);
+        _orderHelper.OnPositionChanged += _ => UpdateOrderLine(_currentMarketPrice);
+
         _volumeClassifier = new BetterVolumeClassifier(_logger, lookBack: 20,
             churnSpreadMultiplier: 1.1,
             absorptionDeltaRatioThreshold: 0.3,
             absorptionSpreadMaxMultiplier: 0.8);
 
         _ = InitAndSubscribe();
-    }
-
-    private void HandleOrdersChanged(IReadOnlyList<OrderPersistence> orders)
-    {
-        UpdateOrderLine(_currentMarketPrice);
     }
 
     private void UpdateOrderLine(double currentPrice)
@@ -65,20 +59,19 @@ public class MainWindowViewModel : ViewModelBase
             _currentMarketPrice = currentPrice;
         }
 
-        var orders = _orderHelper.Orders;
-        if (orders != null && orders.Count == 1 && string.Equals(orders[0].Status, "Filled", StringComparison.OrdinalIgnoreCase))
+        var position = _orderHelper.Position;
+        if (position.NetQuantity != 0 && position.AveragePrice > 0)
         {
-            var order = orders[0];
-            var entryPrice = order.LmtPrice;
-            var isBuy = string.Equals(order.Action, "BUY", StringComparison.OrdinalIgnoreCase);
+            var entryPrice = position.AveragePrice;
+            var isBuy = string.Equals(position.Direction, "BUY", StringComparison.OrdinalIgnoreCase);
 
             var evalPrice = _currentMarketPrice > 0 ? _currentMarketPrice : entryPrice;
             double pnlPoints = isBuy ? (evalPrice - entryPrice) : (entryPrice - evalPrice);
-            double pnlDollar = pnlPoints * 2.0 * (double)order.TotalQuantity;
+            double pnlDollar = pnlPoints * 2.0 * (double)Math.Abs(position.NetQuantity);
             var color = pnlDollar >= 0 ? "#26a69a" : "#ef5350";
 
             string sign = pnlDollar >= 0 ? "+" : "";
-            string pnlTitle = $"{sign}${pnlDollar:F2} ({sign}{pnlPoints:F2} pts)";
+            string pnlTitle = $"{sign}${pnlDollar:F2} ({sign}{pnlPoints:F2} pts) @ {position.AveragePrice:F2}";
 
             OnOrderPriceLine?.Invoke(entryPrice, color, pnlTitle);
         }
@@ -90,7 +83,7 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task InitAndSubscribe()
     {
-        await _orderHelper.ReadCurrentOrders();
+        await _orderHelper.ReadCurrentState();
 
         _client.OnNotification += msg => _logger.WriteLine($"[IB] {msg}");
         _client.Start("127.0.0.1", 4001, 0);
@@ -223,19 +216,21 @@ public class MainWindowViewModel : ViewModelBase
 
     public async Task CloseActiveTrade()
     {
-        var orders = _orderHelper.Orders;
-        if (orders is { Count: 1 } && string.Equals(orders[0].Status, "Filled", StringComparison.OrdinalIgnoreCase))
+        var position = _orderHelper.Position;
+        if (position.NetQuantity == 0)
         {
-            var order = orders[0];
-            _logger.WriteLine($"[TRADE] CloseActiveTrade requested for {order.Action} order {order.OrderId}");
-            if (string.Equals(order.Action, "BUY", StringComparison.OrdinalIgnoreCase))
-            {
-                await OnSell();
-            }
-            else if (string.Equals(order.Action, "SELL", StringComparison.OrdinalIgnoreCase))
-            {
-                await OnBuy();
-            }
+            _logger.WriteLine("[TRADE] CloseActiveTrade requested but position is flat.");
+            return;
+        }
+
+        _logger.WriteLine($"[TRADE] CloseActiveTrade: closing {position.Direction} {Math.Abs(position.NetQuantity)} @ {position.AveragePrice:F2}");
+        if (string.Equals(position.Direction, "BUY", StringComparison.OrdinalIgnoreCase))
+        {
+            await OnSell();
+        }
+        else if (string.Equals(position.Direction, "SELL", StringComparison.OrdinalIgnoreCase))
+        {
+            await OnBuy();
         }
     }
 }
