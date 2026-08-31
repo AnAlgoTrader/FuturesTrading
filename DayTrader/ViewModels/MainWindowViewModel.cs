@@ -184,36 +184,12 @@ public class MainWindowViewModel : ViewModelBase
 
     public async Task OnBuy()
     {
-        var order = new Order
-        {
-            OrderId = _client.GetNextValidId(),
-            Action = "BUY",
-            TotalQuantity = OrderQuantity,
-            OrderType = "LMT",
-            LmtPrice = _bestPrice.AskPrice,
-            Transmit = true,
-            Tif = "GTC"
-        };
-        await _orderHelper.PersistOrder(order);
-        _client.PlaceOrder(_tradingContract?.Contract, order);
-        _logger.WriteLine($"[TRADE] OrderId:{order.OrderId} - Action:{order.Action} - Quantity:{order.TotalQuantity} - EntryPrice:{order.LmtPrice}");
+        await SubmitOrder("BUY", OrderQuantity, _bestPrice.AskPrice);
     }
 
     public async Task OnSell()
     {
-        var order = new Order
-        {
-            OrderId = _client.GetNextValidId(),
-            Action = "SELL",
-            TotalQuantity = OrderQuantity,
-            OrderType = "LMT",
-            LmtPrice = _bestPrice.BidPrice,
-            Transmit = true,
-            Tif = "GTC"
-        };
-        await _orderHelper.PersistOrder(order);
-        _client.PlaceOrder(_tradingContract?.Contract, order);
-        _logger.WriteLine($"[TRADE] OrderId:{order.OrderId} - Action:{order.Action} - Quantity:{order.TotalQuantity} - EntryPrice:{order.LmtPrice}");
+        await SubmitOrder("SELL", OrderQuantity, _bestPrice.BidPrice);
     }
 
     public async Task CloseActiveTrade()
@@ -233,20 +209,34 @@ public class MainWindowViewModel : ViewModelBase
                 return;
             }
 
-            _logger.WriteLine($"[TRADE] CloseActiveTrade: closing {position.Direction} {Math.Abs(position.NetQuantity)} @ {position.AveragePrice:F2}");
-            if (string.Equals(position.Direction, "BUY", StringComparison.OrdinalIgnoreCase))
-            {
-                await OnSell();
-            }
-            else if (string.Equals(position.Direction, "SELL", StringComparison.OrdinalIgnoreCase))
-            {
-                await OnBuy();
-            }
+            var closeQty = Math.Abs(position.NetQuantity);
+            var closeAction = string.Equals(position.Direction, "BUY", StringComparison.OrdinalIgnoreCase) ? "SELL" : "BUY";
+            var closePrice = string.Equals(closeAction, "BUY", StringComparison.OrdinalIgnoreCase) ? _bestPrice.AskPrice : _bestPrice.BidPrice;
+
+            _logger.WriteLine($"[TRADE] CloseActiveTrade: closing {position.Direction} {closeQty} @ {position.AveragePrice:F2} with {closeAction} {closeQty}");
+            await SubmitOrder(closeAction, closeQty, closePrice);
             _logger.WriteLine("[TRADE] CloseActiveTrade: close order submitted.");
         }
         finally
         {
             Interlocked.Exchange(ref _closeTradeInProgress, 0);
         }
+    }
+
+    private async Task SubmitOrder(string action, decimal quantity, double price)
+    {
+        var order = new Order
+        {
+            OrderId = _client.GetNextValidId(),
+            Action = action,
+            TotalQuantity = quantity,
+            OrderType = "LMT",
+            LmtPrice = price,
+            Transmit = true,
+            Tif = "GTC"
+        };
+        await _orderHelper.PersistOrder(order);
+        _client.PlaceOrder(_tradingContract?.Contract, order);
+        _logger.WriteLine($"[TRADE] OrderId:{order.OrderId} - Action:{order.Action} - Quantity:{order.TotalQuantity} - EntryPrice:{order.LmtPrice}");
     }
 }
