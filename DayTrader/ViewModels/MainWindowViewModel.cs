@@ -14,7 +14,7 @@ namespace DayTrader.ViewModels;
 
 public class MainWindowViewModel : ViewModelBase
 {
-    private const decimal OrderQuantity = 1;
+    private const decimal OrderQuantity = 5;
 
     private readonly IbClient _client = new();
     private readonly BufferedLeeReadyClassifier _classifier = new();
