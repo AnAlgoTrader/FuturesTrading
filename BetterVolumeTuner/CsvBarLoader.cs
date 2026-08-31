@@ -15,12 +15,19 @@ public static class CsvBarLoader
     public static List<Bar> Load(string csvPath)
     {
         var bars = new List<Bar>();
-        var lines = File.ReadLines(csvPath);
 
-        bool headerSkipped = false;
-        foreach (var line in lines)
+        // Auto-detect timestamp format from the first data line.
+        //   NQ: "12/26/2022 18:01"   ET local, no timezone
+        //   ES: "2025-10-02T13:14:00Z"  ISO8601 UTC
+        bool formatUtc = PeekFormat(csvPath);
+
+        foreach (var line in File.ReadLines(csvPath))
         {
-            if (!headerSkipped) { headerSkipped = true; continue; }
+            // Skip header (first line) and any empty lines
+            if (line.Length == 0) continue;
+            bool isHeader = line.StartsWith("time", StringComparison.OrdinalIgnoreCase)
+                         || line.StartsWith("timestamp", StringComparison.OrdinalIgnoreCase);
+            if (isHeader) continue;
             if (string.IsNullOrWhiteSpace(line)) continue;
 
             var parts = line.Split(',');
@@ -28,19 +35,13 @@ public static class CsvBarLoader
 
             try
             {
-                // timestamp ET, open, high, low, close, volume
-                var timestamp = DateTime.ParseExact(
-                    parts[0].Trim(),
-                    "MM/dd/yyyy HH:mm",
-                    CultureInfo.InvariantCulture);
+                long epochSeconds = ParseTimestamp(parts[0].Trim(), formatUtc: formatUtc);
 
                 double open = double.Parse(parts[1], CultureInfo.InvariantCulture);
                 double high = double.Parse(parts[2], CultureInfo.InvariantCulture);
                 double low = double.Parse(parts[3], CultureInfo.InvariantCulture);
                 double close = double.Parse(parts[4], CultureInfo.InvariantCulture);
                 decimal volume = decimal.Parse(parts[5], CultureInfo.InvariantCulture);
-
-                long epochSeconds = new DateTimeOffset(timestamp).ToUnixTimeSeconds();
 
                 // Approximate delta via close-vs-open split
                 decimal buyVolume, sellVolume;
@@ -91,5 +92,36 @@ public static class CsvBarLoader
         }
 
         return bars;
+    }
+
+    /// <summary>
+    /// Reads the first data line of the CSV and determines whether timestamps
+    /// are ISO8601 UTC (ES) or ET local (NQ).
+    /// </summary>
+    private static bool PeekFormat(string csvPath)
+    {
+        using var reader = new StreamReader(csvPath);
+        reader.ReadLine(); // header
+        string? first = reader.ReadLine(); // first data line
+        if (string.IsNullOrEmpty(first)) return true;
+
+        // ISO8601 with 'T' separator and 'Z' suffix => UTC
+        bool isUtc = first.Contains('T') && first.Contains('Z');
+        return isUtc;
+    }
+
+    private static long ParseTimestamp(string ts, bool formatUtc)
+    {
+        if (formatUtc)
+        {
+            var dt = DateTimeOffset.Parse(ts, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+            return dt.ToUnixTimeSeconds();
+        }
+
+        // NQ format: "MM/dd/yyyy HH:mm" — ET local (America/New_York), no timezone
+        var local = DateTime.ParseExact(ts, "MM/dd/yyyy HH:mm", CultureInfo.InvariantCulture);
+        var eastern = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+        var utc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), eastern);
+        return new DateTimeOffset(utc).ToUnixTimeSeconds();
     }
 }

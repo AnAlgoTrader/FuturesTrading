@@ -1,8 +1,14 @@
 using System.Diagnostics;
 using System.Text;
 
-const string csvPath = "../Data/Dataset_NQ_1min_2022_2025.csv";
-const string outputPath = "sweep_results.txt";
+// Dataset path: pass --data <path> to override; defaults to NQ.
+string csvPath = "../Data/Dataset_NQ_1min_2022_2025.csv";
+for (int ai = 0; ai < args.Length - 1; ai++)
+{
+    if (args[ai] == "--data")
+        csvPath = args[ai + 1];
+}
+string outputPath = "sweep_results.txt";
 
 // Tee Console.Out to both stdout and a file
 var fileWriter = new StreamWriter(outputPath) { AutoFlush = true };
@@ -38,6 +44,39 @@ Console.WriteLine($"  Avg spread: {bars.Average(b => b.Spread):F2}");
 Console.WriteLine();
 
 // Run sweep
+if (args.Contains("--churn-scan"))
+{
+    Console.WriteLine("Running Churn reversal filter scan (no full sweep)...");
+    Console.WriteLine();
+    using (var logger = new DayTrader.Helper.SilentLogger())
+    {
+        var scan = new BetterVolumeTuner.ChurnReversalScan(bars, logger);
+        var rows = scan.Run(
+            new[] { 5, 10, 20 },
+            new[] { 2, 4, 6, 8 },
+            new[] { 0.10, 0.25, 0.40 });
+        BetterVolumeTuner.ConsoleReporter.PrintChurnReversalScan(rows);
+    }
+    Console.WriteLine($"Done. Results saved to {outputPath}");
+    fileWriter.Flush();
+    Console.SetOut(originalOut);
+    fileWriter.Close();
+    return;
+}
+
+// Run sweep
+if (args.Contains("--churn-only"))
+{
+    Console.WriteLine("Skipping parameter sweep (--churn-only).");
+    Console.WriteLine();
+    PrintChurnReversal(bars);
+    Console.WriteLine($"Done. Results saved to {outputPath}");
+    fileWriter.Flush();
+    Console.SetOut(originalOut);
+    fileWriter.Close();
+    return;
+}
+
 Console.WriteLine("Starting parameter sweep (2880 combinations)...");
 Console.WriteLine();
 sw.Restart();
@@ -53,6 +92,7 @@ BetterVolumeTuner.ConsoleReporter.PrintTopResults(results, topN: 20);
 BetterVolumeTuner.ConsoleReporter.PrintSignalBreakdown(results.First());
 BetterVolumeTuner.ConsoleReporter.PrintSignalDistribution(results);
 BetterVolumeTuner.ConsoleReporter.PrintParameterSensitivity(results);
+PrintChurnReversal(bars);
 
 Console.WriteLine($"Done. Results saved to {outputPath}");
 
@@ -60,6 +100,18 @@ Console.WriteLine($"Done. Results saved to {outputPath}");
 fileWriter.Flush();
 Console.SetOut(originalOut);
 fileWriter.Close();
+
+static void PrintChurnReversal(List<DayTrader.Helper.Bar> bars)
+{
+    Console.WriteLine();
+    Console.WriteLine("Running Churn-after-trend reversal hypothesis test...");
+    using (var logger = new DayTrader.Helper.SilentLogger())
+    {
+        var churnTest = new BetterVolumeTuner.ChurnReversalTest(bars, logger);
+        var churnReport = churnTest.Run();
+        BetterVolumeTuner.ConsoleReporter.PrintChurnReversal(churnReport);
+    }
+}
 
 /// <summary>
 /// TextWriter that tees output to two writers simultaneously.

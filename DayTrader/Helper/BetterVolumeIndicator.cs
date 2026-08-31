@@ -165,10 +165,10 @@ public class BetterVolumeClassifier
 
     public BetterVolumeClassifier(
         Logger logger,
-        int lookBack = 50,
+        int lookBack = 30,
         double churnSpreadMultiplier = 2.5,
-        double absorptionDeltaRatioThreshold = 0.6,
-        double absorptionSpreadMaxMultiplier = 0.5,
+        double absorptionDeltaRatioThreshold = 0.7,
+        double absorptionSpreadMaxMultiplier = 0.7,
         int stackedImbalanceCount = 4,
         double stackedImbalanceDeltaRatioThreshold = 0.6,
         int minSignalPersistence = 1)
