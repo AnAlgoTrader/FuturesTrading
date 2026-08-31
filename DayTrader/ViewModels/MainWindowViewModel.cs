@@ -46,10 +46,12 @@ public class MainWindowViewModel : ViewModelBase
         _orderHelper.OnOrdersChanged += _ => UpdateOrderLine(_currentMarketPrice);
         _orderHelper.OnPositionChanged += _ => UpdateOrderLine(_currentMarketPrice);
 
-        _volumeClassifier = new BetterVolumeClassifier(_logger, lookBack: 20,
-            churnSpreadMultiplier: 1.1,
-            absorptionDeltaRatioThreshold: 0.3,
-            absorptionSpreadMaxMultiplier: 0.8);
+        _volumeClassifier = new BetterVolumeClassifier(_logger, lookBack: 50,
+            churnSpreadMultiplier: 2.5,
+            absorptionDeltaRatioThreshold: 0.6,
+            absorptionSpreadMaxMultiplier: 0.5,
+            stackedImbalanceCount: 4,
+            stackedImbalanceDeltaRatioThreshold: 0.6);
 
         _ = InitAndSubscribe();
     }

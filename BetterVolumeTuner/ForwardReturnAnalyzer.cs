@@ -78,22 +78,49 @@ public class ForwardReturnAnalyzer
     /// <summary>
     /// Composite score: weighted sum of absolute information ratios across horizons.
     /// Higher = more predictive signal.
+    ///
+    /// Per-signal weights control how much each signal type contributes to the
+    /// overall score, independent of how often it fires. This prevents a
+    /// frequency-dominated, low-value signal like LowVolume from overwhelming
+    /// rare-but-informative signals like Absorption, and lets the sweep favor
+    /// parameter sets that make the genuinely predictive signals actionable.
+    ///
+    /// Signals with fewer than minSamples observations are heavily discounted,
+    /// since an IR computed on a handful of bars is statistically meaningless.
     /// </summary>
-    public double GetCompositeScore()
+    public double GetCompositeScore(
+        Dictionary<DayTrader.Helper.VolumeSignal, double>? signalWeights = null,
+        int minSamples = 50)
     {
-        double score = 0;
-        foreach (var (_, horizons) in _returns)
+        // Default weights: emphasize high-willpower microstructure signals over
+        // the frequent but weak LowVolume marker.
+        signalWeights ??= new Dictionary<DayTrader.Helper.VolumeSignal, double>
         {
+            [DayTrader.Helper.VolumeSignal.ClimaxUp] = 1.2,
+            [DayTrader.Helper.VolumeSignal.ClimaxDown] = 1.2,
+            [DayTrader.Helper.VolumeSignal.Churn] = 1.0,
+            [DayTrader.Helper.VolumeSignal.LowVolume] = 0.25,
+            [DayTrader.Helper.VolumeSignal.Absorption] = 1.5,
+            [DayTrader.Helper.VolumeSignal.StackedImbalance] = 1.5,
+        };
+
+        double score = 0;
+        foreach (var (key, horizons) in _returns)
+        {
+            double sigWeight = signalWeights.GetValueOrDefault(key.Signal, 0.5);
+
             foreach (var (h, rets) in horizons)
             {
-                if (rets.Count < 10) continue;
+                if (rets.Count < Math.Min(minSamples, 10)) continue;
                 double mean = rets.Average();
                 double variance = rets.Sum(r => (r - mean) * (r - mean)) / rets.Count;
                 double std = Math.Sqrt(variance);
                 double ir = std > 0 ? Math.Abs(mean) / std : 0;
                 // Weight shorter horizons more
                 double weight = 1.0 / Math.Sqrt(h);
-                score += ir * weight;
+                // Discount signals with too few samples to be reliable
+                double sampleDiscount = rets.Count < minSamples ? (double)rets.Count / minSamples : 1.0;
+                score += ir * weight * sigWeight * sampleDiscount;
             }
         }
         return score;

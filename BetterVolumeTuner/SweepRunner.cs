@@ -87,6 +87,17 @@ public class SweepRunner
 
         var stats = analyzer.GetStats();
         double compositeScore = analyzer.GetCompositeScore();
+        double unweightedScore = analyzer.GetCompositeScore(
+            new Dictionary<VolumeSignal, double>
+            {
+                [VolumeSignal.ClimaxUp] = 1.0,
+                [VolumeSignal.ClimaxDown] = 1.0,
+                [VolumeSignal.Churn] = 1.0,
+                [VolumeSignal.LowVolume] = 1.0,
+                [VolumeSignal.Absorption] = 1.0,
+                [VolumeSignal.StackedImbalance] = 1.0,
+            },
+            minSamples: 10);
 
         int totalSignals = signalCounts.Where(kvp => kvp.Key != VolumeSignal.Normal).Sum(kvp => kvp.Value);
         double signalRate = _bars.Count > 0 ? (double)totalSignals / _bars.Count : 0;
@@ -100,6 +111,7 @@ public class SweepRunner
             StackedImbalanceCount = stackCount,
             StackedImbalanceDeltaRatioThreshold = stackDeltaRatio,
             CompositeScore = compositeScore,
+            UnweightedScore = unweightedScore,
             SignalRate = signalRate,
             TotalBars = _bars.Count,
             TotalSignals = totalSignals,
@@ -118,6 +130,7 @@ public class SweepResult
     public int StackedImbalanceCount { get; set; }
     public double StackedImbalanceDeltaRatioThreshold { get; set; }
     public double CompositeScore { get; set; }
+    public double UnweightedScore { get; set; }
     public double SignalRate { get; set; }
     public int TotalBars { get; set; }
     public int TotalSignals { get; set; }

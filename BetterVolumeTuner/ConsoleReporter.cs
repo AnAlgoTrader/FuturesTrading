@@ -15,7 +15,7 @@ public static class ConsoleReporter
         Console.WriteLine("═══════════════════════════════════════════════════════════════════════════════");
         Console.WriteLine();
 
-        var header = $"{"Rank",-5} {"Score",8} {"LB",4} {"Churn",6} {"AbsDR",6} {"AbsSM",6} {"StkN",5} {"StkDR",6} {"SigRate",8} {"#Signals",8}";
+        var header = $"{"Rank",-5} {"Score",8} {"Unwtd",8} {"LB",4} {"Churn",6} {"AbsDR",6} {"AbsSM",6} {"StkN",5} {"StkDR",6} {"SigRate",8} {"#Signals",8}";
         Console.WriteLine(header);
         Console.WriteLine(new string('─', header.Length));
 
@@ -23,7 +23,7 @@ public static class ConsoleReporter
         {
             var r = results[i];
             Console.WriteLine(
-                $"{i + 1,-5} {r.CompositeScore,8:F4} {r.LookBack,4} {r.ChurnSpreadMultiplier,6:F1} " +
+                $"{i + 1,-5} {r.CompositeScore,8:F4} {r.UnweightedScore,8:F4} {r.LookBack,4} {r.ChurnSpreadMultiplier,6:F1} " +
                 $"{r.AbsorptionDeltaRatioThreshold,6:F1} {r.AbsorptionSpreadMaxMultiplier,6:F1} " +
                 $"{r.StackedImbalanceCount,5} {r.StackedImbalanceDeltaRatioThreshold,6:F1} " +
                 $"{r.SignalRate,8:P1} {r.TotalSignals,8}");
