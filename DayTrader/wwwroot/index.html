@@ -271,6 +271,44 @@
             updateCloseButtonPosition();
         };
 
+        var activeMagnetLines = [];
+
+        window.setMagnetLines = function (lines) {
+            if (activeMagnetLines && activeMagnetLines.length > 0) {
+                for (var i = 0; i < activeMagnetLines.length; i++) {
+                    try {
+                        series.removePriceLine(activeMagnetLines[i]);
+                    } catch (e) {}
+                }
+                activeMagnetLines = [];
+            }
+
+            if (!lines || !Array.isArray(lines) || lines.length === 0) {
+                return;
+            }
+
+            for (var j = 0; j < lines.length; j++) {
+                var item = lines[j];
+                if (!item || !item.price || item.price <= 0) continue;
+
+                var lineOptions = {
+                    price: item.price,
+                    color: item.color || '#ba68c8',
+                    lineWidth: item.percentage >= 50 ? 2 : 1,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: item.title || (item.percentage ? ('Magnet ' + item.percentage.toFixed(1) + '%') : 'Magnet')
+                };
+
+                try {
+                    var line = series.createPriceLine(lineOptions);
+                    activeMagnetLines.push(line);
+                } catch (e) {
+                    console.error('Error creating magnet line:', e);
+                }
+            }
+        };
+
         chart.timeScale().subscribeVisibleLogicalRangeChange(function () {
             updateCloseButtonPosition();
         });

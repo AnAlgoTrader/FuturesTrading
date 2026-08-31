@@ -1,10 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using DayTrader.Helper;
+using DayTrader.Models;
 using DayTrader.ViewModels;
 
 namespace DayTrader.Views;
@@ -12,8 +16,9 @@ namespace DayTrader.Views;
 public partial class MainWindow : Window
 {
     private readonly NativeWebView _chart;
-    private readonly System.Collections.Generic.List<(Bar Bar, string Color)> _pendingCandles = new();
+    private readonly List<(Bar Bar, string Color)> _pendingCandles = new();
     private (double Price, string Color, string Title)? _pendingOrderLine;
+    private IReadOnlyList<MagnetLevel> _pendingMagnetLevels;
     private MainWindowViewModel _viewModel;
     private bool _chartReady;
 
@@ -48,6 +53,7 @@ public partial class MainWindow : Window
             {
                 _viewModel.OnBarPush -= PushCandle;
                 _viewModel.OnOrderPriceLine -= SetOrderPriceLine;
+                _viewModel.OnMagnetLevels -= SetMagnetLevels;
             }
 
             _viewModel = DataContext as MainWindowViewModel;
@@ -55,6 +61,7 @@ public partial class MainWindow : Window
             {
                 _viewModel.OnBarPush += PushCandle;
                 _viewModel.OnOrderPriceLine += SetOrderPriceLine;
+                _viewModel.OnMagnetLevels += SetMagnetLevels;
             }
         };
     }
@@ -87,12 +94,36 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() => _ = InvokeScript(script));
     }
 
+    private void SetMagnetLevels(IReadOnlyList<MagnetLevel> levels)
+    {
+        if (!_chartReady)
+        {
+            _pendingMagnetLevels = levels;
+            return;
+        }
+
+        var lineDtos = levels
+            .Where(l => l.Percentage > 20.0 && l.Strike > 0)
+            .Select(l => new
+            {
+                price = l.Strike,
+                percentage = l.Percentage,
+                title = $"Magnet {l.Percentage:F1}%",
+                color = l.Percentage >= 50.0 ? "#ba68c8" : "#9575cd"
+            })
+            .ToList();
+
+        var json = JsonSerializer.Serialize(lineDtos);
+        var script = $"window.setMagnetLines({json})";
+        Dispatcher.UIThread.Post(() => _ = InvokeScript(script));
+    }
+
     private void FlushPendingCandles()
     {
-        System.Collections.Generic.List<(Bar Bar, string Color)> candles;
+        List<(Bar Bar, string Color)> candles;
         lock (_pendingCandles)
         {
-            candles = new System.Collections.Generic.List<(Bar Bar, string Color)>(_pendingCandles);
+            candles = new List<(Bar Bar, string Color)>(_pendingCandles);
             _pendingCandles.Clear();
         }
 
@@ -105,6 +136,12 @@ public partial class MainWindow : Window
         {
             SetOrderPriceLine(_pendingOrderLine.Value.Price, _pendingOrderLine.Value.Color, _pendingOrderLine.Value.Title);
             _pendingOrderLine = null;
+        }
+
+        if (_pendingMagnetLevels != null)
+        {
+            SetMagnetLevels(_pendingMagnetLevels);
+            _pendingMagnetLevels = null;
         }
     }
 

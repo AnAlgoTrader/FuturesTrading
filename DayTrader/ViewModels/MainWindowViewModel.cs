@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DayTrader.Helper;
+using DayTrader.Models;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Helper;
 using Ib.Csharp.Api.Client.Implementation.Model;
@@ -21,9 +23,11 @@ public class MainWindowViewModel : ViewModelBase
     private readonly TickBarAggregator _aggregator = new();
     private readonly BetterVolumeClassifier _volumeClassifier;
     private readonly Logger _logger;
+    private readonly MagnetLevelReader _magnetReader;
 
     public event Action<Bar, string> OnBarPush;
     public event Action<double, string, string> OnOrderPriceLine;
+    public event Action<IReadOnlyList<MagnetLevel>> OnMagnetLevels;
 
     private ClassificationResult _classification = ClassificationResult.Default;
     private PriceUpdate _bestPrice;
@@ -52,6 +56,10 @@ public class MainWindowViewModel : ViewModelBase
             absorptionSpreadMaxMultiplier: 0.7,
             stackedImbalanceCount: 4,
             stackedImbalanceDeltaRatioThreshold: 0.6);
+
+        _magnetReader = new MagnetLevelReader(_logger);
+        _magnetReader.OnLevelsUpdated += levels => OnMagnetLevels?.Invoke(levels);
+        _magnetReader.Start();
 
         _ = InitAndSubscribe();
     }
