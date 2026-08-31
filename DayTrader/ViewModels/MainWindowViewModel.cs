@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using DayTrader.Helper;
 using Ib.Csharp.Api.Client.Implementation;
@@ -28,6 +29,7 @@ public class MainWindowViewModel : ViewModelBase
     private PriceUpdate _bestPrice;
     private ContractDetails _tradingContract;
     private readonly OrderHelper _orderHelper;
+    private int _closeTradeInProgress;
 
     private double _currentMarketPrice;
 
@@ -216,21 +218,35 @@ public class MainWindowViewModel : ViewModelBase
 
     public async Task CloseActiveTrade()
     {
-        var position = _orderHelper.Position;
-        if (position.NetQuantity == 0)
+        if (Interlocked.Exchange(ref _closeTradeInProgress, 1) == 1)
         {
-            _logger.WriteLine("[TRADE] CloseActiveTrade requested but position is flat.");
+            _logger.WriteLine("[TRADE] CloseActiveTrade SKIPPED - another close is already in progress.");
             return;
         }
 
-        _logger.WriteLine($"[TRADE] CloseActiveTrade: closing {position.Direction} {Math.Abs(position.NetQuantity)} @ {position.AveragePrice:F2}");
-        if (string.Equals(position.Direction, "BUY", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            await OnSell();
+            var position = _orderHelper.Position;
+            if (position.NetQuantity == 0)
+            {
+                _logger.WriteLine("[TRADE] CloseActiveTrade requested but position is flat.");
+                return;
+            }
+
+            _logger.WriteLine($"[TRADE] CloseActiveTrade: closing {position.Direction} {Math.Abs(position.NetQuantity)} @ {position.AveragePrice:F2}");
+            if (string.Equals(position.Direction, "BUY", StringComparison.OrdinalIgnoreCase))
+            {
+                await OnSell();
+            }
+            else if (string.Equals(position.Direction, "SELL", StringComparison.OrdinalIgnoreCase))
+            {
+                await OnBuy();
+            }
+            _logger.WriteLine("[TRADE] CloseActiveTrade: close order submitted.");
         }
-        else if (string.Equals(position.Direction, "SELL", StringComparison.OrdinalIgnoreCase))
+        finally
         {
-            await OnBuy();
+            Interlocked.Exchange(ref _closeTradeInProgress, 0);
         }
     }
 }
