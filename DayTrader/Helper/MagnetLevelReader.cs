@@ -11,7 +11,7 @@ namespace DayTrader.Helper;
 
 public class MagnetLevelReader : IDisposable
 {
-    public const string DefaultPath = "/home/oce/LocalDB/Options/SPX.magnets.json";
+    public const string DefaultPath = "/home/oce/LocalDB/Options/NDX.magnets.json";
     private readonly string _filePath;
     private readonly TimeSpan _interval;
     private readonly double _minPercentage;
