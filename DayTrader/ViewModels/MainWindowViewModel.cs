@@ -100,8 +100,8 @@ public class MainWindowViewModel : ViewModelBase
         _client.OnNotification += msg => _logger.WriteLine($"[IB] {msg}");
         _client.Start("127.0.0.1", 4001, 0);
 
-        var futuresContract = await ContractHelper.GetFrontMonth(_client, "NQ");
-        _tradingContract = await ContractHelper.GetFrontMonth(_client, "MNQ");
+        var futuresContract = await ContractHelper.GetFrontMonth(_client, "ES");
+        _tradingContract = await ContractHelper.GetFrontMonth(_client, "MES");
         _logger.WriteLine($"Futures contract  Symbol:{futuresContract.Contract.Symbol} Exchange:{futuresContract.Contract.Exchange} LastDate:{futuresContract.Contract.LastTradeDate}");
 
         // 1. Fetch historical data and wait for it to complete
