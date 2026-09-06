@@ -12,5 +12,12 @@
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
-    <NativeWebView x:Name="Chart" />
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Button Grid.Row="0" Content="Click me" Command="{Binding OnButtonClick}" Margin="8" />
+        <NativeWebView Grid.Row="1" x:Name="Chart" />
+    </Grid>
 </Window>
