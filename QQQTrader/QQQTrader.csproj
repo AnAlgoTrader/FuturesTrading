@@ -20,4 +20,10 @@
         <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
         <PackageReference Include="ReactiveUI.Avalonia" Version="12.1.1" />
     </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="Avalonia.Controls.WebView">
+        <HintPath>..\..\..\.nuget\packages\avalonia.controls.webview\12.1.0\lib\net8.0\Avalonia.Controls.WebView.dll</HintPath>
+      </Reference>
+    </ItemGroup>
 </Project>

@@ -9,11 +9,8 @@
         Icon="/Assets/avalonia-logo.ico"
         Title="QQQTrader"
         WindowState="Maximized">
-
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
-
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-
+    <NativeWebView x:Name="Chart" Source="https://www.google.com" />
 </Window>
