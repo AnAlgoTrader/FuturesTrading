@@ -7,8 +7,8 @@
 <div id="message">Waiting for message</div>
 <script>
     (function () {
-        window.notifyUI = function (message){
-            //TODO load message in div
+        window.notifyUI = function (message) {
+            document.getElementById('message').textContent = message;
         }
     })();
 </script>
