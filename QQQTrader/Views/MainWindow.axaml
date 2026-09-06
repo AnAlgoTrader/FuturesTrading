@@ -12,5 +12,5 @@
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
-    <NativeWebView x:Name="Chart" Source="https://www.example.com" />
+    <NativeWebView x:Name="Chart" />
 </Window>
