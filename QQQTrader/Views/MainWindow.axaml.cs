@@ -19,8 +19,7 @@ public partial class MainWindow : Window
         {
             if (DataContext is MainWindowViewModel vm)
             {
-                vm.OnInvokeScript += script =>
-                    Dispatcher.UIThread.Post(() => _ = chart.InvokeScript(script));
+                vm.OnInvokeScript += script => Dispatcher.UIThread.Post(() => _ = chart.InvokeScript(script));
             }
         };
     }
