@@ -8,21 +8,19 @@ namespace QQQTrader.Views;
 
 public partial class MainWindow : Window
 {
-    private readonly NativeWebView _chart;
-
     public MainWindow()
     {
         InitializeComponent();
         var indexPath = Path.Combine(AppContext.BaseDirectory, "wwwroot", "index.html");
-        _chart = this.FindControl<NativeWebView>("Chart")!;
-        _chart.Source = new Uri(indexPath);
+        var chart = this.FindControl<NativeWebView>("Chart")!;
+        chart.Source = new Uri(indexPath);
 
         DataContextChanged += (_, _) =>
         {
             if (DataContext is MainWindowViewModel vm)
             {
                 vm.OnInvokeScript += script =>
-                    Dispatcher.UIThread.Post(() => _ = _chart.InvokeScript(script));
+                    Dispatcher.UIThread.Post(() => _ = chart.InvokeScript(script));
             }
         };
     }
