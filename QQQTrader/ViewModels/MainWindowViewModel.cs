@@ -37,7 +37,6 @@ public class MainWindowViewModel : ViewModelBase
         foreach (var item in historicalData)
         {
             OnInvokeScript?.Invoke($"window.updateData({item.Time}, {item.Open}, {item.High}, {item.Low}, {item.Close}, {item.WAP})");
-            Console.WriteLine(item.WAP);
         }
     }
 
