@@ -22,11 +22,14 @@
         wickDownColor: '#ef5350'
     });
 
+    const vwap = chart.addSeries(LightweightCharts.LineSeries, { color: '#2962FF' });
+
     window.notifyUI = function (message) {
         document.getElementById('message').textContent = message;
     }
     
     window.updateData = function (time, open, high, low, close, vwap){
         candles.update({ time: time, open: open, high: high, low: low, close: close });
+        vwap.update({ time: time, value: vwap });
     }
 })();
