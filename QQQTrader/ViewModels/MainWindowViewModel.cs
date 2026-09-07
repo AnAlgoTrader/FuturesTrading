@@ -1,13 +1,9 @@
 ﻿using System;
-using System.IO;
 using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
-using Ib.Csharp.Api.Client.Implementation.Helper;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 using QQQTrader.Helper;
-
-
 using ReactiveUI;
 using ReactiveUI.Primitives;
 
@@ -19,7 +15,7 @@ public class MainWindowViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> OnButtonClick { get; }
     private readonly IbClient _client = new();
     private ContractDetails? _qqqContract;
-    private VwapCalculator _vwapCalculator;
+    private readonly VwapCalculator _vwapCalculator;
 
     public MainWindowViewModel()
     {
