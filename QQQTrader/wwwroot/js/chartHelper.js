@@ -26,10 +26,6 @@
         color: '#FF9900',
         lineWidth: 1,
     });
-
-    window.notifyUI = function (message) {
-        document.getElementById('message').textContent = message;
-    }
     
     window.updateData = function (time, open, high, low, close, vwap){
         candlesSeries.update({ time: time, open: open, high: high, low: low, close: close });
