@@ -26,6 +26,7 @@
         color: '#FF9900',
         lineWidth: 1,
         priceLineVisible: false,
+        crosshairMarkerVisible: false,
     });
     
     window.updateData = function (time, open, high, low, close, vwap){
