@@ -25,6 +25,7 @@
     const vwapSeries = chart.addSeries(LightweightCharts.LineSeries, {
         color: '#FF9900',
         lineWidth: 1,
+        priceLineVisible: false,
     });
     
     window.updateData = function (time, open, high, low, close, vwap){
