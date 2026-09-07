@@ -1,10 +1,13 @@
 ﻿using System;
+using System.IO;
 using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Helper;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 using QQQTrader.Helper;
+
+
 using ReactiveUI;
 using ReactiveUI.Primitives;
 
@@ -16,9 +19,11 @@ public class MainWindowViewModel : ViewModelBase
     public ReactiveCommand<RxVoid, RxVoid> OnButtonClick { get; }
     private readonly IbClient _client = new();
     private ContractDetails? _qqqContract;
+    private VwapCalculator _vwapCalculator;
 
     public MainWindowViewModel()
     {
+        _vwapCalculator = new VwapCalculator();
         OnButtonClick = ReactiveCommand.Create(OnButtonClicked);
         _ = InitAndSubscribe();
     }
@@ -33,10 +38,13 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task DisplayHistoricalData()
     {
-        var historicalData = await _client.GetHistoricalData(1105, _qqqContract!.Contract, $"1 {nameof(Duration.D)}", $"5 {nameof(BarSize.secs)}", "TRADES", 600000);
+        var historicalData = await _client.GetHistoricalData(1105, _qqqContract!.Contract, $"2 {nameof(Duration.D)}", $"5 {nameof(BarSize.secs)}", "TRADES", 600000);
+        
         foreach (var item in historicalData)
         {
-            OnInvokeScript?.Invoke($"window.updateData({item.Time}, {item.Open}, {item.High}, {item.Low}, {item.Close}, {item.WAP})");
+            var time = long.Parse(item.Time);
+            var vwap = _vwapCalculator.AddBar(time, (double)item.WAP, (double)item.Volume);
+            OnInvokeScript?.Invoke($"window.updateData({item.Time}, {item.Open}, {item.High}, {item.Low}, {item.Close}, {vwap})");
         }
     }
 
