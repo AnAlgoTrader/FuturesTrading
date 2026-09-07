@@ -22,7 +22,10 @@
         wickDownColor: '#ef5350'
     });
 
-    const vwapSeries = chart.addSeries(LightweightCharts.LineSeries, { color: '#2962FF' });
+    const vwapSeries = chart.addSeries(LightweightCharts.LineSeries, {
+        color: '#FF9900',
+        lineWidth: 1,
+    });
 
     window.notifyUI = function (message) {
         document.getElementById('message').textContent = message;
