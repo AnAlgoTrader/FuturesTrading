@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Runtime.InteropServices.JavaScript;
 using Avalonia.Threading;
+using Ib.Csharp.Api.Client.Implementation.Helper;
 using ReactiveUI;
 using ReactiveUI.Primitives;
 
@@ -17,14 +19,15 @@ public class MainWindowViewModel : ViewModelBase
     {
         OnButtonClick = ReactiveCommand.Create(OnButtonClicked);
 
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         _timer.Tick += (_, _) => TimerTick();
         _timer.Start();
     }
 
     private void TimerTick()
     {
-        //OnInvokeScript?.Invoke($"window.notifyUI('this is a message from the MainWindowViewModel ({_count})')");
+        var time = DateHelper.ToTradingViewTime(DateTime.Now);
+        OnInvokeScript?.Invoke($"window.updateData({time}, 750, 760, 740, 755, 0)");
     }
 
     private void OnButtonClicked()

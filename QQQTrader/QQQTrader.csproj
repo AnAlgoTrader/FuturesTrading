@@ -28,4 +28,8 @@
         <HintPath>..\..\..\.nuget\packages\avalonia.controls.webview\12.1.0\lib\net8.0\Avalonia.Controls.WebView.dll</HintPath>
       </Reference>
     </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client.csproj" />
+    </ItemGroup>
 </Project>
