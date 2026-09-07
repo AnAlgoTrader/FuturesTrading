@@ -14,7 +14,7 @@
         timeScale: {borderColor: '#2a2e39', timeVisible: true, secondsVisible: false}
     });
 
-    const candles = chart.addSeries(LightweightCharts.CandlestickSeries, {
+    const candlesSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
         upColor: '#26a69a',
         downColor: '#ef5350',
         borderVisible: false,
@@ -22,14 +22,14 @@
         wickDownColor: '#ef5350'
     });
 
-    const vwap = chart.addSeries(LightweightCharts.LineSeries, { color: '#2962FF' });
+    const vwapSeries = chart.addSeries(LightweightCharts.LineSeries, { color: '#2962FF' });
 
     window.notifyUI = function (message) {
         document.getElementById('message').textContent = message;
     }
     
     window.updateData = function (time, open, high, low, close, vwap){
-        candles.update({ time: time, open: open, high: high, low: low, close: close });
-        vwap.update({ time: time, value: vwap });
+        candlesSeries.update({ time: time, open: open, high: high, low: low, close: close });
+        vwapSeries.update({ time: time, value: vwap });
     }
 })();
