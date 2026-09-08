@@ -4,6 +4,7 @@ using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 using QQQTrader.Helper;
+using QQQTrader.Model;
 using ReactiveUI;
 using ReactiveUI.Primitives;
 
@@ -16,6 +17,7 @@ public class MainWindowViewModel : ViewModelBase
     private readonly IbClient _client = new();
     private ContractDetails? _qqqContract;
     private readonly VwapCalculator _vwapCalculator;
+    public readonly AccountInfo AccountInfo = new();
 
     public MainWindowViewModel()
     {
@@ -28,6 +30,11 @@ public class MainWindowViewModel : ViewModelBase
     {
         _client.OnNotification += Console.WriteLine;
         _client.Start("127.0.0.1", 4001, 0);
+        _client.OnAccountUpdate += accountUpdate =>
+        {
+            AccountInfo.AvailableFunds = accountUpdate.AvailableFunds;
+        };
+        _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
         _qqqContract = await ContractHelper.GetQQQContract(_client);
         await DisplayHistoricalData();
     }
