@@ -16,10 +16,42 @@
             height: 100%;
             position: relative;
         }
+        #close-btn {
+            position: absolute;
+            right: 65px;
+            transform: translateY(-50%);
+            display: none;
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            border-radius: 50%;
+            background: #ef5350;
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            font-size: 11px;
+            font-weight: bold;
+            line-height: 18px;
+            text-align: center;
+            cursor: pointer;
+            z-index: 100;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s, background 0.15s;
+        }
+        #close-btn:hover {
+            background: #f44336;
+            transform: translateY(-50%) scale(1.15);
+        }
+        #close-btn:active {
+            transform: translateY(-50%) scale(0.9);
+        }
     </style>
 </head>
 <body>
-<div id="chart"></div>
+<div id="chart">
+    <button id="close-btn" title="Close Position">✕</button>
+</div>
 <script src="js/lightweight-charts.standalone.production.js"></script>
 <script src="js/chartHelper.js"></script>
 </body>

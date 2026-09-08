@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using QQQTrader.ViewModels;
@@ -11,6 +12,7 @@ public partial class MainWindow : Window
     private readonly NativeWebView _chart;
     private string? _pendingScript;
     private bool _chartReady;
+    private MainWindowViewModel? _viewModel;
 
     public MainWindow()
     {
@@ -28,11 +30,20 @@ public partial class MainWindow : Window
             }
         };
 
+        _chart.WebMessageReceived += (_, e) =>
+        {
+            if (e.Body != null && e.Body.Contains("closeTrade"))
+            {
+                Dispatcher.UIThread.Post(() => _ = _viewModel?.CloseActiveTrade());
+            }
+        };
+
         _chart.Source = new Uri(indexPath);
 
         DataContextChanged += (_, _) =>
         {
             if (DataContext is not MainWindowViewModel vm) return;
+            _viewModel = vm;
             vm.OnInvokeScript += script =>
             {
                 if (_chartReady)
@@ -44,6 +55,27 @@ public partial class MainWindow : Window
                     _pendingScript = script;
                 }
             };
+            vm.OnOrderPriceLine += (price, color, title) =>
+            {
+                var script = $"window.setOrderLine({Price(price)}, '{color}', '{EscapeTitle(title)}')";
+                InvokeInChart(script);
+            };
         };
     }
+
+    private void InvokeInChart(string script)
+    {
+        if (_chartReady)
+        {
+            Dispatcher.UIThread.Post(() => _ = _chart.InvokeScript(script));
+        }
+        else
+        {
+            _pendingScript = script;
+        }
+    }
+
+    private static string Price(double price) => price.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string EscapeTitle(string title) => title.Replace("'", "\\'");
 }

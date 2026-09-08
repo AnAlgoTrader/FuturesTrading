@@ -1,0 +1,9 @@
+namespace QQQTrader.Models;
+
+public class PositionSummary
+{
+    public decimal NetQuantity { get; set; }
+    public string Direction { get; set; } = "";
+    public decimal Quantity { get; set; }
+    public double AveragePrice { get; set; }
+}

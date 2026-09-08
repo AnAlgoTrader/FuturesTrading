@@ -29,9 +29,83 @@
         crosshairMarkerVisible: false,
         lastValueVisible: false
     });
-    
+
+    let activePriceLine = null;
+    let lastOrderPrice = 0;
+    const closeBtn = document.getElementById('close-btn');
+
     window.updateData = function (time, open, high, low, close, vwap){
         candlesSeries.update({ time: time, open: open, high: high, low: low, close: close });
         vwapSeries.update({ time: time, value: vwap });
+    };
+
+    function updateCloseButtonPosition() {
+        if (!lastOrderPrice || lastOrderPrice <= 0) {
+            closeBtn.style.display = 'none';
+            return;
+        }
+        const y = candlesSeries.priceToCoordinate(lastOrderPrice);
+        if (y === null || y === undefined || isNaN(y) || y < 0 || y > container.clientHeight) {
+            closeBtn.style.display = 'none';
+        } else {
+            closeBtn.style.display = 'flex';
+            closeBtn.style.top = y + 'px';
+        }
     }
+
+    closeBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        try {
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage('closeTrade');
+            }
+        } catch (err) {}
+        try {
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.postAvWebViewMessage) {
+                window.webkit.messageHandlers.postAvWebViewMessage.postMessage('closeTrade');
+            }
+        } catch (err) {}
+    });
+
+    window.setOrderLine = function (price, color, title) {
+        lastOrderPrice = price;
+
+        if (!price || price <= 0) {
+            if (activePriceLine) {
+                try {
+                    candlesSeries.removePriceLine(activePriceLine);
+                } catch (e) {}
+                activePriceLine = null;
+            }
+            updateCloseButtonPosition();
+            return;
+        }
+
+        const lineOptions = {
+            price: price,
+            color: color || '#26a69a',
+            lineWidth: 2,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: title || ''
+        };
+
+        if (!activePriceLine) {
+            activePriceLine = candlesSeries.createPriceLine(lineOptions);
+        } else {
+            activePriceLine.applyOptions(lineOptions);
+        }
+
+        updateCloseButtonPosition();
+    };
+
+    window.addEventListener('resize', function () {
+        chart.resize(container.clientWidth, container.clientHeight);
+        updateCloseButtonPosition();
+    });
+
+    chart.timeScale().subscribeVisibleLogicalRangeChange(function () {
+        updateCloseButtonPosition();
+    });
 })();
