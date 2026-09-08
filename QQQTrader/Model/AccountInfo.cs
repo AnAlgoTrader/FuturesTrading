@@ -1,6 +1,14 @@
+using ReactiveUI;
+
 namespace QQQTrader.Model;
 
-public class AccountInfo
+public class AccountInfo : ReactiveObject
 {
-    public double AvailableFunds { get; set; }
+    private double _availableFunds;
+
+    public double AvailableFunds
+    {
+        get => _availableFunds;
+        set => this.RaiseAndSetIfChanged(ref _availableFunds, value);
+    }
 }

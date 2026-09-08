@@ -17,7 +17,7 @@ public class MainWindowViewModel : ViewModelBase
     private readonly IbClient _client = new();
     private ContractDetails? _qqqContract;
     private readonly VwapCalculator _vwapCalculator;
-    public readonly AccountInfo AccountInfo = new();
+    public AccountInfo AccountInfo { get; } = new();
 
     public MainWindowViewModel()
     {
