@@ -23,9 +23,12 @@ public class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel()
     {
         _vwapCalculator = new VwapCalculator();
-        _candleAggregator = new CandleAggregator();
-        _candleAggregator.OnCandleUpdate += (time, open, high, low, close, vwap) =>
+        _candleAggregator = new CandleAggregator(_vwapCalculator);
+        _candleAggregator.OnCandleUpdate += (candleTime, open, high, low, close, vwap) =>
+        {
+            var time = new DateTimeOffset(candleTime).ToUnixTimeSeconds();
             OnInvokeScript?.Invoke($"window.updateData({time}, {open}, {high}, {low}, {close}, {vwap})");
+        };
         OnEnterButtonClick = ReactiveCommand.Create(OnButtonClicked);
         _ = InitAndSubscribe();
     }

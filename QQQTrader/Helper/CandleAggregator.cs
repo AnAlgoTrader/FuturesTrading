@@ -5,44 +5,44 @@ namespace QQQTrader.Helper;
 
 public class CandleAggregator
 {
+    private readonly VwapCalculator _vwapCalculator;
     private DateTime _currentMinute = DateTime.MinValue;
     private double _open;
     private double _high;
     private double _low;
     private double _close;
-    private long _timeSeconds;
-    private double _sumPV;
-    private double _sumVol;
+    private DateTime _candleTime;
 
-    public event Action<long, double, double, double, double, double>? OnCandleUpdate;
+    public event Action<DateTime, double, double, double, double, double>? OnCandleUpdate;
+
+    public CandleAggregator(VwapCalculator vwapCalculator)
+    {
+        _vwapCalculator = vwapCalculator;
+    }
 
     public void AddBar(RealTimeBar bar)
     {
         var barTime = DateTimeOffset.FromUnixTimeSeconds(bar.Date).UtcDateTime;
-        var minuteStart = new DateTime(barTime.Year, barTime.Month, barTime.Day, barTime.Hour, barTime.Minute, 0, DateTimeKind.Utc);
-        var minuteSeconds = new DateTimeOffset(minuteStart).ToUnixTimeSeconds();
+        var candleTime = new DateTime(barTime.Year, barTime.Month, barTime.Day, barTime.Hour, barTime.Minute, 0, DateTimeKind.Utc);
+        var candleTimeUnix = new DateTimeOffset(candleTime).ToUnixTimeSeconds();
 
-        if (_currentMinute == DateTime.MinValue || minuteStart != _currentMinute)
+        if (_currentMinute == DateTime.MinValue || candleTime != _currentMinute)
         {
-            _currentMinute = minuteStart;
+            _currentMinute = candleTime;
             _open = bar.Open;
             _high = bar.High;
             _low = bar.Low;
             _close = bar.Close;
-            _timeSeconds = minuteSeconds;
-            _sumPV = (double)bar.Wap * (double)bar.Volume;
-            _sumVol = (double)bar.Volume;
+            _candleTime = candleTime;
         }
         else
         {
             _high = Math.Max(_high, bar.High);
             _low = Math.Min(_low, bar.Low);
             _close = bar.Close;
-            _sumPV += (double)bar.Wap * (double)bar.Volume;
-            _sumVol += (double)bar.Volume;
         }
 
-        var vwap = _sumVol > 0 ? _sumPV / _sumVol : 0;
-        OnCandleUpdate?.Invoke(_timeSeconds, _open, _high, _low, _close, vwap);
+        var vwap = _vwapCalculator.AddBar(candleTimeUnix, (double)bar.Wap, (double)bar.Volume);
+        OnCandleUpdate?.Invoke(_candleTime, _open, _high, _low, _close, vwap);
     }
 }
