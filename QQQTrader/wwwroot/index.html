@@ -26,18 +26,18 @@
             padding: 0;
             border-radius: 50%;
             background: #ef5350;
-            color: #ffffff;
             border: 1px solid rgba(255, 255, 255, 0.7);
-            font-size: 11px;
-            font-weight: bold;
-            line-height: 18px;
-            text-align: center;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
             z-index: 100;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-            align-items: center;
-            justify-content: center;
             transition: transform 0.1s, background 0.15s;
+        }
+        #close-btn img {
+            width: 12px;
+            height: 12px;
+            display: block;
         }
         #close-btn:hover {
             background: #f44336;
@@ -50,7 +50,7 @@
 </head>
 <body>
 <div id="chart">
-    <button id="close-btn" title="Close Position">✕</button>
+    <button id="close-btn" title="Close Position"><img src="img/close.png" alt="×"></button>
 </div>
 <script src="js/lightweight-charts.standalone.production.js"></script>
 <script src="js/chartHelper.js"></script>
