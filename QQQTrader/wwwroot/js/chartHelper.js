@@ -27,6 +27,7 @@
         lineWidth: 1,
         priceLineVisible: false,
         crosshairMarkerVisible: false,
+        lastValueVisible: false
     });
     
     window.updateData = function (time, open, high, low, close, vwap){
