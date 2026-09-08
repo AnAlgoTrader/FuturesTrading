@@ -49,7 +49,7 @@
                 <TextBlock Text="Usd:" Classes="label" />
                 <TextBlock Text="{Binding AccountInfo.CashUsd}" Classes="value" />
             </StackPanel>
-            <Button Content="Click me" Command="{Binding OnButtonClick}" Margin="8" />
+            <Button Content="Enter" Command="{Binding OnEnterButtonClick}" Margin="8" />
         </StackPanel>
         <NativeWebView Grid.Row="1" x:Name="Chart" />
     </Grid>

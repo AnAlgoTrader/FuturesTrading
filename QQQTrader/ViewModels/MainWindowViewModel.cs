@@ -13,7 +13,7 @@ namespace QQQTrader.ViewModels;
 public class MainWindowViewModel : ViewModelBase
 {
     public event Action<string>? OnInvokeScript;
-    public ReactiveCommand<RxVoid, RxVoid> OnButtonClick { get; }
+    public ReactiveCommand<RxVoid, RxVoid> OnEnterButtonClick { get; }
     private readonly IbClient _client = new();
     private ContractDetails? _qqqContract;
     private readonly VwapCalculator _vwapCalculator;
@@ -22,7 +22,7 @@ public class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel()
     {
         _vwapCalculator = new VwapCalculator();
-        OnButtonClick = ReactiveCommand.Create(OnButtonClicked);
+        OnEnterButtonClick = ReactiveCommand.Create(OnButtonClicked);
         _ = InitAndSubscribe();
     }
 
