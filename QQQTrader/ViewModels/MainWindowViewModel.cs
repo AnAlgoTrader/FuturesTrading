@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Model;
@@ -19,6 +20,7 @@ public class MainWindowViewModel : ViewModelBase
     private readonly VwapCalculator _vwapCalculator;
     private readonly CandleAggregator _candleAggregator;
     public AccountInfo AccountInfo { get; } = new();
+    public MarketPriceUpdate MarketPriceUpdate { get; } = new();
 
     public MainWindowViewModel()
     {
@@ -45,11 +47,18 @@ public class MainWindowViewModel : ViewModelBase
             AccountInfo.CashUsd = accountUpdate.CashUsd;
             AccountInfo.BuyingPower = accountUpdate.BuyingPower;
         };
+        _client.OnMarketDataPriceUpdate += updates =>
+        {
+            var marketPrice = updates.First().Value;
+            MarketPriceUpdate.Bid = marketPrice.BidPrice;
+            MarketPriceUpdate.Ask = marketPrice.AskPrice;
+        };
         _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
         _client.OnRealTimeBarUpdate += _candleAggregator.AddBar;
         _qqqContract = await ContractHelper.GetQQQContract(_client);
         await DisplayHistoricalData();
         _client.SubscribeToRealTimeBars(1106, _qqqContract.Contract);
+        _client.SubscribeToMarketData(1107, _qqqContract);
     }
 
     private async Task DisplayHistoricalData()
@@ -72,7 +81,7 @@ public class MainWindowViewModel : ViewModelBase
             Action = "BUY",
             TotalQuantity = 25,
             OrderType = "LMT",
-            LmtPrice = 700, //TODO get price
+            LmtPrice = MarketPriceUpdate.Ask,
             Transmit = true,
             Tif = "DAY"
         };

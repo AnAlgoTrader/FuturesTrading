@@ -49,6 +49,18 @@
                 <TextBlock Text="Usd:" Classes="label" />
                 <TextBlock Text="{Binding AccountInfo.CashUsd}" Classes="value" />
             </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                <TextBlock Text="Price:" Classes="label" />
+                <TextBlock Classes="value">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="{}{0:F2} ({1:F2}) {2:F2}">
+                            <Binding Path="MarketPriceUpdate.Ask" />
+                            <Binding Path="MarketPriceUpdate.Spread" />
+                            <Binding Path="MarketPriceUpdate.Bid" />
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+            </StackPanel>
             <Button Content="Enter" Command="{Binding OnEnterButtonClick}" Margin="8" />
         </StackPanel>
         <NativeWebView Grid.Row="1" x:Name="Chart" />
