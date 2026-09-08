@@ -32,7 +32,11 @@ public class MainWindowViewModel : ViewModelBase
         _client.Start("127.0.0.1", 4001, 0);
         _client.OnAccountUpdate += accountUpdate =>
         {
+            AccountInfo.UpdateOn = accountUpdate.UpdateOn;
             AccountInfo.AvailableFunds = accountUpdate.AvailableFunds;
+            AccountInfo.CashEuro = accountUpdate.CashEuro;
+            AccountInfo.CashUsd = accountUpdate.CashUsd;
+            AccountInfo.BuyingPower = accountUpdate.BuyingPower;
         };
         _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
         _qqqContract = await ContractHelper.GetQQQContract(_client);

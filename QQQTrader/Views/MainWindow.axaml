@@ -10,28 +10,44 @@
         Title="QQQTrader"
         WindowState="Maximized">
     <Design.DataContext>
-        <vm:MainWindowViewModel/>
+        <vm:MainWindowViewModel />
     </Design.DataContext>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="5*" />
             <RowDefinition Height="95*" />
         </Grid.RowDefinitions>
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="20">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="20" Background="#131722">
             <StackPanel.Styles>
                 <Style Selector="TextBlock.label">
-                    <Setter Property="FontWeight" Value="Bold"/>
-                    <Setter Property="Foreground" Value="Gray"/>
-                    <Setter Property="Margin" Value="0,0,4,0"/>
-                    <Setter Property="VerticalAlignment" Value="Center"/>
+                    <Setter Property="FontWeight" Value="Bold" />
+                    <Setter Property="Foreground" Value="Gray" />
+                    <Setter Property="Margin" Value="0,0,4,0" />
+                    <Setter Property="VerticalAlignment" Value="Center" />
                 </Style>
                 <Style Selector="TextBlock.value">
-                    <Setter Property="VerticalAlignment" Value="Center"/>
+                    <Setter Property="VerticalAlignment" Value="Center" />
                 </Style>
             </StackPanel.Styles>
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Funds:" Classes="label"/>
-                <TextBlock Text="{Binding AccountInfo.AvailableFunds}" Classes="value"/>
+            <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                <TextBlock Text="Update On:" Classes="label" />
+                <TextBlock Text="{Binding AccountInfo.UpdateOn, StringFormat='\{0:ddd dd MMM HH:mm\}'}" Classes="value" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                <TextBlock Text="Funds:" Classes="label" />
+                <TextBlock Text="{Binding AccountInfo.AvailableFunds}" Classes="value" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                <TextBlock Text="BuyingPower:" Classes="label" />
+                <TextBlock Text="{Binding AccountInfo.BuyingPower}" Classes="value" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                <TextBlock Text="Eur:" Classes="label" />
+                <TextBlock Text="{Binding AccountInfo.CashEuro}" Classes="value" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                <TextBlock Text="Usd:" Classes="label" />
+                <TextBlock Text="{Binding AccountInfo.CashUsd}" Classes="value" />
             </StackPanel>
             <Button Content="Click me" Command="{Binding OnButtonClick}" Margin="8" />
         </StackPanel>
