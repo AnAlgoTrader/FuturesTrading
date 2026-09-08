@@ -17,11 +17,15 @@ public class MainWindowViewModel : ViewModelBase
     private readonly IbClient _client = new();
     private ContractDetails? _qqqContract;
     private readonly VwapCalculator _vwapCalculator;
+    private readonly CandleAggregator _candleAggregator;
     public AccountInfo AccountInfo { get; } = new();
 
     public MainWindowViewModel()
     {
         _vwapCalculator = new VwapCalculator();
+        _candleAggregator = new CandleAggregator();
+        _candleAggregator.OnCandleUpdate += (time, open, high, low, close, vwap) =>
+            OnInvokeScript?.Invoke($"window.updateData({time}, {open}, {high}, {low}, {close}, {vwap})");
         OnEnterButtonClick = ReactiveCommand.Create(OnButtonClicked);
         _ = InitAndSubscribe();
     }
@@ -39,7 +43,7 @@ public class MainWindowViewModel : ViewModelBase
             AccountInfo.BuyingPower = accountUpdate.BuyingPower;
         };
         _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
-        _client.OnRealTimeBarUpdate += bar => { Console.WriteLine($"real time bar received: {bar.Open}"); };
+        _client.OnRealTimeBarUpdate += _candleAggregator.AddBar;
         _qqqContract = await ContractHelper.GetQQQContract(_client);
         await DisplayHistoricalData();
         _client.SubscribeToRealTimeBars(1106, _qqqContract.Contract);
