@@ -39,14 +39,16 @@ public class MainWindowViewModel : ViewModelBase
             AccountInfo.BuyingPower = accountUpdate.BuyingPower;
         };
         _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
+        _client.OnRealTimeBarUpdate += bar => { Console.WriteLine($"real time bar received: {bar.Open}"); };
         _qqqContract = await ContractHelper.GetQQQContract(_client);
         await DisplayHistoricalData();
+        _client.SubscribeToRealTimeBars(1106, _qqqContract.Contract);
     }
 
     private async Task DisplayHistoricalData()
     {
         var historicalData = await _client.GetHistoricalData(1105, _qqqContract!.Contract, $"3 {nameof(Duration.D)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000);
-        
+
         foreach (var item in historicalData)
         {
             var time = long.Parse(item.Time);
@@ -57,6 +59,16 @@ public class MainWindowViewModel : ViewModelBase
 
     private void OnButtonClicked()
     {
-        Console.WriteLine("Button clicked");
+        var order = new Order
+        {
+            OrderId = _client.GetNextValidId(),
+            Action = "BUY",
+            TotalQuantity = 25,
+            OrderType = "LMT",
+            LmtPrice = 700, //TODO get price
+            Transmit = true,
+            Tif = "DAY"
+        };
+        _client.PlaceOrder(_qqqContract?.Contract, order);
     }
 }
