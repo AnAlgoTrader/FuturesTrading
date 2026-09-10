@@ -25,6 +25,8 @@ public class MainWindowViewModel : ViewModelBase
     private double _currentChartPrice;
     private int _closeTradeInProgress;
     private const decimal OrderQuantity = 1;
+    private const int ChartMarketDataRequestId = 1108;
+    private const int TradeMarketDataRequestId = 1107;
     public AccountInfo AccountInfo { get; } = new();
     public MarketPriceUpdate MarketPriceUpdate { get; } = new();
     
@@ -142,14 +144,14 @@ public class MainWindowViewModel : ViewModelBase
             foreach (var kv in updates)
             {
                 var marketPrice = kv.Value;
-                if (kv.Key == 1108)
+                if (kv.Key == ChartMarketDataRequestId)
                 {
                     _currentChartPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
                         ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
                         : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
                     _orderHelper.CurrentChartPrice = _currentChartPrice;
                 }
-                else
+                if (kv.Key == TradeMarketDataRequestId)
                 {
                     _currentTradePrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
                         ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
@@ -167,8 +169,16 @@ public class MainWindowViewModel : ViewModelBase
         _tradeContract = await ContractHelper.GetTradeContract(_client);
         await DisplayHistoricalData();
         _client.SubscribeToRealTimeBars(1106, _chartContract.Contract);
-        _client.SubscribeToMarketData(1108, _chartContract);
-        _client.SubscribeToMarketData(1107, _tradeContract);
+
+        if (TradingConfig.IsSingleInstrument)
+        {
+            _client.SubscribeToMarketData(TradeMarketDataRequestId, _chartContract);
+        }
+        else
+        {
+            _client.SubscribeToMarketData(ChartMarketDataRequestId, _chartContract);
+            _client.SubscribeToMarketData(TradeMarketDataRequestId, _tradeContract);
+        }
     }
 
     private async Task DisplayHistoricalData()
