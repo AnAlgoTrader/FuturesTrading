@@ -8,7 +8,7 @@ namespace DayTrader.Helper;
 
 public class ContractHelper
 {
-    private const string Symbol = "MNQ";
+    private const string Symbol = "MES";
 
     public static async Task<ContractDetails> GetFrontMonthContract(IbClient client)
     {
