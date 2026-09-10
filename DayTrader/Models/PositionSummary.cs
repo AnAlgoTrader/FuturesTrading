@@ -6,4 +6,5 @@ public class PositionSummary
     public string Direction { get; set; } = "";
     public decimal Quantity { get; set; }
     public double AveragePrice { get; set; }
+    public double SpyEntryPrice { get; set; }
 }

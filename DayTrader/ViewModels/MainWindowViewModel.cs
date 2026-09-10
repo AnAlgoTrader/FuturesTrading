@@ -21,7 +21,7 @@ public class MainWindowViewModel : ViewModelBase
     private readonly CandleAggregator _candleAggregator;
     private readonly Logger _logger;
     private readonly OrderHelper _orderHelper;
-    private double _currentPrice;
+    private double _currentMesPrice;
     private double _currentSpyPrice;
     private int _closeTradeInProgress;
     private const decimal OrderQuantity = 1;
@@ -56,7 +56,7 @@ public class MainWindowViewModel : ViewModelBase
             var entryPrice = position.AveragePrice;
             var isBuy = string.Equals(position.Direction, "BUY", StringComparison.OrdinalIgnoreCase);
 
-            var evalPrice = _currentPrice > 0 ? _currentPrice : entryPrice;
+            var evalPrice = _currentMesPrice > 0 ? _currentMesPrice : entryPrice;
             double pnlDollar = isBuy
                 ? (evalPrice - entryPrice) * (double)position.NetQuantity
                 : (entryPrice - evalPrice) * (double)Math.Abs(position.NetQuantity);
@@ -65,11 +65,7 @@ public class MainWindowViewModel : ViewModelBase
             string sign = pnlDollar >= 0 ? "+" : "";
             string pnlTitle = $"{sign}${pnlDollar:F2} @ {position.AveragePrice:F2}";
 
-            double priceScale = _currentSpyPrice > 0 && entryPrice > 0
-                ? _currentSpyPrice / entryPrice
-                : 0;
-
-            OnOrderPriceLine?.Invoke(entryPrice, color, pnlTitle, priceScale);
+            OnOrderPriceLine?.Invoke(entryPrice, color, pnlTitle, position.SpyEntryPrice);
         }
         else
         {
@@ -148,10 +144,11 @@ public class MainWindowViewModel : ViewModelBase
                     _currentSpyPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
                         ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
                         : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
+                    _orderHelper.CurrentSpyPrice = _currentSpyPrice;
                 }
                 else
                 {
-                    _currentPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
+                    _currentMesPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
                         ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
                         : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
                     MarketPriceUpdate.Bid = marketPrice.BidPrice;

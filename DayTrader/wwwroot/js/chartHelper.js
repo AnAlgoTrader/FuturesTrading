@@ -68,8 +68,8 @@
         } catch (err) {}
     });
 
-    window.setOrderLine = function (price, color, title, priceScale) {
-        if (!price || price <= 0) {
+    window.setOrderLine = function (price, color, title, spyPrice) {
+        if (!price || price <= 0 || !spyPrice || spyPrice <= 0) {
             lastOrderPrice = 0;
             if (activePriceLine) {
                 try {
@@ -81,14 +81,10 @@
             return;
         }
 
-        var displayPrice = price;
-        if (priceScale && priceScale > 0) {
-            displayPrice = price * priceScale;
-        }
-        lastOrderPrice = displayPrice;
+        lastOrderPrice = spyPrice;
 
         const lineOptions = {
-            price: displayPrice,
+            price: spyPrice,
             color: color || '#26a69a',
             lineWidth: 2,
             lineStyle: LightweightCharts.LineStyle.Dashed,
