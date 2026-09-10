@@ -5,11 +5,11 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using QQQTrader.Models;
+using DayTrader.Models;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 
-namespace QQQTrader.Helper;
+namespace DayTrader.Helper;
 
 public class OrderHelper
 {

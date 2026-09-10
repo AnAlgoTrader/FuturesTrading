@@ -1,4 +1,4 @@
-namespace QQQTrader.Models;
+namespace DayTrader.Models;
 
 public class OrderPersistence
 {

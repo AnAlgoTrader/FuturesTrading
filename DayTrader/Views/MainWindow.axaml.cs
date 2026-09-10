@@ -3,9 +3,9 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Threading;
-using QQQTrader.ViewModels;
+using DayTrader.ViewModels;
 
-namespace QQQTrader.Views;
+namespace DayTrader.Views;
 
 public partial class MainWindow : Window
 {

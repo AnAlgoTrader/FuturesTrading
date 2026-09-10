@@ -1,7 +1,7 @@
 using System;
 using Ib.Csharp.Api.Client.Implementation.Model;
 
-namespace QQQTrader.Helper;
+namespace DayTrader.Helper;
 
 public class CandleAggregator
 {

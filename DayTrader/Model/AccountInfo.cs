@@ -1,7 +1,7 @@
 using System;
 using ReactiveUI;
 
-namespace QQQTrader.Model;
+namespace DayTrader.Model;
 
 public class AccountInfo : ReactiveObject
 {

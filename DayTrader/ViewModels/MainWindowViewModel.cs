@@ -5,12 +5,12 @@ using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
-using QQQTrader.Helper;
-using QQQTrader.Model;
+using DayTrader.Helper;
+using DayTrader.Model;
 using ReactiveUI;
 using ReactiveUI.Primitives;
 
-namespace QQQTrader.ViewModels;
+namespace DayTrader.ViewModels;
 
 public class MainWindowViewModel : ViewModelBase
 {

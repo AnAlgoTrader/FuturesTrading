@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace QQQTrader.Helper;
+namespace DayTrader.Helper;
 
 public class Logger : IDisposable
 {

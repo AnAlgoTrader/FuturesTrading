@@ -1,10 +1,10 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using QQQTrader.ViewModels;
-using QQQTrader.Views;
+using DayTrader.ViewModels;
+using DayTrader.Views;
 
-namespace QQQTrader;
+namespace DayTrader;
 
 public partial class App : Application
 {

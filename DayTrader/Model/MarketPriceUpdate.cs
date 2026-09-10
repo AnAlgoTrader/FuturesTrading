@@ -1,6 +1,6 @@
 using ReactiveUI;
 
-namespace QQQTrader.Model;
+namespace DayTrader.Model;
 
 public class MarketPriceUpdate : ReactiveObject
 {

@@ -1,6 +1,6 @@
 using System;
 
-namespace QQQTrader.Helper;
+namespace DayTrader.Helper;
 
 public class VwapCalculator
 {

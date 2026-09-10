@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
 using IBApi;
 
-namespace QQQTrader.Helper;
+namespace DayTrader.Helper;
 
 public class ContractHelper
 {

@@ -2,7 +2,7 @@
 using ReactiveUI.Avalonia;
 using System;
 
-namespace QQQTrader;
+namespace DayTrader;
 
 internal sealed class Program
 {
