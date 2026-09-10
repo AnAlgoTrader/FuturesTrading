@@ -31,6 +31,9 @@ public class MainWindowViewModel : ViewModelBase
     private ContractDetails? _spyContract;
     private ContractDetails? _mesContract;
 
+    private double MesMultiplier =>
+        double.TryParse(_mesContract?.Contract.Multiplier, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var m) ? m : 1;
+
     public MainWindowViewModel()
     {
         _logger = new Logger();
@@ -58,8 +61,8 @@ public class MainWindowViewModel : ViewModelBase
 
             var evalPrice = _currentMesPrice > 0 ? _currentMesPrice : entryPrice;
             double pnlDollar = isBuy
-                ? (evalPrice - entryPrice) * (double)position.NetQuantity
-                : (entryPrice - evalPrice) * (double)Math.Abs(position.NetQuantity);
+                ? (evalPrice - entryPrice) * (double)position.NetQuantity * MesMultiplier
+                : (entryPrice - evalPrice) * (double)Math.Abs(position.NetQuantity) * MesMultiplier;
             var color = pnlDollar >= 0 ? "#26a69a" : "#ef5350";
 
             string sign = pnlDollar >= 0 ? "+" : "";
