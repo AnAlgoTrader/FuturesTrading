@@ -18,7 +18,6 @@ public class MainWindowViewModel : ViewModelBase
     public event Action<double, string, string>? OnOrderPriceLine;
     public ReactiveCommand<RxVoid, RxVoid> OnEnterButtonClick { get; }
     private readonly IbClient _client = new();
-    private ContractDetails? _futuresContract;
     private readonly VwapCalculator _vwapCalculator;
     private readonly CandleAggregator _candleAggregator;
     private readonly Logger _logger;
@@ -28,6 +27,9 @@ public class MainWindowViewModel : ViewModelBase
     private const decimal OrderQuantity = 1;
     public AccountInfo AccountInfo { get; } = new();
     public MarketPriceUpdate MarketPriceUpdate { get; } = new();
+    
+    private ContractDetails? _spyContract;
+    private ContractDetails? _mesContract;
 
     public MainWindowViewModel()
     {
@@ -114,7 +116,7 @@ public class MainWindowViewModel : ViewModelBase
             Tif = "DAY"
         };
         await _orderHelper.PersistOrder(order);
-        _client.PlaceOrder(_futuresContract?.Contract, order);
+        _client.PlaceOrder(_mesContract?.Contract, order);
         _logger.WriteLine($"[TRADE] OrderId:{order.OrderId} - Action:{order.Action} - Quantity:{order.TotalQuantity} - EntryPrice:{order.LmtPrice}");
     }
 
@@ -145,15 +147,16 @@ public class MainWindowViewModel : ViewModelBase
         _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
         _client.OnRealTimeBarUpdate += _candleAggregator.AddBar;
         _client.OnOrderStatusUpdate += status => _ = _orderHelper.UpdateOrderStatus(status);
-        _futuresContract = await ContractHelper.GetFrontMonthContract(_client);
+        _spyContract = await ContractHelper.GetSpyContract(_client);
+        _mesContract = await ContractHelper.GetMesContract(_client);
         await DisplayHistoricalData();
-        _client.SubscribeToRealTimeBars(1106, _futuresContract.Contract);
-        _client.SubscribeToMarketData(1107, _futuresContract);
+        _client.SubscribeToRealTimeBars(1106, _spyContract.Contract);
+        _client.SubscribeToMarketData(1107, _mesContract);
     }
 
     private async Task DisplayHistoricalData()
     {
-        var historicalData = await _client.GetHistoricalData(1105, _futuresContract!.Contract, $"3 {nameof(Duration.D)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000);
+        var historicalData = await _client.GetHistoricalData(1105, _spyContract!.Contract, $"3 {nameof(Duration.D)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000);
 
         foreach (var item in historicalData)
         {
