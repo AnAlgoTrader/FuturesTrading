@@ -20,7 +20,7 @@ public class OrderHelper
     private readonly Logger? _logger;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
-    public double CurrentSpyPrice { get; set; }
+    public double CurrentChartPrice { get; set; }
 
     public event Action<IReadOnlyList<OrderPersistence>>? OnOrdersChanged;
     public event Action<PositionSummary>? OnPositionChanged;
@@ -48,7 +48,7 @@ public class OrderHelper
                     Direction = _position.Direction,
                     Quantity = _position.Quantity,
                     AveragePrice = _position.AveragePrice,
-                    SpyEntryPrice = _position.SpyEntryPrice
+                    ChartEntryPrice = _position.ChartEntryPrice
                 };
             }
         }
@@ -177,11 +177,11 @@ public class OrderHelper
 
         if (newQ == 0)
         {
-            _position.SpyEntryPrice = 0;
+            _position.ChartEntryPrice = 0;
         }
         else if (q == 0 || Math.Sign(newQ) != Math.Sign(q))
         {
-            _position.SpyEntryPrice = CurrentSpyPrice;
+            _position.ChartEntryPrice = CurrentChartPrice;
         }
     }
 

@@ -8,13 +8,13 @@ namespace DayTrader.Helper;
 
 public class ContractHelper
 {
-    public static async Task<ContractDetails> GetSpyContract(IbClient client)
+    public static async Task<ContractDetails> GetChartContract(IbClient client)
     {
         var contractDataList = await client.GetContractData("SPY", "STK");
         return contractDataList.OrderBy(x => x.Contract.LastTradeDate).FirstOrDefault(x => x.Contract.Exchange == "SMART" && x.Contract.Currency == "USD")!;
     }
 
-    public static async Task<ContractDetails> GetMesContract(IbClient client)
+    public static async Task<ContractDetails> GetTradeContract(IbClient client)
     {
         var contractDataList = await client.GetContractData("MES", "FUT");
         return contractDataList.OrderBy(x=> x.Contract.LastTradeDate).FirstOrDefault(x=> 

@@ -68,8 +68,8 @@
         } catch (err) {}
     });
 
-    window.setOrderLine = function (price, color, title, spyPrice) {
-        if (!price || price <= 0 || !spyPrice || spyPrice <= 0) {
+    window.setOrderLine = function (price, color, title, chartPrice) {
+        if (!price || price <= 0 || !chartPrice || chartPrice <= 0) {
             lastOrderPrice = 0;
             if (activePriceLine) {
                 try {
@@ -81,10 +81,10 @@
             return;
         }
 
-        lastOrderPrice = spyPrice;
+        lastOrderPrice = chartPrice;
 
         const lineOptions = {
-            price: spyPrice,
+            price: chartPrice,
             color: color || '#26a69a',
             lineWidth: 2,
             lineStyle: LightweightCharts.LineStyle.Dashed,

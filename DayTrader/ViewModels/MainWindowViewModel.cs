@@ -21,18 +21,18 @@ public class MainWindowViewModel : ViewModelBase
     private readonly CandleAggregator _candleAggregator;
     private readonly Logger _logger;
     private readonly OrderHelper _orderHelper;
-    private double _currentMesPrice;
-    private double _currentSpyPrice;
+    private double _currentTradePrice;
+    private double _currentChartPrice;
     private int _closeTradeInProgress;
     private const decimal OrderQuantity = 1;
     public AccountInfo AccountInfo { get; } = new();
     public MarketPriceUpdate MarketPriceUpdate { get; } = new();
     
-    private ContractDetails? _spyContract;
-    private ContractDetails? _mesContract;
+    private ContractDetails? _chartContract;
+    private ContractDetails? _tradeContract;
 
-    private double MesMultiplier =>
-        double.TryParse(_mesContract?.Contract.Multiplier, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var m) ? m : 1;
+    private double TradeMultiplier =>
+        double.TryParse(_tradeContract?.Contract.Multiplier, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var m) ? m : 1;
 
     public MainWindowViewModel()
     {
@@ -59,16 +59,16 @@ public class MainWindowViewModel : ViewModelBase
             var entryPrice = position.AveragePrice;
             var isBuy = string.Equals(position.Direction, "BUY", StringComparison.OrdinalIgnoreCase);
 
-            var evalPrice = _currentMesPrice > 0 ? _currentMesPrice : entryPrice;
+            var evalPrice = _currentTradePrice > 0 ? _currentTradePrice : entryPrice;
             double pnlDollar = isBuy
-                ? (evalPrice - entryPrice) * (double)position.NetQuantity * MesMultiplier
-                : (entryPrice - evalPrice) * (double)Math.Abs(position.NetQuantity) * MesMultiplier;
+                ? (evalPrice - entryPrice) * (double)position.NetQuantity * TradeMultiplier
+                : (entryPrice - evalPrice) * (double)Math.Abs(position.NetQuantity) * TradeMultiplier;
             var color = pnlDollar >= 0 ? "#26a69a" : "#ef5350";
 
             string sign = pnlDollar >= 0 ? "+" : "";
             string pnlTitle = $"{sign}${pnlDollar:F2} @ {position.AveragePrice:F2}";
 
-            OnOrderPriceLine?.Invoke(entryPrice, color, pnlTitle, position.SpyEntryPrice);
+            OnOrderPriceLine?.Invoke(entryPrice, color, pnlTitle, position.ChartEntryPrice);
         }
         else
         {
@@ -119,7 +119,7 @@ public class MainWindowViewModel : ViewModelBase
             Tif = "DAY"
         };
         await _orderHelper.PersistOrder(order);
-        _client.PlaceOrder(_mesContract?.Contract, order);
+        _client.PlaceOrder(_tradeContract?.Contract, order);
         _logger.WriteLine($"[TRADE] OrderId:{order.OrderId} - Action:{order.Action} - Quantity:{order.TotalQuantity} - EntryPrice:{order.LmtPrice}");
     }
 
@@ -144,14 +144,14 @@ public class MainWindowViewModel : ViewModelBase
                 var marketPrice = kv.Value;
                 if (kv.Key == 1108)
                 {
-                    _currentSpyPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
+                    _currentChartPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
                         ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
                         : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
-                    _orderHelper.CurrentSpyPrice = _currentSpyPrice;
+                    _orderHelper.CurrentChartPrice = _currentChartPrice;
                 }
                 else
                 {
-                    _currentMesPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
+                    _currentTradePrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
                         ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
                         : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
                     MarketPriceUpdate.Bid = marketPrice.BidPrice;
@@ -163,17 +163,17 @@ public class MainWindowViewModel : ViewModelBase
         _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
         _client.OnRealTimeBarUpdate += _candleAggregator.AddBar;
         _client.OnOrderStatusUpdate += status => _ = _orderHelper.UpdateOrderStatus(status);
-        _spyContract = await ContractHelper.GetSpyContract(_client);
-        _mesContract = await ContractHelper.GetMesContract(_client);
+        _chartContract = await ContractHelper.GetChartContract(_client);
+        _tradeContract = await ContractHelper.GetTradeContract(_client);
         await DisplayHistoricalData();
-        _client.SubscribeToRealTimeBars(1106, _spyContract.Contract);
-        _client.SubscribeToMarketData(1108, _spyContract);
-        _client.SubscribeToMarketData(1107, _mesContract);
+        _client.SubscribeToRealTimeBars(1106, _chartContract.Contract);
+        _client.SubscribeToMarketData(1108, _chartContract);
+        _client.SubscribeToMarketData(1107, _tradeContract);
     }
 
     private async Task DisplayHistoricalData()
     {
-        var historicalData = await _client.GetHistoricalData(1105, _spyContract!.Contract, $"3 {nameof(Duration.D)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000);
+        var historicalData = await _client.GetHistoricalData(1105, _chartContract!.Contract, $"3 {nameof(Duration.D)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000);
 
         foreach (var item in historicalData)
         {
