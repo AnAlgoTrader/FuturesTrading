@@ -1,5 +1,8 @@
 namespace DayTrader;
 
+/// <summary>
+/// In case of trading stocks, provide both the Chart and the Trade configs with the same values
+/// </summary>
 public static class TradingConfig
 {
     public const string ChartSymbol = "SPY";
