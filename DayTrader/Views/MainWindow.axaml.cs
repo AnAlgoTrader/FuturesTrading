@@ -55,9 +55,9 @@ public partial class MainWindow : Window
                     _pendingScript = script;
                 }
             };
-            vm.OnOrderPriceLine += (price, color, title) =>
+            vm.OnOrderPriceLine += (price, color, title, priceScale) =>
             {
-                var script = $"window.setOrderLine({Price(price)}, '{color}', '{EscapeTitle(title)}')";
+                var script = $"window.setOrderLine({Price(price)}, '{color}', '{EscapeTitle(title)}', {Price(priceScale)})";
                 InvokeInChart(script);
             };
         };

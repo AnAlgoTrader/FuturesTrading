@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
@@ -15,7 +14,7 @@ namespace DayTrader.ViewModels;
 public class MainWindowViewModel : ViewModelBase
 {
     public event Action<string>? OnInvokeScript;
-    public event Action<double, string, string>? OnOrderPriceLine;
+    public event Action<double, string, string, double>? OnOrderPriceLine;
     public ReactiveCommand<RxVoid, RxVoid> OnEnterButtonClick { get; }
     private readonly IbClient _client = new();
     private readonly VwapCalculator _vwapCalculator;
@@ -23,6 +22,7 @@ public class MainWindowViewModel : ViewModelBase
     private readonly Logger _logger;
     private readonly OrderHelper _orderHelper;
     private double _currentPrice;
+    private double _currentSpyPrice;
     private int _closeTradeInProgress;
     private const decimal OrderQuantity = 1;
     public AccountInfo AccountInfo { get; } = new();
@@ -65,11 +65,15 @@ public class MainWindowViewModel : ViewModelBase
             string sign = pnlDollar >= 0 ? "+" : "";
             string pnlTitle = $"{sign}${pnlDollar:F2} @ {position.AveragePrice:F2}";
 
-            OnOrderPriceLine?.Invoke(entryPrice, color, pnlTitle);
+            double priceScale = _currentSpyPrice > 0 && entryPrice > 0
+                ? _currentSpyPrice / entryPrice
+                : 0;
+
+            OnOrderPriceLine?.Invoke(entryPrice, color, pnlTitle, priceScale);
         }
         else
         {
-            OnOrderPriceLine?.Invoke(0, string.Empty, string.Empty);
+            OnOrderPriceLine?.Invoke(0, string.Empty, string.Empty, 0);
         }
     }
 
@@ -136,12 +140,24 @@ public class MainWindowViewModel : ViewModelBase
         };
         _client.OnMarketDataPriceUpdate += updates =>
         {
-            var marketPrice = updates.First().Value;
-            _currentPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
-                ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
-                : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
-            MarketPriceUpdate.Bid = marketPrice.BidPrice;
-            MarketPriceUpdate.Ask = marketPrice.AskPrice;
+            foreach (var kv in updates)
+            {
+                var marketPrice = kv.Value;
+                if (kv.Key == 1108)
+                {
+                    _currentSpyPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
+                        ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
+                        : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
+                }
+                else
+                {
+                    _currentPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
+                        ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
+                        : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
+                    MarketPriceUpdate.Bid = marketPrice.BidPrice;
+                    MarketPriceUpdate.Ask = marketPrice.AskPrice;
+                }
+            }
             UpdateOrderLine();
         };
         _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
@@ -151,6 +167,7 @@ public class MainWindowViewModel : ViewModelBase
         _mesContract = await ContractHelper.GetMesContract(_client);
         await DisplayHistoricalData();
         _client.SubscribeToRealTimeBars(1106, _spyContract.Contract);
+        _client.SubscribeToMarketData(1108, _spyContract);
         _client.SubscribeToMarketData(1107, _mesContract);
     }
 

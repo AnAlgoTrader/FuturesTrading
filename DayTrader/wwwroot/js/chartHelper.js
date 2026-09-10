@@ -68,10 +68,9 @@
         } catch (err) {}
     });
 
-    window.setOrderLine = function (price, color, title) {
-        lastOrderPrice = price;
-
+    window.setOrderLine = function (price, color, title, priceScale) {
         if (!price || price <= 0) {
+            lastOrderPrice = 0;
             if (activePriceLine) {
                 try {
                     candlesSeries.removePriceLine(activePriceLine);
@@ -82,8 +81,14 @@
             return;
         }
 
+        var displayPrice = price;
+        if (priceScale && priceScale > 0) {
+            displayPrice = price * priceScale;
+        }
+        lastOrderPrice = displayPrice;
+
         const lineOptions = {
-            price: price,
+            price: displayPrice,
             color: color || '#26a69a',
             lineWidth: 2,
             lineStyle: LightweightCharts.LineStyle.Dashed,
