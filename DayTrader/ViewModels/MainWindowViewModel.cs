@@ -5,7 +5,7 @@ using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 using DayTrader.Helper;
-using DayTrader.Model;
+using DayTrader.Models;
 using ReactiveUI;
 using ReactiveUI.Primitives;
 
