@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ES Intraday Dashboard — 0DTE Focus</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2128;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --red: #f85149;
+    --amber: #d29922;
+    --blue: #58a6ff;
+    --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    padding: 16px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  h1 { font-size: 16px; font-weight: 600; letter-spacing: 0.3px; }
+  .clock { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* STRICT 3-COLUMN GRID */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .panel h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .tag.regime { background: rgba(248,81,73,0.15); color: var(--red); }
+  .tag.levels { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .tag.flow   { background: rgba(188,140,255,0.15); color: var(--purple); }
+  .tag.range  { background: rgba(210,153,34,0.15); color: var(--amber); }
+  .tag.ctx    { background: rgba(63,185,80,0.15); color: var(--green); }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(48,54,61,0.5);
+  }
+  .row:last-child { border-bottom: none; }
+  .label { color: var(--muted); }
+  .val { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .green { color: var(--green); }
+  .red { color: var(--red); }
+  .amber { color: var(--amber); }
+  .blue { color: var(--blue); }
+  .purple { color: var(--purple); }
+
+  /* Regime panel emphasis */
+  .regime-panel {
+    background: linear-gradient(135deg, rgba(248,81,73,0.08), rgba(22,27,34,1));
+    border-color: rgba(248,81,73,0.4);
+  }
+  .regime-status {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .regime-sub { color: var(--muted); font-size: 11.5px; margin-bottom: 12px; line-height: 1.4; }
+
+  .price-bar {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .bar-track {
+    height: 6px;
+    background: var(--panel-2);
+    border-radius: 3px;
+    position: relative;
+    margin: 8px 0;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+  }
+  .bar-marker {
+    position: absolute;
+    top: -4px;
+    width: 2px;
+    height: 14px;
+    background: white;
+  }
+
+  /* Level ladder */
+  .ladder { font-variant-numeric: tabular-nums; flex: 1; }
+  .ladder-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-bottom: 3px;
+    font-size: 12px;
+  }
+  .ladder-row.resistance { background: rgba(248,81,73,0.08); }
+  .ladder-row.support    { background: rgba(63,185,80,0.08); }
+  .ladder-row.flip       { background: rgba(210,153,34,0.15); border: 1px dashed var(--amber); }
+  .ladder-row.spot       { background: rgba(88,166,255,0.2); border: 1px solid var(--blue); font-weight: 700; }
+
+  /* Flow */
+  .flow-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(48,54,61,0.5);
+  }
+  .flow-item:last-child { border-bottom: none; }
+  .arrow { font-size: 14px; }
+
+  /* Events */
+  .event {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    background: var(--panel-2);
+    font-size: 12px;
+  }
+  .event.urgent { border-left: 3px solid var(--red); }
+
+  /* Scenario (spans full row) */
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .scenario-col .val { margin-bottom: 6px; }
+  .scenario-col p { color: var(--muted); font-size: 12px; line-height: 1.45; }
+
+  /* Responsive: stack to 1 column on narrow screens */
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ES Intraday Dashboard <span style="color:var(--muted);font-weight:400;">· 0DTE Focus</span></h1>
+  <div class="clock">ES 5,812.25 &nbsp;|&nbsp; <span class="green">+0.34%</span> &nbsp;|&nbsp; 11:42:07 ET</div>
+</header>
+
+<div class="grid">
+
+  <!-- ROW 1 -->
+  <div class="panel regime-panel">
+    <h2>Dealer Gamma Regime <span class="tag regime">REGIME</span></h2>
+    <div class="regime-status red">NEGATIVE GAMMA</div>
+    <div class="regime-sub">Dealers amplify moves · expect trend continuation · breakouts extend</div>
+
+    <div class="price-bar">
+      <span>Put Wall 5,780</span>
+      <span>Flip 5,805</span>
+      <span>Call Wall 5,830</span>
+    </div>
+    <div class="bar-track">
+      <div class="bar-fill" style="width:100%; background: linear-gradient(90deg, rgba(63,185,80,0.5), rgba(210,153,34,0.5), rgba(248,81,73,0.5));"></div>
+      <div class="bar-marker" style="left: 55%;"></div>
+    </div>
+    <div class="price-bar">
+      <span>SPX 5,808.4</span>
+      <span class="blue">↑ above flip 3.4 pts</span>
+      <span>0DTE wt: 58%</span>
+    </div>
+
+    <div style="margin-top:12px;">
+      <div class="row"><span class="label">Net GEX (0DTE-weighted)</span><span class="val red">−$2.4B / 1%</span></div>
+      <div class="row"><span class="label">Regime change prob (60m)</span><span class="val amber">38%</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>0DTE Level Ladder <span class="tag levels">LEVELS</span></h2>
+    <div class="ladder">
+      <div class="ladder-row resistance"><span>5,840 — Call Wall #2</span><span>1.1B</span></div>
+      <div class="ladder-row resistance"><span>5,830 — Call Wall</span><span>2.3B</span></div>
+      <div class="ladder-row resistance"><span>5,820 — Secondary</span><span>0.8B</span></div>
+      <div class="ladder-row spot"><span>5,812 — ES spot</span><span>—</span></div>
+      <div class="ladder-row flip"><span>5,805 — GAMMA FLIP</span><span>0</span></div>
+      <div class="ladder-row support"><span>5,795 — Secondary</span><span>0.9B</span></div>
+      <div class="ladder-row support"><span>5,780 — Put Wall</span><span>2.7B</span></div>
+      <div class="ladder-row support"><span>5,765 — Put Wall #2</span><span>1.2B</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Flow Pressure <span class="tag flow">FLOW</span></h2>
+    <div class="flow-item">
+      <span class="label">Charm</span>
+      <span class="val red"><span class="arrow">↓</span> Selling pressure</span>
+    </div>
+    <div class="flow-item">
+      <span class="label">Vanna</span>
+      <span class="val green"><span class="arrow">↑</span> Mild bid</span>
+    </div>
+    <div class="flow-item">
+      <span class="label">Net drift bias</span>
+      <span class="val red">Bearish tilt</span>
+    </div>
+    <div class="flow-item">
+      <span class="label">0DTE delta flow (15m)</span>
+      <span class="val red">−$410M</span>
+    </div>
+    <div class="flow-item">
+      <span class="label">Session phase</span>
+      <span class="val amber">Midday chop</span>
+    </div>
+  </div>
+
+  <!-- ROW 2 -->
+  <div class="panel">
+    <h2>Expected Move <span class="tag range">RANGE</span></h2>
+    <div class="row"><span class="label">0DTE straddle (ATM)</span><span class="val">± 22.5 pts</span></div>
+    <div class="row"><span class="label">Move consumed</span><span class="val amber">58%</span></div>
+    <div class="row"><span class="label">Remaining implied</span><span class="val">± 9.4 pts</span></div>
+    <div class="row"><span class="label">Realized / Implied</span><span class="val green">0.84</span></div>
+    <div class="row"><span class="label">Session range</span><span class="val">5,798 – 5,818</span></div>
+    <div class="bar-track" style="margin-top:10px;">
+      <div class="bar-fill" style="width:58%; background: var(--amber);"></div>
+    </div>
+    <div class="price-bar"><span>Open 5,802</span><span>58%</span><span>Target 5,824</span></div>
+  </div>
+
+  <div class="panel">
+    <h2>Volatility Structure <span class="tag ctx">CONTEXT</span></h2>
+    <div class="row"><span class="label">VIX spot</span><span class="val">15.42 <span class="red">+2.1%</span></span></div>
+    <div class="row"><span class="label">VIX M1 / M2</span><span class="val">15.8 / 16.4</span></div>
+    <div class="row"><span class="label">Term structure</span><span class="val green">Contango</span></div>
+    <div class="row"><span class="label">Roll yield</span><span class="val red">−3.8%</span></div>
+    <div class="row"><span class="label">VVIX</span><span class="val amber">96.3</span></div>
+    <div class="row"><span class="label">IV rank (30d)</span><span class="val">42%</span></div>
+  </div>
+
+  <div class="panel">
+    <h2>Macro Risk <span class="tag ctx">CONTEXT</span></h2>
+    <div class="event urgent">
+      <span>FOMC Statement</span>
+      <span class="red">2d 4h</span>
+    </div>
+    <div class="event">
+      <span>CPI Release</span>
+      <span>6d 18h</span>
+    </div>
+    <div class="event">
+      <span>PCE</span>
+      <span>9d 2h</span>
+    </div>
+    <div class="row" style="margin-top:8px;"><span class="label">FedWatch: hold</span><span class="val">72%</span></div>
+    <div class="row"><span class="label">FedWatch: cut 25bp</span><span class="val">28%</span></div>
+  </div>
+
+  <!-- ROW 3 -->
+  <div class="panel">
+    <h2>Market Internals <span class="tag ctx">CONTEXT</span></h2>
+    <div class="row"><span class="label">NYSE TICK</span><span class="val green">+412</span></div>
+    <div class="row"><span class="label">TRIN</span><span class="val">1.08</span></div>
+    <div class="row"><span class="label">ADD</span><span class="val green">+1,240</span></div>
+    <div class="row"><span class="label">UVOL / DVOL</span><span class="val green">1.6 : 1</span></div>
+    <div class="row"><span class="label">Breadth divergence</span><span class="val amber">Watch</span></div>
+    <div class="row"><span class="label">ES vs. cash premium</span><span class="val">+3.85 pts</span></div>
+  </div>
+
+  <div class="panel">
+    <h2>Session Phase <span class="tag flow">FLOW</span></h2>
+    <div class="row"><span class="label">Current window</span><span class="val amber">Midday chop</span></div>
+    <div class="row"><span class="label">Time to power hour</span><span class="val">3h 18m</span></div>
+    <div class="row"><span class="label">0DTE decay (θ)</span><span class="val red">Accelerating</span></div>
+    <div class="row"><span class="label">Charm peak window</span><span class="val">15:00–16:00</span></div>
+    <div class="row"><span class="label">Pinning risk</span><span class="val amber">Low (neg γ)</span></div>
+  </div>
+
+  <div class="panel">
+    <h2>Regime Triggers <span class="tag regime">REGIME</span></h2>
+    <div class="row"><span class="label">Flip reclaim (bullish)</span><span class="val green">≥ 5,806</span></div>
+    <div class="row"><span class="label">Flip loss (bearish)</span><span class="val red">≤ 5,804</span></div>
+    <div class="row"><span class="label">Call wall break</span><span class="val blue">≥ 5,831</span></div>
+    <div class="row"><span class="label">Put wall break</span><span class="val blue">≤ 5,779</span></div>
+    <div class="row"><span class="label">Vol trigger (VIX)</span><span class="val amber">&gt; 16.5</span></div>
+    <div class="row"><span class="label">Invalidation</span><span class="val">Flip cross + hold</span></div>
+  </div>
+
+  <!-- ROW 4: Scenario spans full width -->
+  <div class="panel" style="grid-column: 1 / -1;">
+    <h2>Scenario Read <span class="tag regime">SYNTHESIS</span></h2>
+    <div class="scenario-grid">
+      <div class="scenario-col">
+        <div class="val red">↓ Break below 5,805</div>
+        <p>Gamma flip lost → dealers flip pro-cyclical. Targets 5,795 → 5,780 put wall. Charm selling into close adds pressure.</p>
+      </div>
+      <div class="scenario-col">
+        <div class="val amber">→ Hold 5,805–5,830</div>
+        <p>If price reclaims flip, positive gamma resumes. Range-bound into power hour, pinning toward 5,815–5,820 max GEX.</p>
+      </div>
+      <div class="scenario-col">
+        <div class="val green">↑ Break above 5,830</div>
+        <p>Call wall break in negative gamma = squeeze. Next resistance 5,840, then air pocket. Vanna tailwind if VIX stays bid.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
