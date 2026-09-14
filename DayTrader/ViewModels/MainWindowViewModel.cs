@@ -52,9 +52,7 @@ public class MainWindowViewModel : ViewModelBase
             OnInvokeScript?.Invoke($"window.updateData({time}, {open}, {high}, {low}, {close}, {vwap})");
         };
         OnEnterButtonClick = ReactiveCommand.Create(OnButtonClicked);
-        _sidePanelScheduler = ObservableExtensions.Subscribe(
-            Observable.Timer(TimeSpan.Zero, TimeSpan.FromMinutes(1)),
-            _ => HandleSidePanelSchedulerTick());
+        _sidePanelScheduler = ObservableExtensions.Subscribe(Observable.Timer(TimeSpan.Zero, TimeSpan.FromMinutes(1)), _ => HandleSidePanelSchedulerTick());
         _ = InitAndSubscribe();
     }
 
