@@ -80,7 +80,7 @@
                     <Style Selector="TextBlock.val">
                         <Setter Property="Foreground" Value="#d1d4dc" />
                         <Setter Property="VerticalAlignment" Value="Center" />
-                        <Setter Property="HorizontalAlignment" Value="Right" />
+                        <Setter Property="HorizontalAlignment" Value="Left" />
                         <Setter Property="FontWeight" Value="SemiBold" />
                     </Style>
                     </StackPanel.Styles>
