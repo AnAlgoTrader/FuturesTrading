@@ -65,6 +65,11 @@ public class MainWindowViewModel : ViewModelBase
         SidePanelInfo.Vix = Math.Round(data.Vix, 2);
         SidePanelInfo.Vvix = Math.Round(data.Vvix, 2);
         SidePanelInfo.IvPercentile = data.IvPercentile;
+        SidePanelInfo.IvRank = data.IvRank;
+        SidePanelInfo.Rv5 = data.Rv5;
+        SidePanelInfo.Vrp = data.Vrp;
+        SidePanelInfo.VrpZScore = data.VrpZScore;
+        SidePanelInfo.VvixPercentile = data.VvixPercentile;
     }
 
     private void UpdateOrderLine()

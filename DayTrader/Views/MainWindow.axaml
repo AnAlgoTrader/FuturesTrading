@@ -121,6 +121,46 @@
                             <TextBlock Text="IV Percentile:" Classes="attr" />
                             <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.IvPercentile}" Classes="val" />
                         </Grid>
+                        <Grid Grid.Row="3" Grid.ColumnSpan="2" Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="IV Rank:" Classes="attr" />
+                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.IvRank}" Classes="val" />
+                        </Grid>
+                        <Grid Grid.Row="4" Grid.ColumnSpan="2" Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Rv5:" Classes="attr" />
+                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.Rv5}" Classes="val" />
+                        </Grid>
+                        <Grid Grid.Row="5" Grid.ColumnSpan="2" Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Vrp:" Classes="attr" />
+                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.Vrp}" Classes="val" />
+                        </Grid>
+                        <Grid Grid.Row="6" Grid.ColumnSpan="2" Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="VrpZScore:" Classes="attr" />
+                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.VrpZScore}" Classes="val" />
+                        </Grid>
+                        <Grid Grid.Row="7" Grid.ColumnSpan="2" Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="VvixPercentile:" Classes="attr" />
+                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.VvixPercentile}" Classes="val" />
+                        </Grid>
                     </Grid>
                 </StackPanel>
                 </StackPanel>
