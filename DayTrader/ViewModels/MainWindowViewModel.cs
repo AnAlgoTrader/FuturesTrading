@@ -54,8 +54,13 @@ public class MainWindowViewModel : ViewModelBase
         OnEnterButtonClick = ReactiveCommand.Create(OnButtonClicked);
         _sidePanelScheduler = ObservableExtensions.Subscribe(
             Observable.Timer(TimeSpan.Zero, TimeSpan.FromMinutes(1)),
-            _ => Console.WriteLine($"[SCHEDULER] tick @ {DateTime.Now:HH:mm:ss}"));
+            _ => HandleSidePanelSchedulerTick());
         _ = InitAndSubscribe();
+    }
+
+    private void HandleSidePanelSchedulerTick()
+    {
+        Console.WriteLine($"[SCHEDULER] tick @ {DateTime.Now:HH:mm:ss}");
     }
 
     private void UpdateOrderLine()
