@@ -69,9 +69,100 @@
                 <ColumnDefinition Width="20*"></ColumnDefinition>
             </Grid.ColumnDefinitions>
             <NativeWebView Grid.Column="0" x:Name="Chart" />
-            <StackPanel Grid.Column="1" Background="Red">
-                
-            </StackPanel>
+            <Border Grid.Column="1" Background="#131722">
+                <StackPanel>
+                  <StackPanel.Styles>
+                    <Style Selector="TextBlock.attr">
+                        <Setter Property="Foreground" Value="Gray" />
+                        <Setter Property="FontWeight" Value="Bold" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                    </Style>
+                    <Style Selector="TextBlock.val">
+                        <Setter Property="Foreground" Value="#d1d4dc" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                        <Setter Property="HorizontalAlignment" Value="Right" />
+                        <Setter Property="FontWeight" Value="SemiBold" />
+                    </Style>
+                    </StackPanel.Styles>
+                <StackPanel Margin="12,16,12,0" Spacing="6">
+                    <Grid Margin="0,6,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Symbol" Classes="attr" />
+                            <TextBlock Grid.Column="1" Text="MES" Classes="val" />
+                        </Grid>
+
+                        <Grid Grid.Row="2" Grid.ColumnSpan="2" Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Direction" Classes="attr" />
+                            <TextBlock Grid.Column="1" Text="BUY" Classes="val" />
+                        </Grid>
+
+                        <Grid Grid.Row="3" Grid.ColumnSpan="2" Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Quantity" Classes="attr" />
+                            <TextBlock Grid.Column="1" Text="5" Classes="val" />
+                        </Grid>
+
+                        <Grid Grid.Row="4" Grid.ColumnSpan="2" Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Avg Entry" Classes="attr" />
+                            <TextBlock Grid.Column="1" Text="4,215.50" Classes="val" />
+                        </Grid>
+
+                        <Grid Grid.Row="5" Grid.ColumnSpan="2" Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Current" Classes="attr" />
+                            <TextBlock Grid.Column="1" Text="4,220.25" Classes="val" />
+                        </Grid>
+
+                        <Grid Grid.Row="6" Grid.ColumnSpan="2" Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Unrealized P&amp;L" Classes="attr" />
+                            <TextBlock Grid.Column="1" Text="+24.00  (+0.11%)" Classes="val" Foreground="#26a69a" />
+                        </Grid>
+
+                        <Grid Grid.Row="7" Grid.ColumnSpan="2" Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="1*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Commission" Classes="attr" />
+                            <TextBlock Grid.Column="1" Text="2.30" Classes="val" />
+                        </Grid>
+                    </Grid>
+                </StackPanel>
+                </StackPanel>
+            </Border>
         </Grid>
     </Grid>
 </Window>
