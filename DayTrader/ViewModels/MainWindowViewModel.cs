@@ -70,6 +70,7 @@ public class MainWindowViewModel : ViewModelBase
         SidePanelInfo.Vrp = data.Vrp;
         SidePanelInfo.VrpZScore = data.VrpZScore;
         SidePanelInfo.VvixPercentile = data.VvixPercentile;
+        SidePanelInfo.Analysis = SidePanelInfo.BuildAnalysis();
     }
 
     private void UpdateOrderLine()

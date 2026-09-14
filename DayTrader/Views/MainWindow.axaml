@@ -162,6 +162,8 @@
                             <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.VvixPercentile}" Classes="val" />
                         </Grid>
                     </Grid>
+                    <TextBlock Margin="0,10,0,0" Text="{Binding SidePanelInfo.Analysis}"
+                               Foreground="#d1d4dc" FontSize="12" LineHeight="16" TextWrapping="Wrap" />
                 </StackPanel>
                 </StackPanel>
             </Border>
