@@ -87,51 +87,64 @@ public class SidePanelInfo : ReactiveObject
 
         lines.Add(Vix switch
         {
-            < 14 => $"VIX {Vix:F1} - calm, low-vol regime.",
-            < 20 => $"VIX {Vix:F1} - normal risk appetite.",
-            < 30 => $"VIX {Vix:F1} - elevated stress regime.",
-            _ => $"VIX {Vix:F1} - high-fear regime."
+            < 14 => $"VIX {Vix:F1} - calm tape, low expected range; trending setups favored.",
+            < 20 => $"VIX {Vix:F1} - normal conditions, volatility within typical bounds.",
+            < 30 => $"VIX {Vix:F1} - elevated; expect wider ranges, faster moves, wider stops.",
+            _ => $"VIX {Vix:F1} - stressed market; wide swings, whipsaw risk."
         });
 
         lines.Add(Vvix switch
         {
-            < 90 => $"VVIX {Vvix:F1} - smooth, mean-reverting vol-of-vol.",
+            < 90 => $"VVIX {Vvix:F1} - smooth vol-of-vol; regime shifts unlikely.",
             < 110 => $"VVIX {Vvix:F1} - normal vol-of-vol.",
-            _ => $"VVIX {Vvix:F1} - jumpy vol-of-vol; tail risk elevated."
+            _ => $"VVIX {Vvix:F1} - jumpy; volatility itself unstable, regime changes likely."
         });
 
         lines.Add(IvPercentile switch
         {
-            < 25 => $"IV percentile {IvPercentile:F0} - cheap vs history; favors buying premium.",
-            < 70 => $"IV percentile {IvPercentile:F0} - fair vs history.",
-            _ => $"IV percentile {IvPercentile:F0} - rich vs history; favors selling premium."
+            < 25 => $"IV at {IvPercentile:F0}th pct - calm, near the bottom of its range.",
+            < 70 => $"IV at {IvPercentile:F0}th pct - within normal bounds.",
+            _ => $"IV at {IvPercentile:F0}th pct - elevated; conditions clearly outside normal."
         });
 
-        lines.Add($"IV rank {IvRank:F0} within 1y range (VIX {Vix:F1}).");
+        lines.Add($"IV rank {IvRank:F0} vs the 1y band (VIX {Vix:F1}).");
+
+        lines.Add(Rv5 switch
+        {
+            <= 0 => "5d realized vol: n/a.",
+            < 10 => $"5d realized vol {Rv5:F1}% - quiet, trending-friendly tape.",
+            < 20 => $"5d realized vol {Rv5:F1}% - recent movement within normal bounds.",
+            _ => $"5d realized vol {Rv5:F1}% - recent chop above normal; respect wider stops."
+        });
 
         lines.Add(Vrp switch
         {
-            > 0 => $"VRP {Vrp:F1} - implied above realized; premium rich.",
-            < 0 => $"VRP {Vrp:F1} - implied below realized; premium cheap.",
-            _ => $"VRP {Vrp:F1} - implied in line with realized."
+            > 3 => $"VRP {Vrp:F1} - market prices more risk than realized; watch for repricing toward reality.",
+            < -3 => $"VRP {Vrp:F1} - realized has outpaced implied; the market was caught off guard.",
+            _ => $"VRP {Vrp:F1} - implied and realized aligned; no repricing pressure."
         });
-
-        if (Rv5 > 0)
-            lines.Add($"5d realized vol {Rv5:F1}%.");
 
         lines.Add(VrpZScore switch
         {
-            >= 2 => $"VRP z-score {VrpZScore:F1} - unusually rich premium.",
-            <= -2 => $"VRP z-score {VrpZScore:F1} - unusually cheap premium.",
-            _ => $"VRP z-score {VrpZScore:F1} - within normal bounds."
+            >= 2 => $"VRP z {VrpZScore:F1} - extreme; a dislocation that tends to snap back.",
+            <= -2 => $"VRP z {VrpZScore:F1} - extreme; unwind risk is high.",
+            _ => $"VRP z {VrpZScore:F1} - normal."
         });
 
         lines.Add(VvixPercentile switch
         {
-            < 30 => $"VVIX percentile {VvixPercentile:F0} - low vol-of-vol regime.",
-            < 70 => $"VVIX percentile {VvixPercentile:F0} - neutral vol-of-vol regime.",
-            _ => $"VVIX percentile {VvixPercentile:F0} - high vol-of-vol regime."
+            < 30 => $"VVIX pct {VvixPercentile:F0} - calm vol environment.",
+            < 70 => $"VVIX pct {VvixPercentile:F0} - neutral.",
+            _ => $"VVIX pct {VvixPercentile:F0} - volatile vol; conditions abnormal."
         });
+
+        var abnormal = Vix >= 30 || IvPercentile >= 85 || VvixPercentile >= 85;
+        var calm = Vix < 20 && IvPercentile < 70 && VvixPercentile < 70 && Rv5 is > 0 and < 20;
+        lines.Add(abnormal
+            ? "Verdict: ABNORMAL conditions - stay defensive."
+            : calm
+                ? "Verdict: calm tape, vol within normal bounds - directional setups OK."
+                : "Verdict: normal conditions.");
 
         return string.Join(Environment.NewLine, lines);
     }
