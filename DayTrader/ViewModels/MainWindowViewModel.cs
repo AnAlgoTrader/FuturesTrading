@@ -7,6 +7,7 @@ using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 using DayTrader.Helper;
 using DayTrader.Models;
+using DayTrader.Services;
 using ReactiveUI;
 using ReactiveUI.Primitives;
 
@@ -31,6 +32,8 @@ public class MainWindowViewModel : ViewModelBase
     private const int TradeMarketDataRequestId = 1107;
     public AccountInfo AccountInfo { get; } = new();
     public MarketPriceUpdate MarketPriceUpdate { get; } = new();
+    public SidePanelInfo SidePanelInfo { get; set; } = new();
+    private readonly YahooDataService _yahooDataService = new();
     
     private ContractDetails? _chartContract;
     private ContractDetails? _tradeContract;
@@ -52,13 +55,16 @@ public class MainWindowViewModel : ViewModelBase
             OnInvokeScript?.Invoke($"window.updateData({time}, {open}, {high}, {low}, {close}, {vwap})");
         };
         OnEnterButtonClick = ReactiveCommand.Create(OnButtonClicked);
-        _sidePanelScheduler = ObservableExtensions.Subscribe(Observable.Timer(TimeSpan.Zero, TimeSpan.FromMinutes(1)), _ => HandleSidePanelSchedulerTick());
+        _sidePanelScheduler = ObservableExtensions.Subscribe(Observable.Timer(TimeSpan.Zero, TimeSpan.FromMinutes(1)), async _ => await HandleSidePanelSchedulerTick());
         _ = InitAndSubscribe();
     }
 
-    private void HandleSidePanelSchedulerTick()
+    private async Task HandleSidePanelSchedulerTick()
     {
-        Console.WriteLine($"[SCHEDULER] tick @ {DateTime.Now:HH:mm:ss}");
+        var data = await _yahooDataService.GetMarketRegimeAsync();
+        SidePanelInfo.Vix = Math.Round(data.Vix, 2);
+        SidePanelInfo.Vvix = Math.Round(data.Vvix, 2);
+        SidePanelInfo.IvPercentile = data.IvPercentile;
     }
 
     private void UpdateOrderLine()
