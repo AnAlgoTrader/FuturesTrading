@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
@@ -21,6 +22,7 @@ public class MainWindowViewModel : ViewModelBase
     private readonly CandleAggregator _candleAggregator;
     private readonly Logger _logger;
     private readonly OrderHelper _orderHelper;
+    private readonly IDisposable _sidePanelScheduler;
     private double _currentTradePrice;
     private double _currentChartPrice;
     private int _closeTradeInProgress;
@@ -50,6 +52,9 @@ public class MainWindowViewModel : ViewModelBase
             OnInvokeScript?.Invoke($"window.updateData({time}, {open}, {high}, {low}, {close}, {vwap})");
         };
         OnEnterButtonClick = ReactiveCommand.Create(OnButtonClicked);
+        _sidePanelScheduler = ObservableExtensions.Subscribe(
+            Observable.Timer(TimeSpan.Zero, TimeSpan.FromMinutes(1)),
+            _ => Console.WriteLine($"[SCHEDULER] tick @ {DateTime.Now:HH:mm:ss}"));
         _ = InitAndSubscribe();
     }
 
