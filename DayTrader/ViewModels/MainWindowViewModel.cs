@@ -72,10 +72,7 @@ public class MainWindowViewModel : ViewModelBase
 
             OnOrderPriceLine?.Invoke(entryPrice, color, pnlTitle, position.ChartEntryPrice);
         }
-        else
-        {
-            OnOrderPriceLine?.Invoke(0, string.Empty, string.Empty, 0);
-        }
+        else OnOrderPriceLine?.Invoke(0, string.Empty, string.Empty, 0);
     }
 
     public async Task CloseActiveTrade()
@@ -141,23 +138,23 @@ public class MainWindowViewModel : ViewModelBase
         };
         _client.OnMarketDataPriceUpdate += updates =>
         {
-            foreach (var kv in updates)
+            foreach (var (key, marketPrice) in updates)
             {
-                var marketPrice = kv.Value;
-                if (kv.Key == ChartMarketDataRequestId)
+                switch (key)
                 {
-                    _currentChartPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
-                        ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
-                        : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
-                    _orderHelper.CurrentChartPrice = _currentChartPrice;
-                }
-                if (kv.Key == TradeMarketDataRequestId)
-                {
-                    _currentTradePrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
-                        ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
-                        : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
-                    MarketPriceUpdate.Bid = marketPrice.BidPrice;
-                    MarketPriceUpdate.Ask = marketPrice.AskPrice;
+                    case ChartMarketDataRequestId:
+                        _currentChartPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
+                            ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
+                            : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
+                        _orderHelper.CurrentChartPrice = _currentChartPrice;
+                        break;
+                    case TradeMarketDataRequestId:
+                        _currentTradePrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
+                            ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
+                            : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
+                        MarketPriceUpdate.Bid = marketPrice.BidPrice;
+                        MarketPriceUpdate.Ask = marketPrice.AskPrice;
+                        break;
                 }
             }
             UpdateOrderLine();
