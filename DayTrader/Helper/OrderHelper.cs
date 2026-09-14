@@ -183,6 +183,12 @@ public class OrderHelper
         {
             _position.ChartEntryPrice = CurrentChartPrice;
         }
+        else if (Math.Abs(newQ) > Math.Abs(q))
+        {
+            _position.ChartEntryPrice =
+                (_position.ChartEntryPrice * (double)Math.Abs(q) + CurrentChartPrice * (double)filledQty)
+                / (double)Math.Abs(newQ);
+        }
     }
 
     private async Task SaveActiveOrdersInternal()
