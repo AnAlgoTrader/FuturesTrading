@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -184,6 +185,7 @@ public class MainWindowViewModel : ViewModelBase
         _client.OnOrderStatusUpdate += status => _ = _orderHelper.UpdateOrderStatus(status);
         _chartContract = await ContractHelper.GetChartContract(_client);
         _tradeContract = await ContractHelper.GetTradeContract(_client);
+        SidePanelInfo.FuturesExpiration = DateTime.ParseExact(_tradeContract!.Contract.LastTradeDateOrContractMonth, "yyyyMMdd", CultureInfo.InvariantCulture);
         await DisplayHistoricalData();
         _client.SubscribeToRealTimeBars(1106, _chartContract.Contract);
 
