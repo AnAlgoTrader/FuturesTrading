@@ -3,32 +3,22 @@ using System.Collections.Generic;
 
 namespace DayTrader.Helper;
 
-/// <summary>
-/// Port of the Better Volume Indicator (emini-watch / LazyBear BVI) deciding what color a
-/// candle should be. Buy/sell volume is estimated from the OHLCV bar, then volume-climax up,
-/// volume-climax down, high-volume churn and low-volume markers are detected by comparing each
-/// marker against its highest/lowest over the lookback window (current bar included). Feed
-/// candles in chronological order via ProcessCandle; feeding a candle for a minute already in
-/// the buffer replaces it in place and recalculates, which is how live forming candles update.
-/// Colors have priority: magenta (climax + churn) &gt; yellow (low volume) &gt; red (climax up) &gt;
-/// white (climax down) &gt; green (churn) &gt; gray (no signal).
-/// </summary>
 public class BetterVolumeIndicator
 {
-    public const string ClimaxUpColor = "#ff0000";
-    public const string ClimaxDownColor = "#ffffff";
-    public const string ChurnColor = "#009b32";
-    public const string LowVolumeColor = "#ffff00";
-    public const string ClimaxChurnColor = "#ff00ff";
-    public const string DefaultColor = "#808080";
+    private const string ClimaxUpColor = "#ff0000";
+    private const string ClimaxDownColor = "#ffffff";
+    private const string ChurnColor = "#009b32";
+    private const string LowVolumeColor = "#ffff00";
+    private const string ClimaxChurnColor = "#ff00ff";
+    private const string DefaultColor = "#808080";
 
-    private readonly int _lookback;
+    private readonly int _lookBack;
     private readonly bool _useTwoBars;
     private readonly List<Candle> _candles = new();
 
-    public BetterVolumeIndicator(int lookback = 20, bool useTwoBars = true)
+    public BetterVolumeIndicator(int lookBack = 20, bool useTwoBars = true)
     {
-        _lookback = Math.Max(2, lookback);
+        _lookBack = Math.Max(2, lookBack);
         _useTwoBars = useTwoBars;
     }
 
@@ -40,7 +30,7 @@ public class BetterVolumeIndicator
         if (_candles.Count == 0 || _candles[^1].TimeSeconds != timeSeconds)
         {
             _candles.Add(MakeCandle(timeSeconds, open, high, low, close, volume));
-            while (_candles.Count > _lookback)
+            while (_candles.Count > _lookBack)
                 _candles.RemoveAt(0);
         }
         else
@@ -48,7 +38,7 @@ public class BetterVolumeIndicator
             _candles[^1] = MakeCandle(timeSeconds, open, high, low, close, volume);
         }
 
-        if (_candles.Count < _lookback) return DefaultColor;
+        if (_candles.Count < _lookBack) return DefaultColor;
 
         var signal = _useTwoBars
             ? EvaluateTwoBar(_candles[^1])
