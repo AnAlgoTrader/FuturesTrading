@@ -12,6 +12,8 @@ public class BetterVolumeIndicator
     private const string ClimaxChurnColor = "#ff00ff";
     private const string DefaultColor = "#808080";
 
+    private static readonly TimeZoneInfo EasternTime = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+
     private readonly int _lookBack;
     private readonly bool _useTwoBars;
     private readonly List<Candle> _candles = new();
@@ -87,6 +89,10 @@ public class BetterVolumeIndicator
     private CandleSignals EvaluateTwoBar(Candle current)
     {
         var prev = _candles[^2];
+
+        if (current.SessionDate != prev.SessionDate)
+            return new CandleSignals(false, false, false, false);
+
         var buy = current.BuyVolume;
         var sell = current.SellVolume;
 
@@ -164,7 +170,14 @@ public class BetterVolumeIndicator
     }
 
     private static Candle MakeCandle(long timeSeconds, double open, double high, double low, double close, double volume)
-        => new(timeSeconds, open, high, low, close, volume, SplitBuyVolume(open, high, low, close, volume));
+        => new(timeSeconds, open, high, low, close, volume, SplitBuyVolume(open, high, low, close, volume),
+            SessionDate(timeSeconds));
+
+    private static int SessionDate(long timeSeconds)
+    {
+        var et = TimeZoneInfo.ConvertTime(DateTimeOffset.FromUnixTimeSeconds(timeSeconds), EasternTime);
+        return et.Year * 10000 + et.Month * 100 + et.Day;
+    }
 
     private static double SplitBuyVolume(double open, double high, double low, double close, double volume)
     {
@@ -183,7 +196,8 @@ public class BetterVolumeIndicator
         => Math.Max(candle.High, prevCandle.High) - Math.Min(candle.Low, prevCandle.Low);
 
     private readonly record struct Candle(
-        long TimeSeconds, double Open, double High, double Low, double Close, double Volume, double BuyVolume)
+        long TimeSeconds, double Open, double High, double Low, double Close, double Volume, double BuyVolume,
+        int SessionDate)
     {
         public double SellVolume => Volume - BuyVolume;
         public double Range => High - Low;

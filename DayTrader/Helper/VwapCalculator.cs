@@ -21,6 +21,8 @@ public class VwapCalculator
             }
         }
 
+        if (volume <= 0) return Current;
+
         _sumPV += wap * volume;
         _sumVol += volume;
         return Current;

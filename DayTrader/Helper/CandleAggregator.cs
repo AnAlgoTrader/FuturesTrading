@@ -26,7 +26,7 @@ public class CandleAggregator
 
     public void AddBar(RealTimeBar bar)
     {
-        if (bar.Open == 0 && bar.High == 0 && bar.Low == 0 && bar.Close == 0 && bar.Volume == 0) return;
+        if (bar.Volume == 0 || (bar.Open == 0 && bar.High == 0 && bar.Low == 0 && bar.Close == 0)) return;
 
         var barTime = DateTimeOffset.FromUnixTimeSeconds(bar.Date).UtcDateTime;
         var candleTime = new DateTime(barTime.Year, barTime.Month, barTime.Day, barTime.Hour, barTime.Minute, 0, DateTimeKind.Utc);
