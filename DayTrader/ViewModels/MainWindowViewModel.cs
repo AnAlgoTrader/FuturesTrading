@@ -36,6 +36,7 @@ public class MainWindowViewModel : ViewModelBase
     public MarketPriceUpdate MarketPriceUpdate { get; } = new();
     public SidePanelInfo SidePanelInfo { get; set; } = new();
     private readonly YahooDataService _yahooDataService = new();
+    private readonly BetterVolumeIndicator _betterVolume = new();
     
     private ContractDetails? _chartContract;
     private ContractDetails? _tradeContract;
@@ -50,12 +51,11 @@ public class MainWindowViewModel : ViewModelBase
         _orderHelper.OnOrdersChanged += _ => UpdateOrderLine();
         _orderHelper.OnPositionChanged += _ => UpdateOrderLine();
         _vwapCalculator = new VwapCalculator();
-        _candleAggregator = new CandleAggregator(_vwapCalculator);
+        _candleAggregator = new CandleAggregator(_vwapCalculator, _betterVolume);
         _candleAggregator.OnCandleUpdate += (candleTime, open, high, low, close, vwap, color) =>
         {
             var time = new DateTimeOffset(candleTime).ToUnixTimeSeconds();
-            var colorArg = string.IsNullOrEmpty(color) ? "" : $", '{color}'";
-            OnInvokeScript?.Invoke($"window.updateData({time}, {open}, {high}, {low}, {close}, {vwap}{colorArg})");
+            OnInvokeScript?.Invoke($"window.updateData({time}, {open}, {high}, {low}, {close}, {vwap}, '{color}')");
         };
         BuyButtonClick = ReactiveCommand.Create(() => { _ = SubmitOrder("BUY", OrderQuantity, MarketPriceUpdate.Ask); });
         SellButtonClick = ReactiveCommand.Create(() => { _ = SubmitOrder("SELL", OrderQuantity, MarketPriceUpdate.Bid); });
@@ -211,7 +211,8 @@ public class MainWindowViewModel : ViewModelBase
         {
             var time = long.Parse(item.Time);
             var vwap = _vwapCalculator.AddBar(time, (double)item.WAP, (double)item.Volume);
-            OnInvokeScript?.Invoke($"window.updateData({item.Time}, {item.Open}, {item.High}, {item.Low}, {item.Close}, {vwap})");
+            var color = _betterVolume.ProcessCandle(time, (double)item.Open, (double)item.High, (double)item.Low, (double)item.Close, (double)item.Volume);
+            OnInvokeScript?.Invoke($"window.updateData({item.Time}, {item.Open}, {item.High}, {item.Low}, {item.Close}, {vwap}, '{color}')");
         }
     }
 }
