@@ -19,7 +19,8 @@ recolors as it builds).
    - doji: `buy = sell = vol / 2`
 
 2. **One-bar vs two-bar mode** (`useTwoBars`, default `true`) — signals are
-   evaluated on the single current bar, or on the current+previous bar pair.
+   evaluated on both single bars and bar pairs when enabled (`false` evaluates
+   single bars only).
 
 3. **Lookback window** (`lookBack`, default `20`) — each signal compares against
    the highest/lowest of the same metric over the last 20 bars.
@@ -30,6 +31,11 @@ recolors as it builds).
 
 5. **Warmup** — the first 19 bars are gray (not enough history for a 20-bar
    window). This happens once at startup/backfill.
+
+6. **Volume gate** (`volumeThreshold`, default `1.0`) — climax and churn signals
+   require volume to meet or exceed the rolling average volume
+   (`volume >= avgVolume * volumeThreshold`), preventing low-volume chop from
+   firing false exhaustion signals.
 
 ## Colors and meaning
 
@@ -88,7 +94,8 @@ day-trading reads:
 | Parameter | Default | Effect |
 |-----------|---------|--------|
 | `lookBack` | `20` | Bars in the highest/lowest comparison window |
-| `useTwoBars` | `true` | Evaluate on bar pairs (`false` = single-bar signals only) |
+| `useTwoBars` | `true` | Evaluate on bar pairs in addition to single bars (`false` = single-bar signals only) |
+| `volumeThreshold` | `1.0` | Multiplier on rolling average volume required for Climax and Churn signals (`1.0` = volume >= average) |
 
 The indicator is instantiated in `CandleAggregator` as
 `new BetterVolumeIndicator()` using the defaults above.

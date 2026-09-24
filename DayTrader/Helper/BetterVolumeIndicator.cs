@@ -16,12 +16,14 @@ public class BetterVolumeIndicator
 
     private readonly int _lookBack;
     private readonly bool _useTwoBars;
+    private readonly double _volumeThreshold;
     private readonly List<Candle> _candles = new();
 
-    public BetterVolumeIndicator(int lookBack = 20, bool useTwoBars = true)
+    public BetterVolumeIndicator(int lookBack = 20, bool useTwoBars = true, double volumeThreshold = 1.0)
     {
         _lookBack = Math.Max(2, lookBack);
         _useTwoBars = useTwoBars;
+        _volumeThreshold = Math.Max(0.0, volumeThreshold);
     }
 
     /// <summary>Feeds (or updates, by minute) a candle and returns the color for it.</summary>
@@ -42,9 +44,16 @@ public class BetterVolumeIndicator
 
         if (_candles.Count < _lookBack) return DefaultColor;
 
-        var signal = _useTwoBars
-            ? EvaluateTwoBar(_candles[^1])
-            : EvaluateOneBar(_candles[^1]);
+        var signal = EvaluateOneBar(_candles[^1]);
+        if (_useTwoBars && _candles.Count >= 2)
+        {
+            var twoBar = EvaluateTwoBar(_candles[^1]);
+            signal = new CandleSignals(
+                signal.ClimaxUp || twoBar.ClimaxUp,
+                signal.ClimaxDown || twoBar.ClimaxDown,
+                signal.Churn || twoBar.Churn,
+                signal.LowVolume || twoBar.LowVolume);
+        }
 
         if (signal.Churn && (signal.ClimaxUp || signal.ClimaxDown)) return ClimaxChurnColor;
         if (signal.LowVolume) return LowVolumeColor;
@@ -64,24 +73,19 @@ public class BetterVolumeIndicator
         var s5 = (buy - sell) * range;
         var s6 = sell * range;
         var s7 = (sell - buy) * range;
-        var s8 = Divide(buy, range);
-        var s9 = Divide(buy - sell, range);
-        var s10 = Divide(sell, range);
-        var s11 = Divide(sell - buy, range);
         var s12 = Divide(current.Volume, range);
 
+        var avgVolume = AveragePrior(c => c.Volume);
+        var isAboveAvgVol = current.Volume >= avgVolume * _volumeThreshold;
+
         var lowVolume = current.Volume <= MinPrior(c => c.Volume);
-        var climaxUp = current.Close > current.Open && (
+        var climaxUp = current.Close > current.Open && isAboveAvgVol && (
             s4 >= MaxPrior(c => c.BuyVolume * c.Range) ||
-            s5 >= MaxPrior(c => (c.BuyVolume - c.SellVolume) * c.Range) ||
-            s10 <= MinPrior(c => Divide(c.SellVolume, c.Range)) ||
-            s11 <= MinPrior(c => Divide(c.SellVolume - c.BuyVolume, c.Range)));
-        var climaxDown = current.Close < current.Open && (
+            s5 >= MaxPrior(c => (c.BuyVolume - c.SellVolume) * c.Range));
+        var climaxDown = current.Close < current.Open && isAboveAvgVol && (
             s6 >= MaxPrior(c => c.SellVolume * c.Range) ||
-            s7 >= MaxPrior(c => (c.SellVolume - c.BuyVolume) * c.Range) ||
-            s8 <= MinPrior(c => Divide(c.BuyVolume, c.Range)) ||
-            s9 <= MinPrior(c => Divide(c.BuyVolume - c.SellVolume, c.Range)));
-        var churn = s12 >= MaxPrior(c => Divide(c.Volume, c.Range));
+            s7 >= MaxPrior(c => (c.SellVolume - c.BuyVolume) * c.Range));
+        var churn = isAboveAvgVol && s12 >= MaxPrior(c => Divide(c.Volume, c.Range));
 
         return new CandleSignals(climaxUp, climaxDown, churn, lowVolume);
     }
@@ -103,26 +107,55 @@ public class BetterVolumeIndicator
         var s15 = (buy - sell + prev.BuyVolume - prev.SellVolume) * span;
         var s16 = (sell + prev.SellVolume) * span;
         var s17 = (sell - buy + prev.SellVolume - prev.BuyVolume) * span;
-        var s18 = Divide(buy + prev.BuyVolume, span);
-        var s19 = Divide(buy - sell + prev.BuyVolume - prev.SellVolume, span);
-        var s20 = Divide(sell + prev.SellVolume, span);
-        var s21 = Divide(sell - buy + prev.SellVolume - prev.BuyVolume, span);
         var s22 = Divide(s13, span);
 
+        var avgPairVol = AveragePriorPair((c, p) => c.Volume + p.Volume);
+        var isAboveAvgVol = s13 >= avgPairVol * _volumeThreshold;
+
         var lowVolume = s13 <= MinPriorPair((c, p) => c.Volume + p.Volume);
-        var climaxUp = current.Close > current.Open && prev.Close > prev.Open && (
+        var climaxUp = current.Close > current.Open && prev.Close > prev.Open && isAboveAvgVol && (
             s14 >= MaxPriorPair((c, p) => (c.BuyVolume + p.BuyVolume) * PairSpan(c, p)) ||
-            s15 >= MaxPriorPair((c, p) => (c.BuyVolume - c.SellVolume + p.BuyVolume - p.SellVolume) * PairSpan(c, p)) ||
-            s20 <= MinPriorPair((c, p) => Divide(c.SellVolume + p.SellVolume, PairSpan(c, p))) ||
-            s21 <= MinPriorPair((c, p) => Divide(c.SellVolume - c.BuyVolume + p.SellVolume - p.BuyVolume, PairSpan(c, p))));
-        var climaxDown = current.Close < current.Open && prev.Close < prev.Open && (
+            s15 >= MaxPriorPair((c, p) => (c.BuyVolume - c.SellVolume + p.BuyVolume - p.SellVolume) * PairSpan(c, p)));
+        var climaxDown = current.Close < current.Open && prev.Close < prev.Open && isAboveAvgVol && (
             s16 >= MaxPriorPair((c, p) => (c.SellVolume + p.SellVolume) * PairSpan(c, p)) ||
-            s17 >= MaxPriorPair((c, p) => (c.SellVolume - c.BuyVolume + p.SellVolume - p.BuyVolume) * PairSpan(c, p)) ||
-            s18 <= MinPriorPair((c, p) => Divide(c.BuyVolume + p.BuyVolume, PairSpan(c, p))) ||
-            s19 <= MinPriorPair((c, p) => Divide(c.BuyVolume - c.SellVolume + p.BuyVolume - p.SellVolume, PairSpan(c, p))));
-        var churn = s22 >= MaxPriorPair((c, p) => Divide(c.Volume + p.Volume, PairSpan(c, p)));
+            s17 >= MaxPriorPair((c, p) => (c.SellVolume - c.BuyVolume + p.SellVolume - p.BuyVolume) * PairSpan(c, p)));
+        var churn = isAboveAvgVol && s22 >= MaxPriorPair((c, p) => Divide(c.Volume + p.Volume, PairSpan(c, p)));
 
         return new CandleSignals(climaxUp, climaxDown, churn, lowVolume);
+    }
+
+    private double AveragePrior(Func<Candle, double> selector)
+    {
+        if (_candles.Count <= 1) return 0;
+        double sum = 0;
+        int count = 0;
+        for (var i = 0; i < _candles.Count - 1; i++)
+        {
+            var value = selector(_candles[i]);
+            if (!double.IsNaN(value))
+            {
+                sum += value;
+                count++;
+            }
+        }
+        return count > 0 ? sum / count : 0;
+    }
+
+    private double AveragePriorPair(Func<Candle, Candle, double> selector)
+    {
+        if (_candles.Count <= 2) return 0;
+        double sum = 0;
+        int count = 0;
+        for (var i = 1; i < _candles.Count - 1; i++)
+        {
+            var value = selector(_candles[i], _candles[i - 1]);
+            if (!double.IsNaN(value))
+            {
+                sum += value;
+                count++;
+            }
+        }
+        return count > 0 ? sum / count : 0;
     }
 
     private double MaxPrior(Func<Candle, double> selector)
