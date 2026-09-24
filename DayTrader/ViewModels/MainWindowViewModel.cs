@@ -202,7 +202,7 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task DisplayHistoricalData()
     {
-        var historicalData = await _client.GetHistoricalData(1105, _chartContract!.Contract, $"3 {nameof(Duration.D)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000);
+        var historicalData = await _client.GetHistoricalData(1105, _chartContract!.Contract, $"5 {nameof(Duration.D)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000);
 
         foreach (var item in historicalData)
         {
