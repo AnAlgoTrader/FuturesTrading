@@ -6,10 +6,10 @@ namespace DayTrader.Helper;
 public class BetterVolumeIndicator
 {
     private const string ClimaxUpColor = "#ff0000";
-    private const string ClimaxDownColor = "#ffffff";
-    private const string ChurnColor = "#009b32";
-    private const string LowVolumeColor = "#ffff00";
-    private const string ClimaxChurnColor = "#ff00ff";
+    private const string ClimaxDownColor = "#808080";
+    private const string ChurnColor = "#808080";
+    private const string LowVolumeColor = "#808080";
+    private const string ClimaxChurnColor = "#808080";
     private const string DefaultColor = "#808080";
 
     private static readonly TimeZoneInfo EasternTime = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
