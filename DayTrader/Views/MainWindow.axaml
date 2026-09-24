@@ -49,19 +49,9 @@
                 <TextBlock Text="Usd:" Classes="label" />
                 <TextBlock Text="{Binding AccountInfo.CashUsd}" Classes="value" />
             </StackPanel>
-            <Button Content="Enter" Command="{Binding OnEnterButtonClick}" Margin="8" />
-            <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
-                <TextBlock Text="Price:" Classes="label" />
-                <TextBlock Classes="value">
-                    <TextBlock.Text>
-                        <MultiBinding StringFormat="{}{0:F2} ({1:F2}) {2:F2}">
-                            <Binding Path="MarketPriceUpdate.Ask" />
-                            <Binding Path="MarketPriceUpdate.Spread" />
-                            <Binding Path="MarketPriceUpdate.Bid" />
-                        </MultiBinding>
-                    </TextBlock.Text>
-                </TextBlock>
-            </StackPanel>
+            <Button Content="{Binding MarketPriceUpdate.Ask, StringFormat='{}{0:F2}'}" Command="{Binding BuyButtonClick}" Background="#26a69a" Foreground="White" Margin="8" />
+            <TextBlock Text="{Binding MarketPriceUpdate.Spread, StringFormat='{}{0:F2}'}" Classes="value" />
+            <Button Content="{Binding MarketPriceUpdate.Bid, StringFormat='{}{0:F2}'}" Command="{Binding SellButtonClick}" Background="#ef5350" Foreground="White" Margin="8" />
         </StackPanel>
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>

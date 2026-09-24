@@ -18,7 +18,8 @@ public class MainWindowViewModel : ViewModelBase
 {
     public event Action<string>? OnInvokeScript;
     public event Action<double, string, string, double>? OnOrderPriceLine;
-    public ReactiveCommand<RxVoid, RxVoid> OnEnterButtonClick { get; }
+    public ReactiveCommand<RxVoid, RxVoid> BuyButtonClick { get; }
+    public ReactiveCommand<RxVoid, RxVoid> SellButtonClick { get; }
     private readonly IbClient _client = new();
     private readonly VwapCalculator _vwapCalculator;
     private readonly CandleAggregator _candleAggregator;
@@ -55,7 +56,8 @@ public class MainWindowViewModel : ViewModelBase
             var time = new DateTimeOffset(candleTime).ToUnixTimeSeconds();
             OnInvokeScript?.Invoke($"window.updateData({time}, {open}, {high}, {low}, {close}, {vwap})");
         };
-        OnEnterButtonClick = ReactiveCommand.Create(OnButtonClicked);
+        BuyButtonClick = ReactiveCommand.Create(() => { _ = SubmitOrder("BUY", OrderQuantity, MarketPriceUpdate.Ask); });
+        SellButtonClick = ReactiveCommand.Create(() => { _ = SubmitOrder("SELL", OrderQuantity, MarketPriceUpdate.Bid); });
         _sidePanelScheduler = ObservableExtensions.Subscribe(Observable.Timer(TimeSpan.Zero, TimeSpan.FromMinutes(1)), async _ => await HandleSidePanelSchedulerTick());
         _ = InitAndSubscribe();
     }
@@ -211,9 +213,6 @@ public class MainWindowViewModel : ViewModelBase
             OnInvokeScript?.Invoke($"window.updateData({item.Time}, {item.Open}, {item.High}, {item.Low}, {item.Close}, {vwap})");
         }
     }
-
-    private void OnButtonClicked()
-    {
-        _ = SubmitOrder("BUY", OrderQuantity, MarketPriceUpdate.Ask);
-    }
 }
+
+    
