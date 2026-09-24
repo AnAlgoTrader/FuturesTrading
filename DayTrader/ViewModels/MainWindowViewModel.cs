@@ -26,23 +26,20 @@ public class MainWindowViewModel : ViewModelBase
     private readonly Logger _logger;
     private readonly OrderHelper _orderHelper;
     private readonly IDisposable _sidePanelScheduler;
-    private double _currentTradePrice;
-    private double _currentChartPrice;
+    private double _currentPrice;
     private int _closeTradeInProgress;
     private const decimal OrderQuantity = 1;
-    private const int ChartMarketDataRequestId = 1108;
-    private const int TradeMarketDataRequestId = 1107;
+    private const int MarketDataRequestId = 1108;
     public AccountInfo AccountInfo { get; } = new();
     public MarketPriceUpdate MarketPriceUpdate { get; } = new();
     public SidePanelInfo SidePanelInfo { get; set; } = new();
     private readonly YahooDataService _yahooDataService = new();
     private readonly BetterVolumeIndicator _betterVolume = new();
     
-    private ContractDetails? _chartContract;
-    private ContractDetails? _tradeContract;
+    private ContractDetails? _contract;
 
     private double TradeMultiplier =>
-        double.TryParse(_tradeContract?.Contract.Multiplier, NumberStyles.Float, CultureInfo.InvariantCulture, out var m) ? m : 1;
+        double.TryParse(_contract?.Contract.Multiplier, NumberStyles.Float, CultureInfo.InvariantCulture, out var m) ? m : 1;
 
     public MainWindowViewModel()
     {
@@ -85,7 +82,7 @@ public class MainWindowViewModel : ViewModelBase
             var entryPrice = position.AveragePrice;
             var isBuy = string.Equals(position.Direction, "BUY", StringComparison.OrdinalIgnoreCase);
 
-            var evalPrice = _currentTradePrice > 0 ? _currentTradePrice : entryPrice;
+            var evalPrice = _currentPrice > 0 ? _currentPrice : entryPrice;
             double pnlDollar = isBuy
                 ? (evalPrice - entryPrice) * (double)position.NetQuantity * TradeMultiplier
                 : (entryPrice - evalPrice) * (double)Math.Abs(position.NetQuantity) * TradeMultiplier;
@@ -142,7 +139,7 @@ public class MainWindowViewModel : ViewModelBase
             Tif = "DAY"
         };
         await _orderHelper.PersistOrder(order);
-        _client.PlaceOrder(_tradeContract?.Contract, order);
+        _client.PlaceOrder(_contract?.Contract, order);
         _logger.WriteLine($"[TRADE] OrderId:{order.OrderId} - Action:{order.Action} - Quantity:{order.TotalQuantity} - EntryPrice:{order.LmtPrice}");
     }
 
@@ -164,52 +161,33 @@ public class MainWindowViewModel : ViewModelBase
         {
             foreach (var (key, marketPrice) in updates)
             {
-                switch (key)
-                {
-                    case ChartMarketDataRequestId:
-                        _currentChartPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
-                            ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
-                            : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
-                        _orderHelper.CurrentChartPrice = _currentChartPrice;
-                        break;
-                    case TradeMarketDataRequestId:
-                        _currentTradePrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
-                            ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
-                            : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
-                        MarketPriceUpdate.Bid = marketPrice.BidPrice;
-                        MarketPriceUpdate.Ask = marketPrice.AskPrice;
-                        break;
-                }
+                if (key != MarketDataRequestId) continue;
+                _currentPrice = marketPrice.BidPrice > 0 && marketPrice.AskPrice > 0
+                    ? (marketPrice.BidPrice + marketPrice.AskPrice) / 2.0
+                    : (marketPrice.BidPrice > 0 ? marketPrice.BidPrice : marketPrice.AskPrice);
+                _orderHelper.CurrentChartPrice = _currentPrice;
+                MarketPriceUpdate.Bid = marketPrice.BidPrice;
+                MarketPriceUpdate.Ask = marketPrice.AskPrice;
             }
             UpdateOrderLine();
         };
         _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
         _client.OnRealTimeBarUpdate += _candleAggregator.AddBar;
         _client.OnOrderStatusUpdate += status => _ = _orderHelper.UpdateOrderStatus(status);
-        _chartContract = await ContractHelper.GetChartContract(_client);
-        _tradeContract = await ContractHelper.GetTradeContract(_client);
-        SidePanelInfo.FuturesExpiration = DateTime.ParseExact(_tradeContract!.Contract.LastTradeDateOrContractMonth, "yyyyMMdd", CultureInfo.InvariantCulture);
+        _contract = await ContractHelper.GetContract(_client);
+        SidePanelInfo.FuturesExpiration = DateTime.ParseExact(_contract!.Contract.LastTradeDateOrContractMonth, "yyyyMMdd", CultureInfo.InvariantCulture);
         await DisplayHistoricalData();
-        _client.SubscribeToRealTimeBars(1106, _chartContract.Contract);
-
-        if (TradingConfig.IsSingleInstrument)
-        {
-            _client.SubscribeToMarketData(TradeMarketDataRequestId, _chartContract);
-        }
-        else
-        {
-            _client.SubscribeToMarketData(ChartMarketDataRequestId, _chartContract);
-            _client.SubscribeToMarketData(TradeMarketDataRequestId, _tradeContract);
-        }
+        _client.SubscribeToRealTimeBars(1106, _contract.Contract);
+        _client.SubscribeToMarketData(MarketDataRequestId, _contract);
     }
 
     private async Task DisplayHistoricalData()
     {
-        var historicalData = await _client.GetHistoricalData(1105, _chartContract!.Contract, $"5 {nameof(Duration.D)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000);
+        var historicalData = await _client.GetHistoricalData(1105, _contract!.Contract, $"5 {nameof(Duration.D)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000, false);
 
         foreach (var item in historicalData)
         {
-            if (item.Volume == 0 || (item.Open == 0 && item.High == 0 && item.Low == 0 && item.Close == 0)) continue;
+            if (item.Volume == 0 || item is { Open: 0, High: 0, Low: 0, Close: 0 }) continue;
             var time = long.Parse(item.Time);
             var vwap = _vwapCalculator.AddBar(time, (double)item.WAP, (double)item.Volume);
             var color = _betterVolume.ProcessCandle(time, item.Open, item.High, item.Low, item.Close, (double)item.Volume);
