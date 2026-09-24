@@ -209,6 +209,7 @@ public class MainWindowViewModel : ViewModelBase
 
         foreach (var item in historicalData)
         {
+            if (item.Open == 0 && item.High == 0 && item.Low == 0 && item.Close == 0 && item.Volume == 0) continue;
             var time = long.Parse(item.Time);
             var vwap = _vwapCalculator.AddBar(time, (double)item.WAP, (double)item.Volume);
             var color = _betterVolume.ProcessCandle(time, (double)item.Open, (double)item.High, (double)item.Low, (double)item.Close, (double)item.Volume);
