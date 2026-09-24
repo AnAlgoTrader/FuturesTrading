@@ -51,10 +51,11 @@ public class MainWindowViewModel : ViewModelBase
         _orderHelper.OnPositionChanged += _ => UpdateOrderLine();
         _vwapCalculator = new VwapCalculator();
         _candleAggregator = new CandleAggregator(_vwapCalculator);
-        _candleAggregator.OnCandleUpdate += (candleTime, open, high, low, close, vwap) =>
+        _candleAggregator.OnCandleUpdate += (candleTime, open, high, low, close, vwap, color) =>
         {
             var time = new DateTimeOffset(candleTime).ToUnixTimeSeconds();
-            OnInvokeScript?.Invoke($"window.updateData({time}, {open}, {high}, {low}, {close}, {vwap})");
+            var colorArg = string.IsNullOrEmpty(color) ? "" : $", '{color}'";
+            OnInvokeScript?.Invoke($"window.updateData({time}, {open}, {high}, {low}, {close}, {vwap}{colorArg})");
         };
         BuyButtonClick = ReactiveCommand.Create(() => { _ = SubmitOrder("BUY", OrderQuantity, MarketPriceUpdate.Ask); });
         SellButtonClick = ReactiveCommand.Create(() => { _ = SubmitOrder("SELL", OrderQuantity, MarketPriceUpdate.Bid); });

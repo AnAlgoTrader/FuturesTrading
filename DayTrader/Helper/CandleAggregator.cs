@@ -13,7 +13,7 @@ public class CandleAggregator
     private double _close;
     private DateTime _candleTime;
 
-    public event Action<DateTime, double, double, double, double, double>? OnCandleUpdate;
+    public event Action<DateTime, double, double, double, double, double, string?>? OnCandleUpdate;
 
     public CandleAggregator(VwapCalculator vwapCalculator)
     {
@@ -43,6 +43,12 @@ public class CandleAggregator
         }
 
         var vwap = _vwapCalculator.AddBar(candleTimeUnix, (double)bar.Wap, (double)bar.Volume);
-        OnCandleUpdate?.Invoke(_candleTime, _open, _high, _low, _close, vwap);
+        OnCandleUpdate?.Invoke(_candleTime, _open, _high, _low, _close, vwap, GetCandleColor(_open, _high, _low, _close, vwap));
+    }
+
+    private static string? GetCandleColor(double open, double high, double low, double close, double vwap)
+    {
+        // Color logic based on candle values goes here; null keeps the default up/down colors.
+        return null;
     }
 }

@@ -15,11 +15,7 @@
     });
 
     const candlesSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
-        upColor: '#26a69a',
-        downColor: '#ef5350',
-        borderVisible: false,
-        wickUpColor: '#26a69a',
-        wickDownColor: '#ef5350'
+        borderVisible: false
     });
 
     const vwapSeries = chart.addSeries(LightweightCharts.LineSeries, {
@@ -34,8 +30,15 @@
     let lastOrderPrice = 0;
     const closeBtn = document.getElementById('close-btn');
 
-    window.updateData = function (time, open, high, low, close, vwap){
-        candlesSeries.update({ time: time, open: open, high: high, low: low, close: close });
+    window.updateData = function (time, open, high, low, close, vwap, color){
+        candlesSeries.update({
+            time: time,
+            open: open,
+            high: high,
+            low: low,
+            close: close,
+            color: color || undefined
+        });
         vwapSeries.update({ time: time, value: vwap });
     };
 
