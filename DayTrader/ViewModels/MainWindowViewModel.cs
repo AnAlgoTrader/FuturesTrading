@@ -34,7 +34,7 @@ public class MainWindowViewModel : ViewModelBase
     public MarketPriceUpdate MarketPriceUpdate { get; } = new();
     public SidePanelInfo SidePanelInfo { get; set; } = new();
     private readonly YahooDataService _yahooDataService = new();
-    private readonly BetterVolumeIndicator _betterVolume = new();
+    private readonly ClimaxExhaustionDetector _climaxExhaustionDetector = new();
     
     private ContractDetails? _contract;
 
@@ -48,7 +48,7 @@ public class MainWindowViewModel : ViewModelBase
         _orderHelper.OnOrdersChanged += _ => UpdateOrderLine();
         _orderHelper.OnPositionChanged += _ => UpdateOrderLine();
         _vwapCalculator = new VwapCalculator();
-        _candleAggregator = new CandleAggregator(_vwapCalculator, _betterVolume);
+        _candleAggregator = new CandleAggregator(_vwapCalculator, _climaxExhaustionDetector);
         _candleAggregator.OnCandleUpdate += (candleTime, open, high, low, close, vwap, color) =>
         {
             var time = new DateTimeOffset(candleTime).ToUnixTimeSeconds();
@@ -190,7 +190,7 @@ public class MainWindowViewModel : ViewModelBase
             if (item.Volume == 0 || item is { Open: 0, High: 0, Low: 0, Close: 0 }) continue;
             var time = long.Parse(item.Time);
             var vwap = _vwapCalculator.AddBar(time, (double)item.WAP, (double)item.Volume);
-            var color = _betterVolume.ProcessCandle(time, item.Open, item.High, item.Low, item.Close, (double)item.Volume);
+            var color = _climaxExhaustionDetector.ProcessCandle(time, item.Open, item.High, item.Low, item.Close, (double)item.Volume);
             OnInvokeScript?.Invoke($"window.updateData({item.Time}, {item.Open}, {item.High}, {item.Low}, {item.Close}, {vwap}, '{color}')");
         }
     }

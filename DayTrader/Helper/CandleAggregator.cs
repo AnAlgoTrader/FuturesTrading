@@ -6,7 +6,7 @@ namespace DayTrader.Helper;
 public class CandleAggregator
 {
     private readonly VwapCalculator _vwapCalculator;
-    private readonly BetterVolumeIndicator _betterVolume = new();
+    private readonly ClimaxExhaustionDetector _climaxExhaustionDetector;
     private DateTime _currentMinute = DateTime.MinValue;
     private double _open;
     private double _high;
@@ -18,15 +18,15 @@ public class CandleAggregator
 
     public event Action<DateTime, double, double, double, double, double, string?>? OnCandleUpdate;
 
-    public CandleAggregator(VwapCalculator vwapCalculator, BetterVolumeIndicator? betterVolume = null)
+    public CandleAggregator(VwapCalculator vwapCalculator, ClimaxExhaustionDetector? climaxExhaustionDetector = null)
     {
         _vwapCalculator = vwapCalculator;
-        _betterVolume = betterVolume ?? new BetterVolumeIndicator();
+        _climaxExhaustionDetector = climaxExhaustionDetector ?? new ClimaxExhaustionDetector();
     }
 
     public void AddBar(RealTimeBar bar)
     {
-        if (bar.Volume == 0 || (bar.Open == 0 && bar.High == 0 && bar.Low == 0 && bar.Close == 0)) return;
+        if (bar.Volume == 0 || bar is { Open: 0, High: 0, Low: 0, Close: 0 }) return;
 
         var barTime = DateTimeOffset.FromUnixTimeSeconds(bar.Date).UtcDateTime;
         var candleTime = new DateTime(barTime.Year, barTime.Month, barTime.Day, barTime.Hour, barTime.Minute, 0, DateTimeKind.Utc);
@@ -52,7 +52,7 @@ public class CandleAggregator
         }
 
         var vwap = _vwapCalculator.AddBar(candleTimeUnix, (double)bar.Wap, (double)bar.Volume);
-        var color = _betterVolume.ProcessCandle(candleTimeUnix, _open, _high, _low, _close, _volume);
+        var color = _climaxExhaustionDetector.ProcessCandle(candleTimeUnix, _open, _high, _low, _close, _volume);
         OnCandleUpdate?.Invoke(_candleTime, _open, _high, _low, _close, vwap, color);
     }
 }
