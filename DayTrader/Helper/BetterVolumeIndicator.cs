@@ -204,9 +204,9 @@ public class BetterVolumeIndicator
 
     private static Candle MakeCandle(long timeSeconds, double open, double high, double low, double close, double volume)
         => new(timeSeconds, open, high, low, close, volume, SplitBuyVolume(open, high, low, close, volume),
-            SessionDate(timeSeconds));
+            GetSessionDate(timeSeconds));
 
-    private static int SessionDate(long timeSeconds)
+    private static int GetSessionDate(long timeSeconds)
     {
         var et = TimeZoneInfo.ConvertTime(DateTimeOffset.FromUnixTimeSeconds(timeSeconds), EasternTime);
         return et.Year * 10000 + et.Month * 100 + et.Day;
