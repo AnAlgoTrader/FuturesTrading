@@ -44,4 +44,12 @@ public class AccountInfo : ReactiveObject
         get => _buyingPower;
         set => this.RaiseAndSetIfChanged(ref _buyingPower, value);
     }
+
+    private DateTime _futuresExpiration;
+
+    public DateTime FuturesExpiration
+    {
+        get => _futuresExpiration;
+        set => this.RaiseAndSetIfChanged(ref _futuresExpiration, value);
+    }
 }

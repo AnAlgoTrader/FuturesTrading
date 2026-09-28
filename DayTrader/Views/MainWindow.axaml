@@ -49,122 +49,14 @@
                 <TextBlock Text="Usd:" Classes="label" />
                 <TextBlock Text="{Binding AccountInfo.CashUsd}" Classes="value" />
             </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                <TextBlock Text="Expiration:" Classes="label" />
+                <TextBlock Text="{Binding AccountInfo.FuturesExpiration, StringFormat='\{0:ddd dd MMM\}'}" Classes="value" />
+            </StackPanel>
             <Button Content="{Binding MarketPriceUpdate.Ask, StringFormat='{}{0:F2}'}" Command="{Binding BuyButtonClick}" Background="#26a69a" Foreground="White" Margin="8" />
             <TextBlock Text="{Binding MarketPriceUpdate.Spread, StringFormat='{}{0:F2}'}" Classes="value" />
             <Button Content="{Binding MarketPriceUpdate.Bid, StringFormat='{}{0:F2}'}" Command="{Binding SellButtonClick}" Background="#ef5350" Foreground="White" Margin="8" />
         </StackPanel>
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="80*"></ColumnDefinition>
-                <ColumnDefinition Width="20*"></ColumnDefinition>
-            </Grid.ColumnDefinitions>
-            <NativeWebView Grid.Column="0" x:Name="Chart" />
-            <Border Grid.Column="1" Background="#131722">
-                <StackPanel>
-                  <StackPanel.Styles>
-                    <Style Selector="TextBlock.attr">
-                        <Setter Property="Foreground" Value="Gray" />
-                        <Setter Property="FontWeight" Value="Bold" />
-                        <Setter Property="VerticalAlignment" Value="Center" />
-                    </Style>
-                    <Style Selector="TextBlock.val">
-                        <Setter Property="Foreground" Value="#d1d4dc" />
-                        <Setter Property="VerticalAlignment" Value="Center" />
-                        <Setter Property="HorizontalAlignment" Value="Left" />
-                        <Setter Property="FontWeight" Value="SemiBold" />
-                    </Style>
-                    </StackPanel.Styles>
-                <StackPanel Margin="12,16,12,0" Spacing="6">
-                    <Grid Margin="0,6,0,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="0,3">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="1*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Expiration:" Classes="attr" />
-                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.FuturesExpiration, StringFormat='\{0:ddd dd MMM\}'}" Classes="val" />
-                        </Grid>
-                        <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,3">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="1*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="VIX:" Classes="attr" />
-                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.Vix}" Classes="val" />
-                        </Grid>
-                        <Grid Grid.Row="2" Grid.ColumnSpan="2" Margin="0,3">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="1*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="VVIX:" Classes="attr" />
-                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.Vvix}" Classes="val" />
-                        </Grid>
-                        <Grid Grid.Row="3" Grid.ColumnSpan="2" Margin="0,3">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="1*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="IV Percentile:" Classes="attr" />
-                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.IvPercentile}" Classes="val" />
-                        </Grid>
-                        <Grid Grid.Row="4" Grid.ColumnSpan="2" Margin="0,3">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="1*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="IV Rank:" Classes="attr" />
-                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.IvRank}" Classes="val" />
-                        </Grid>
-                        <Grid Grid.Row="5" Grid.ColumnSpan="2" Margin="0,3">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="1*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Rv5:" Classes="attr" />
-                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.Rv5}" Classes="val" />
-                        </Grid>
-                        <Grid Grid.Row="6" Grid.ColumnSpan="2" Margin="0,3">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="1*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Vrp:" Classes="attr" />
-                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.Vrp}" Classes="val" />
-                        </Grid>
-                        <Grid Grid.Row="7" Grid.ColumnSpan="2" Margin="0,3">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="1*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="VrpZScore:" Classes="attr" />
-                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.VrpZScore}" Classes="val" />
-                        </Grid>
-                        <Grid Grid.Row="8" Grid.ColumnSpan="2" Margin="0,3">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="1*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="VvixPercentile:" Classes="attr" />
-                            <TextBlock Grid.Column="1" Text="{Binding SidePanelInfo.VvixPercentile}" Classes="val" />
-                        </Grid>
-                    </Grid>
-                    <TextBlock Margin="0,10,0,0" Text="{Binding SidePanelInfo.Analysis}"
-                               Foreground="#d1d4dc" FontSize="12" LineHeight="16" TextWrapping="Wrap" />
-                </StackPanel>
-                </StackPanel>
-            </Border>
-        </Grid>
+        <NativeWebView Grid.Row="1" x:Name="Chart" />
     </Grid>
 </Window>

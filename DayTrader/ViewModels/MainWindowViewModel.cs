@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Globalization;
-using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
@@ -8,7 +7,6 @@ using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 using DayTrader.Helper;
 using DayTrader.Models;
-using DayTrader.Services;
 using ReactiveUI;
 using ReactiveUI.Primitives;
 
@@ -25,15 +23,12 @@ public class MainWindowViewModel : ViewModelBase
     private readonly CandleAggregator _candleAggregator;
     private readonly Logger _logger;
     private readonly OrderHelper _orderHelper;
-    private readonly IDisposable _sidePanelScheduler;
     private double _currentPrice;
     private int _closeTradeInProgress;
     private const decimal OrderQuantity = 1;
     private const int MarketDataRequestId = 1108;
     public AccountInfo AccountInfo { get; } = new();
     public MarketPriceUpdate MarketPriceUpdate { get; } = new();
-    public SidePanelInfo SidePanelInfo { get; set; } = new();
-    private readonly YahooDataService _yahooDataService = new();
     private readonly ClimaxExhaustionDetector _climaxExhaustionDetector = new();
     
     private ContractDetails? _contract;
@@ -56,22 +51,7 @@ public class MainWindowViewModel : ViewModelBase
         };
         BuyButtonClick = ReactiveCommand.Create(() => { _ = SubmitOrder("BUY", OrderQuantity, MarketPriceUpdate.Ask); });
         SellButtonClick = ReactiveCommand.Create(() => { _ = SubmitOrder("SELL", OrderQuantity, MarketPriceUpdate.Bid); });
-        _sidePanelScheduler = ObservableExtensions.Subscribe(Observable.Timer(TimeSpan.Zero, TimeSpan.FromMinutes(1)), async _ => await HandleSidePanelSchedulerTick());
         _ = InitAndSubscribe();
-    }
-
-    private async Task HandleSidePanelSchedulerTick()
-    {
-        var data = await _yahooDataService.GetMarketRegimeAsync();
-        SidePanelInfo.Vix = Math.Round(data.Vix, 2);
-        SidePanelInfo.Vvix = Math.Round(data.Vvix, 2);
-        SidePanelInfo.IvPercentile = data.IvPercentile;
-        SidePanelInfo.IvRank = data.IvRank;
-        SidePanelInfo.Rv5 = data.Rv5;
-        SidePanelInfo.Vrp = data.Vrp;
-        SidePanelInfo.VrpZScore = data.VrpZScore;
-        SidePanelInfo.VvixPercentile = data.VvixPercentile;
-        SidePanelInfo.Analysis = SidePanelInfo.BuildAnalysis();
     }
 
     private void UpdateOrderLine()
@@ -175,7 +155,7 @@ public class MainWindowViewModel : ViewModelBase
         _client.OnRealTimeBarUpdate += _candleAggregator.AddBar;
         _client.OnOrderStatusUpdate += status => _ = _orderHelper.UpdateOrderStatus(status);
         _contract = await ContractHelper.GetContract(_client);
-        SidePanelInfo.FuturesExpiration = DateTime.ParseExact(_contract!.Contract.LastTradeDateOrContractMonth, "yyyyMMdd", CultureInfo.InvariantCulture);
+        AccountInfo.FuturesExpiration = DateTime.ParseExact(_contract!.Contract.LastTradeDateOrContractMonth, "yyyyMMdd", CultureInfo.InvariantCulture);
         await DisplayHistoricalData();
         _client.SubscribeToRealTimeBars(1106, _contract.Contract);
         _client.SubscribeToMarketData(MarketDataRequestId, _contract);
