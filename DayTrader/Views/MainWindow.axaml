@@ -57,6 +57,13 @@
             <TextBlock Text="{Binding MarketPriceUpdate.Spread, StringFormat='{}{0:F2}'}" Classes="value" />
             <Button Content="{Binding MarketPriceUpdate.Bid, StringFormat='{}{0:F2}'}" Command="{Binding SellButtonClick}" Background="#ef5350" Foreground="White" Margin="8" />
         </StackPanel>
-        <NativeWebView Grid.Row="1" x:Name="Chart" />
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="80*"></ColumnDefinition>
+                <ColumnDefinition Width="20*"></ColumnDefinition>
+            </Grid.ColumnDefinitions>
+            <NativeWebView Grid.Column="0"  x:Name="Chart" />
+            <StackPanel Grid.Column="1" Background="Red"></StackPanel>
+        </Grid>
     </Grid>
 </Window>
