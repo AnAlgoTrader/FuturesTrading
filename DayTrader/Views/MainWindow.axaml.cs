@@ -32,7 +32,16 @@ public partial class MainWindow : Window
 
         _chart.WebMessageReceived += (_, e) =>
         {
-            if (e.Body != null && e.Body.Contains("closeTrade"))
+            var body = e.Body?.ToString();
+            if (body == null) return;
+
+            if (body.StartsWith("jsError: ", StringComparison.Ordinal))
+            {
+                Console.WriteLine($"[JS] {body["jsError: ".Length..]}");
+                return;
+            }
+
+            if (body.Contains("closeTrade"))
             {
                 Dispatcher.UIThread.Post(() => _ = _viewModel?.CloseActiveTrade());
             }

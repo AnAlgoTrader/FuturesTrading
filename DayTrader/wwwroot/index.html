@@ -2,6 +2,18 @@
 <html lang="en">
 <head>
     <title>Trader</title>
+    <script>
+        window.onerror = function (msg, src, line, col) {
+            var body = 'jsError: ' + msg + ' @ ' + src + ':' + line + ':' + col;
+            try {
+                if (window.chrome && window.chrome.webview) {
+                    window.chrome.webview.postMessage(body);
+                } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.postAvWebViewMessage) {
+                    window.webkit.messageHandlers.postAvWebViewMessage.postMessage(body);
+                }
+            } catch (e) { }
+        };
+    </script>
     <style>
         html, body {
             margin: 0;
