@@ -28,7 +28,7 @@ public class MainWindowViewModel : ViewModelBase
     private readonly OrderHelper _orderHelper;
     private double _currentPrice;
     private int _closeTradeInProgress;
-    private const decimal OrderQuantity = 1;
+    private const decimal OrderQuantity = 2;
     private const int MarketDataRequestId = 1108;
     private const int LadderRowCount = 20;
     public AccountInfo AccountInfo { get; } = new();
