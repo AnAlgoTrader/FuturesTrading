@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
@@ -9,7 +7,6 @@ using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 using DayTrader.Helper;
 using DayTrader.Models;
-using Ib.Csharp.Api.Client.Implementation.Helper;
 using ReactiveUI;
 using ReactiveUI.Primitives;
 
@@ -30,7 +27,6 @@ public class MainWindowViewModel : ViewModelBase
     private int _closeTradeInProgress;
     private const decimal OrderQuantity = 2;
     private const int MarketDataRequestId = 1108;
-    private const int LadderRowCount = 20;
     public AccountInfo AccountInfo { get; } = new();
     public MarketPriceUpdate MarketPriceUpdate { get; } = new();
     private readonly ClimaxExhaustionDetector _climaxExhaustionDetector = new();
@@ -155,11 +151,6 @@ public class MainWindowViewModel : ViewModelBase
             }
             UpdateOrderLine();
         };
-        _client.OnOrderBookUpdate += orderBook =>
-        {
-            var ladder = OrderBookHelper.FormatAsLadder(orderBook);
-            OnInvokeScript?.Invoke(BuildLadderScript(ladder));
-        };
         _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
         _client.OnRealTimeBarUpdate += _candleAggregator.AddBar;
         _client.OnOrderStatusUpdate += status => _ = _orderHelper.UpdateOrderStatus(status);
@@ -168,32 +159,7 @@ public class MainWindowViewModel : ViewModelBase
         await DisplayHistoricalData();
         _client.SubscribeToRealTimeBars(1106, _contract.Contract);
         _client.SubscribeToMarketData(MarketDataRequestId, _contract);
-        _client.SubscribeToMarketDepth(1007, _contract);
     }
-
-    private static string BuildLadderScript(List<LadderRow> ladder)
-    {
-        var json = new StringBuilder("[", LadderRowCount * 48);
-        for (var i = 0; i < LadderRowCount; i++)
-        {
-            if (i > 0) json.Append(',');
-            if (i < ladder.Count)
-            {
-                var row = ladder[i];
-                json.Append("{\"p\":\"")
-                    .Append(row.Price.ToString("0.00", CultureInfo.InvariantCulture))
-                    .Append("\",\"b\":").Append(LadderSize(row.BidSize))
-                    .Append(",\"s\":").Append(LadderSize(row.AskSize))
-                    .Append('}');
-            }
-            else json.Append("null");
-        }
-        json.Append(']');
-        return $"window.updateLadder({json})";
-    }
-
-    private static string LadderSize(decimal? size)
-        => size is { } value ? $"\"{value.ToString(CultureInfo.InvariantCulture)}\"" : "null";
 
     private async Task DisplayHistoricalData()
     {

@@ -30,19 +30,6 @@
     let lastOrderPrice = 0;
     const closeBtn = document.getElementById('close-btn');
 
-    const LADDER_ROWS = 20;
-    const ladderCells = [];
-    for (let i = 0; i < LADDER_ROWS; i++) {
-        const tr = document.getElementById(String(i));
-        ladderCells.push(tr ? [tr.cells[0], tr.cells[1], tr.cells[2]] : null);
-    }
-
-    function setText(cell, text) {
-        if (cell && cell.textContent !== text) cell.textContent = text;
-    }
-
-    const spreadCell = (document.getElementById('imbalance') || { cells: [] }).cells[1];
-
     window.updateData = function (time, open, high, low, close, vwap, color){
         candlesSeries.update({
             time: time,
@@ -53,33 +40,6 @@
             color: color || undefined
         });
         vwapSeries.update({ time: time, value: vwap });
-    };
-
-    window.updateLadder = function (rows) {
-        for (let i = 0; i < LADDER_ROWS; i++) {
-            const cells = ladderCells[i];
-            if (!cells) continue;
-            const r = rows[i];
-            if (r) {
-                setText(cells[0], r.b === null ? '-' : String(r.b));
-                setText(cells[1], String(r.p));
-                setText(cells[2], r.s === null ? '-' : String(r.s));
-            } else {
-                setText(cells[0], '-');
-                setText(cells[1], '-');
-                setText(cells[2], '-');
-            }
-        }
-
-        const top = rows[9];
-        const bottom = rows[10];
-        if (top && bottom) {
-            const diff = Number(bottom.b) - Number(top.s);
-            setText(spreadCell, diff.toFixed(0));
-            spreadCell.style.background = diff > 0 ? 'rgba(38, 166, 154, 0.25)' : diff < 0 ? 'rgba(239, 83, 80, 0.25)' : '';
-        } else {
-            setText(spreadCell, '-');
-        }
     };
 
     function updateCloseButtonPosition() {
