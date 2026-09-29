@@ -165,7 +165,7 @@ public class MainWindowViewModel : ViewModelBase
         await DisplayHistoricalData();
         _client.SubscribeToRealTimeBars(1106, _contract.Contract);
         _client.SubscribeToMarketData(MarketDataRequestId, _contract);
-        _client.SubscribeToMarketDepth(1007, _contract);
+        //_client.SubscribeToMarketDepth(1007, _contract);
     }
 
     private async Task DisplayHistoricalData()

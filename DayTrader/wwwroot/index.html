@@ -11,10 +11,24 @@
             background: #131722;
             overflow: hidden;
         }
-        #chart {
+        #app {
+            display: flex;
             width: 100%;
             height: 100%;
+        }
+        #chart {
+            width: 80%;
+            height: 100%;
             position: relative;
+            flex: 0 0 80%;
+        }
+        #side-panel {
+            flex: 1;
+            background: #1e222d;
+            border-left: 1px solid #2a2e39;
+            color: #d1d4dc;
+            padding: 10px;
+            overflow-y: auto;
         }
         #close-btn {
             position: absolute;
@@ -49,8 +63,11 @@
     </style>
 </head>
 <body>
-<div id="chart">
-    <button id="close-btn" title="Close Position"><img src="img/close.png" alt="×"></button>
+<div id="app">
+    <div id="chart">
+        <button id="close-btn" title="Close Position"><img src="img/close.png" alt="×"></button>
+    </div>
+    <div id="side-panel"></div>
 </div>
 <script src="js/lightweight-charts.standalone.production.js"></script>
 <script src="js/chartHelper.js"></script>
