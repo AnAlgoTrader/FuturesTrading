@@ -63,7 +63,7 @@
                 <ColumnDefinition Width="20*"></ColumnDefinition>
             </Grid.ColumnDefinitions>
             <NativeWebView Grid.Column="0"  x:Name="Chart" />
-            <StackPanel Grid.Column="1" Background="Red"></StackPanel>
+            <StackPanel Name="OrderBookLadder" Grid.Column="1"></StackPanel>
         </Grid>
     </Grid>
 </Window>

@@ -7,6 +7,7 @@ using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 using DayTrader.Helper;
 using DayTrader.Models;
+using Ib.Csharp.Api.Client.Implementation.Helper;
 using ReactiveUI;
 using ReactiveUI.Primitives;
 
@@ -151,6 +152,11 @@ public class MainWindowViewModel : ViewModelBase
             }
             UpdateOrderLine();
         };
+        _client.OnOrderBookUpdate += orderBook =>
+        {
+            var ladder = OrderBookHelper.FormatAsLadder(orderBook);
+            //TODO Update UI with the ladder
+        };
         _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
         _client.OnRealTimeBarUpdate += _candleAggregator.AddBar;
         _client.OnOrderStatusUpdate += status => _ = _orderHelper.UpdateOrderStatus(status);
@@ -159,6 +165,7 @@ public class MainWindowViewModel : ViewModelBase
         await DisplayHistoricalData();
         _client.SubscribeToRealTimeBars(1106, _contract.Contract);
         _client.SubscribeToMarketData(MarketDataRequestId, _contract);
+        _client.SubscribeToMarketDepth(1007, _contract);
     }
 
     private async Task DisplayHistoricalData()
