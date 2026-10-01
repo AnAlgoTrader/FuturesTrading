@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Drawing;
 using Photino.NET;
 
 namespace Trader
@@ -13,10 +12,6 @@ namespace Trader
                 .SetTitle("Trader")
                 .SetUseOsDefaultSize(false)
                 .SetMaximized(true)
-                // Most event handlers can be registered after the
-                // PhotinoWindow was instantiated by calling a registration 
-                // method like the following RegisterWebMessageReceivedHandler.
-                // This could be added in the PhotinoWindowOptions if preferred.
                 .RegisterWebMessageReceivedHandler((sender, message) =>
                 {
                     var window = (PhotinoWindow)sender!;

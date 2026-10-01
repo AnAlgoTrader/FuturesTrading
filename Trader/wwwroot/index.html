@@ -18,14 +18,11 @@
         It will respond and send a message back to the UI.
     </p>
     <button class="primary center" onclick="callDotNet()">Call .NET</button>
-
     <script src="app://dynamic.js"></script>
-
     <script>
         function callDotNet() {
             window.external.sendMessage('Hi .NET! 🤖');
         }
-
         window.external.receiveMessage(message => alert(message));
     </script>
 </body>
