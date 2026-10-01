@@ -1,8 +1,16 @@
 const dateFormatter = new Intl.DateTimeFormat('en-GB', {
     weekday: 'short',
     day: '2-digit',
-    month: 'short'
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
 });
+
+function formatUpdatedOn(date) {
+    const parts = Object.fromEntries(dateFormatter.formatToParts(date).map(p => [p.type, p.value]));
+    return parts.weekday + ' ' + parts.day + ' ' + parts.month + ' ' + parts.hour + ':' + parts.minute;
+}
 
 function callBackground(message){
     window.external.sendMessage(message);
@@ -11,7 +19,7 @@ function callBackground(message){
 function receiveFromBackground(message){
     const accountInfo = JSON.parse(message);
 
-    setStat('stat-updated-on', dateFormatter.format(new Date(accountInfo.UpdateOn)));
+    setStat('stat-updated-on', formatUpdatedOn(new Date(accountInfo.UpdateOn)));
     setStat('stat-funds', accountInfo.AvailableFunds);
     setStat('stat-buying-power', accountInfo.BuyingPower);
     setStat('stat-eur', accountInfo.CashEuro);
