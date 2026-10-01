@@ -1,15 +1,21 @@
 ﻿using System;
+using System.Text.Json;
+using Ib.Csharp.Api.Client.Implementation;
 using Photino.NET;
+using Trader.Model;
 
 namespace Trader
 {
     internal class Program
     {
-        private static PhotinoWindow? _window;
+        private static PhotinoWindow _window;
+        private static readonly IbClient _client = new();
+        private static Logger _logger;
 
         [STAThread]
         private static void Main()
         {
+            _logger = new Logger();
             _window = new PhotinoWindow()
                 .SetTitle("Trader")
                 .SetUseOsDefaultSize(false)
@@ -20,7 +26,7 @@ namespace Trader
             _window.WaitForClose();
         }
 
-        private static void ReceiveMessage(object? sender, string message)
+        private static void ReceiveMessage(object sender, string message)
         {
             if (message == "applicationReady")
                 InitIbClient();
@@ -28,7 +34,13 @@ namespace Trader
 
         private static void InitIbClient()
         {
-            Console.WriteLine("Start Ib client");
+            _client.OnNotification += msg => _logger.WriteLine($"[IB] {msg}");
+            _client.Start("127.0.0.1", 4001, 0);
+            _client.OnAccountUpdate += accountUpdate =>
+            {
+                SendMessage(JsonSerializer.Serialize(accountUpdate));
+            };
+            _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
         }
 
         private static void SendMessage(string message)
