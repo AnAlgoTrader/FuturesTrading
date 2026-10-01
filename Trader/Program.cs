@@ -22,7 +22,13 @@ namespace Trader
 
         private static void ReceiveMessage(object? sender, string message)
         {
-            SendMessage($"Received message: \"{message}\"");
+            if (message == "applicationReady")
+                InitIbClient();
+        }
+
+        private static void InitIbClient()
+        {
+            Console.WriteLine("Start Ib client");
         }
 
         private static void SendMessage(string message)
