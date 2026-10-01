@@ -18,6 +18,7 @@ function callBackground(message){
 
 const handlers = {
     ACCOUNT_UPDATE: accountUpdate,
+    CONTRACT_UPDATE: contractUpdate,
     CANDLE_SET: candleSet,
     CANDLE_UPDATE: candleUpdate,
     MARKET_DATA: marketData,
@@ -38,6 +39,15 @@ function accountUpdate(data){
     setStat('stat-buying-power', data.BuyingPower);
     setStat('stat-eur', data.CashEuro);
     setStat('stat-usd', data.CashUsd);
+}
+
+function contractUpdate(data){
+    setStat('stat-expiration', formatExpiration(new Date(data.Expiration + 'T00:00:00')));
+}
+
+function formatExpiration(date) {
+    const parts = Object.fromEntries(dateFormatter.formatToParts(date).map(p => [p.type, p.value]));
+    return parts.weekday + ' ' + parts.day + ' ' + parts.month;
 }
 
 function setStat(id, value){

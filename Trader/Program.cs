@@ -100,6 +100,7 @@ namespace Trader
             };
 
             _contract = await ContractHelper.GetContract(_client);
+            SendContractUpdate();
             await DisplayHistoricalData();
             _client.SubscribeToRealTimeBars(RealTimeBarRequestId, _contract.Contract);
             _client.SubscribeToMarketData(MarketDataRequestId, _contract);
@@ -117,6 +118,18 @@ namespace Trader
                 Close = close,
                 Vwap = vwap,
                 Color = color
+            });
+        }
+
+        private static void SendContractUpdate()
+        {
+            var contract = _contract!.Contract;
+            var expiration = DateTime.ParseExact(contract.LastTradeDateOrContractMonth, "yyyyMMdd",
+                CultureInfo.InvariantCulture);
+            SendUpdate(UpdateMessageType.CONTRACT_UPDATE, new ContractUpdate
+            {
+                Symbol = contract.Symbol,
+                Expiration = expiration.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
             });
         }
 

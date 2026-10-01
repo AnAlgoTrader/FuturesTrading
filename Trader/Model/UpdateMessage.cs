@@ -11,6 +11,7 @@ public class UpdateMessage
 public class UpdateMessageType
 {
     public const string ACCOUNT_UPDATE = "ACCOUNT_UPDATE";
+    public const string CONTRACT_UPDATE = "CONTRACT_UPDATE";
     public const string CANDLE_SET = "CANDLE_SET";
     public const string CANDLE_UPDATE = "CANDLE_UPDATE";
     public const string MARKET_DATA = "MARKET_DATA";
