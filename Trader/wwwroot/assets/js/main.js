@@ -17,7 +17,9 @@ function callBackground(message){
 }
 
 const handlers = {
-    ACCOUNT_UPDATE: accountUpdate
+    ACCOUNT_UPDATE: accountUpdate,
+    CANDLE_UPDATE: candleUpdate,
+    MARKET_DATA: marketData
 };
 
 function receiveFromBackground(message){
@@ -38,4 +40,17 @@ function accountUpdate(data){
 
 function setStat(id, value){
     document.getElementById(id).textContent = value;
+}
+
+function candleUpdate(data){
+    window.updateData(data.Time, data.Open, data.High, data.Low, data.Close, data.Vwap, data.Color);
+}
+
+function marketData(data){
+    setPrice('btn-buy', data.Ask);
+    setPrice('btn-sell', data.Bid);
+}
+
+function setPrice(id, value){
+    document.getElementById(id).textContent = value > 0 ? value.toFixed(2) : '-';
 }

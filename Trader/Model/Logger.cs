@@ -5,13 +5,13 @@ namespace Trader.Model;
 
 public class Logger : IDisposable
 {
-    private const string DATA_DIR = "/home/oce/LocalDB/logs/daytrader";
-    private readonly StreamWriter _writer;
+    public const string DATA_DIR = "/home/oce/LocalDB/logs/trader";
+    private readonly StreamWriter? _writer;
 
     public Logger()
     {
         Directory.CreateDirectory(DATA_DIR);
-        var filePath = Path.Combine(DATA_DIR, "daytrader.log");
+        var filePath = Path.Combine(DATA_DIR, "trader.log");
         _writer = new StreamWriter(filePath, append: false) { AutoFlush = true };
     }
 
