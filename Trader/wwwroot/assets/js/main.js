@@ -16,14 +16,24 @@ function callBackground(message){
     window.external.sendMessage(message);
 }
 
-function receiveFromBackground(message){
-    const accountInfo = JSON.parse(message);
+const handlers = {
+    ACCOUNT_UPDATE: accountUpdate
+};
 
-    setStat('stat-updated-on', formatUpdatedOn(new Date(accountInfo.UpdateOn)));
-    setStat('stat-funds', accountInfo.AvailableFunds);
-    setStat('stat-buying-power', accountInfo.BuyingPower);
-    setStat('stat-eur', accountInfo.CashEuro);
-    setStat('stat-usd', accountInfo.CashUsd);
+function receiveFromBackground(message){
+    const { Type, Data } = JSON.parse(message);
+
+    if (handlers[Type]) {
+        handlers[Type](Data);
+    }
+}
+
+function accountUpdate(data){
+    setStat('stat-updated-on', formatUpdatedOn(new Date(data.UpdateOn)));
+    setStat('stat-funds', data.AvailableFunds);
+    setStat('stat-buying-power', data.BuyingPower);
+    setStat('stat-eur', data.CashEuro);
+    setStat('stat-usd', data.CashUsd);
 }
 
 function setStat(id, value){

@@ -12,6 +12,8 @@ namespace Trader
         private static readonly IbClient _client = new();
         private static Logger _logger;
 
+        private const string ACCOUNT_UPDATE = "ACCOUNT_UPDATE";
+
         [STAThread]
         private static void Main()
         {
@@ -36,11 +38,18 @@ namespace Trader
         {
             _client.OnNotification += msg => _logger.WriteLine($"[IB] {msg}");
             _client.Start("127.0.0.1", 4001, 0);
-            _client.OnAccountUpdate += accountUpdate =>
-            {
-                SendMessage(JsonSerializer.Serialize(accountUpdate));
-            };
+            _client.OnAccountUpdate += accountUpdate => { SendUpdate(ACCOUNT_UPDATE, accountUpdate); };
             _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
+        }
+
+        private static void SendUpdate(string type, object data)
+        {
+            var message = new UpdateMessage
+            {
+                Type = type,
+                Data = JsonSerializer.SerializeToElement(data)
+            };
+            SendMessage(JsonSerializer.Serialize(message));
         }
 
         private static void SendMessage(string message)
