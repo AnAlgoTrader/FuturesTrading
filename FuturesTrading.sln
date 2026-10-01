@@ -4,7 +4,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ib.Csharp.Api.Client", "..\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DayTrader", "DayTrader\DayTrader.csproj", "{994FEFA0-D72D-42DF-93AF-34C3A6A6EB67}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloPhotino.NET", "Trader\HelloPhotino.NET.csproj", "{4D7441C5-1887-4B62-BA25-58720367FA40}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Trader", "Trader\Trader.csproj", "{4D7441C5-1887-4B62-BA25-58720367FA40}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

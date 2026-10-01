@@ -1,48 +1,25 @@
-﻿using Photino.NET;
+﻿using System;
 using System.Drawing;
-using System.Text;
+using Photino.NET;
 
-namespace HelloPhotinoApp
+namespace Trader
 {
-    //NOTE: To hide the console window, go to the project properties and change the Output Type to Windows Application.
-    // Or edit the .csproj file and change the <OutputType> tag from "WinExe" to "Exe".
-    class Program
+    internal class Program
     {
         [STAThread]
-        static void Main(string[] args)
+        private static void Main()
         {
-            // Window title declared here for visibility
-            string windowTitle = "Photino for .NET Demo App";
-
-            // Creating a new PhotinoWindow instance with the fluent API
             var window = new PhotinoWindow()
-                .SetTitle(windowTitle)
-                // Resize to a percentage of the main monitor work area
+                .SetTitle("Trader")
                 .SetUseOsDefaultSize(false)
-                .SetSize(new Size(1024, 800))
-                // Center window in the middle of the screen
-                .Center()
-                // Users can resize windows by default.
-                // Let's make this one fixed instead.
-                .SetResizable(false)
-                .RegisterCustomSchemeHandler("app", (object sender, string scheme, string url, out string contentType) =>
-                {
-                    contentType = "text/javascript";
-                    return new MemoryStream(Encoding.UTF8.GetBytes(@"
-                        (() =>{
-                            window.setTimeout(() => {
-                                alert(`🎉 Dynamically inserted JavaScript.`);
-                            }, 1000);
-                        })();
-                    "));
-                })
+                .SetMaximized(true)
                 // Most event handlers can be registered after the
                 // PhotinoWindow was instantiated by calling a registration 
                 // method like the following RegisterWebMessageReceivedHandler.
                 // This could be added in the PhotinoWindowOptions if preferred.
-                .RegisterWebMessageReceivedHandler((object sender, string message) =>
+                .RegisterWebMessageReceivedHandler((sender, message) =>
                 {
-                    var window = (PhotinoWindow)sender;
+                    var window = (PhotinoWindow)sender!;
 
                     // The message argument is coming in from sendMessage.
                     // "window.external.sendMessage(message: string)"
@@ -52,9 +29,9 @@ namespace HelloPhotinoApp
                     // "window.external.receiveMessage(callback: Function)"
                     window.SendWebMessage(response);
                 })
-                .Load("wwwroot/index.html"); // Can be used with relative path strings or "new URI()" instance to load a website.
+                .Load("wwwroot/index.html");
 
-            window.WaitForClose(); // Starts the application event loop
+            window.WaitForClose();
         }
     }
 }
