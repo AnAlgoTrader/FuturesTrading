@@ -47,7 +47,12 @@ namespace Trader
             _orderHelper.OnOrdersChanged += _ => UpdateOrderLine();
             _orderHelper.OnPositionChanged += _ => UpdateOrderLine();
 
-            _window = new PhotinoWindow()
+            var window = new PhotinoWindow
+            {
+                LogVerbosity = 0
+            };
+
+            _window = window
                 .SetTitle("Trader")
                 .SetUseOsDefaultSize(false)
                 .SetMaximized(true)
@@ -78,7 +83,7 @@ namespace Trader
             _client.OnAccountUpdate += accountUpdate => SendUpdate(UpdateMessageType.ACCOUNT_UPDATE, accountUpdate);
             _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
             _client.OnRealTimeBarUpdate += _candleAggregator!.AddBar;
-            _client.OnOrderStatusUpdate += status => _ = _orderHelper!.UpdateOrderStatus(status);
+            _client.OnOrderStatusUpdate += status => _ = _orderHelper.UpdateOrderStatus(status);
             _client.OnMarketDataPriceUpdate += updates =>
             {
                 foreach (var (key, marketPrice) in updates)
@@ -89,7 +94,7 @@ namespace Trader
                     _currentPrice = _bid > 0 && _ask > 0
                         ? (_bid + _ask) / 2.0
                         : (_bid > 0 ? _bid : _ask);
-                    _orderHelper!.CurrentChartPrice = _currentPrice;
+                    _orderHelper.CurrentChartPrice = _currentPrice;
                     SendUpdate(UpdateMessageType.MARKET_DATA, new MarketDataUpdate
                     {
                         Bid = _bid,
