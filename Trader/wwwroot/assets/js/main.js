@@ -20,7 +20,8 @@ const handlers = {
     ACCOUNT_UPDATE: accountUpdate,
     CANDLE_SET: candleSet,
     CANDLE_UPDATE: candleUpdate,
-    MARKET_DATA: marketData
+    MARKET_DATA: marketData,
+    ORDER_LINE: orderLine
 };
 
 function receiveFromBackground(message){
@@ -58,4 +59,8 @@ function marketData(data){
 
 function setPrice(id, value){
     document.getElementById(id).textContent = value > 0 ? value.toFixed(2) : '-';
+}
+
+function orderLine(data){
+    window.setOrderLine(data.Price, data.Color, data.Title, data.ChartPrice);
 }
