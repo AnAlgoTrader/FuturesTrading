@@ -41,11 +41,17 @@
             <button class="action action-sell" onclick="callBackground('sell')">Sell</button>            
         </div>
     </header>
-    <main class="layout-main"></main>
+    <main class="layout-main">
+        <div id="chart">
+            <button id="close-btn" title="Close Position"><img src="assets/img/close.png" alt="×"></button>
+        </div>
+    </main>
 </div>
 
 <script src="app://dynamic.js"></script>
-<script type="application/javascript" src="assets/js/main.js"></script>
+<script src="assets/js/main.js"></script>
+<script src="assets/js/lightweight-charts.standalone.production.js"></script>
+<script src="assets/js/chartHelper.js"></script>
 <script>    
     window.external.receiveMessage(message => receiveFromBackground(message));
     callBackground('applicationReady');

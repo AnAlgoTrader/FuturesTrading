@@ -21,4 +21,16 @@
         <PackageReference Include="Photino.NET" Version="4.0.16" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Content Update="wwwroot\assets\js\lightweight-charts.standalone.production.js">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Update="wwwroot\assets\js\chartHelper.js">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Update="wwwroot\assets\img\close.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
 </Project>
