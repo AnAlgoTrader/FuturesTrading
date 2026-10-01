@@ -1,3 +1,9 @@
+const dateFormatter = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short'
+});
+
 function callBackground(message){
     window.external.sendMessage(message);
 }
@@ -5,7 +11,7 @@ function callBackground(message){
 function receiveFromBackground(message){
     const accountInfo = JSON.parse(message);
 
-    setStat('stat-updated-on', accountInfo.UpdateOn);
+    setStat('stat-updated-on', dateFormatter.format(new Date(accountInfo.UpdateOn)));
     setStat('stat-funds', accountInfo.AvailableFunds);
     setStat('stat-buying-power', accountInfo.BuyingPower);
     setStat('stat-eur', accountInfo.CashEuro);
