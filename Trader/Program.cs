@@ -5,28 +5,29 @@ namespace Trader
 {
     internal class Program
     {
+        private static PhotinoWindow? _window;
+
         [STAThread]
         private static void Main()
         {
-            var window = new PhotinoWindow()
+            _window = new PhotinoWindow()
                 .SetTitle("Trader")
                 .SetUseOsDefaultSize(false)
                 .SetMaximized(true)
-                .RegisterWebMessageReceivedHandler((sender, message) =>
-                {
-                    var window = (PhotinoWindow)sender!;
-
-                    // The message argument is coming in from sendMessage.
-                    // "window.external.sendMessage(message: string)"
-                    string response = $"Received message: \"{message}\"";
-
-                    // Send a message back the to JavaScript event handler.
-                    // "window.external.receiveMessage(callback: Function)"
-                    window.SendWebMessage(response);
-                })
+                .RegisterWebMessageReceivedHandler(ReceiveMessage)
                 .Load("wwwroot/index.html");
 
-            window.WaitForClose();
+            _window.WaitForClose();
+        }
+
+        private static void ReceiveMessage(object? sender, string message)
+        {
+            SendMessage($"Received message: \"{message}\"");
+        }
+
+        private static void SendMessage(string message)
+        {
+            _window?.SendWebMessage(message);
         }
     }
 }
