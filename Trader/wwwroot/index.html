@@ -8,9 +8,12 @@
     <link rel="stylesheet" href="assets/css/main.css"/>
 </head>
 <body>
-<button class="primary center" onclick="callBackground('message from the UI')">Call .NET</button>
-<script src="app://dynamic.js"></script>
+<div class="layout">
+    <header class="layout-top"></header>
+    <main class="layout-main"></main>
+</div>
 
+<script src="app://dynamic.js"></script>
 <script type="application/javascript" src="assets/js/main.js"></script>
 <script>    
     window.external.receiveMessage(message => receiveFromBackground(message));
