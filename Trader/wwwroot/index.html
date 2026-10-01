@@ -12,9 +12,9 @@
 <script src="app://dynamic.js"></script>
 
 <script type="application/javascript" src="assets/js/main.js"></script>
-<script>
-    callBackground('applicationReady');
+<script>    
     window.external.receiveMessage(message => receiveFromBackground(message));
+    callBackground('applicationReady');
 </script>
 </body>
 </html>
