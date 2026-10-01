@@ -25,12 +25,13 @@ body {
     background: #2a3d4f;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     padding: 0 1rem;
 }
 
 .stats {
     display: flex;
-    gap: 1.5rem;
+    gap: 3.5rem;
     align-items: center;
 }
 
@@ -51,6 +52,39 @@ body {
     font-size: 1rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
+}
+
+.actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.action {
+    border: none;
+    padding: 0.35rem 1.25rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    transition: filter 0.15s ease;
+}
+
+.action:hover {
+    filter: brightness(1.05);
+}
+
+.action:active {
+    filter: brightness(0.95);
+}
+
+.action-sell {
+    background: #d64545;
+}
+
+.action-buy {
+    background: #2f9c5c;
 }
 
 .layout-main {
