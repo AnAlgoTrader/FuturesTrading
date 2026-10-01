@@ -21,11 +21,39 @@ body {
 }
 
 .layout-top {
-    height: 10vh;
+    height: 5vh;
     background: #2a3d4f;
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+}
+
+.stats {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+.stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #8fa3b8;
+}
+
+.stat-value {
+    font-size: 1rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
 }
 
 .layout-main {
-    height: 90vh;
+    height: 95vh;
     background: #1f2937;
 }
