@@ -52,7 +52,7 @@ body {
 
 .stat-value {
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: 300;
     font-variant-numeric: tabular-nums;
 }
 
