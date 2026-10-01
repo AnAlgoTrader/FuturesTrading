@@ -18,6 +18,7 @@ function callBackground(message){
 
 const handlers = {
     ACCOUNT_UPDATE: accountUpdate,
+    CANDLE_SET: candleSet,
     CANDLE_UPDATE: candleUpdate,
     MARKET_DATA: marketData
 };
@@ -40,6 +41,10 @@ function accountUpdate(data){
 
 function setStat(id, value){
     document.getElementById(id).textContent = value;
+}
+
+function candleSet(data){
+    window.setData(data.Candles);
 }
 
 function candleUpdate(data){

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
@@ -98,13 +99,14 @@ namespace Trader
             var historicalData = await _client.GetHistoricalData(HistoricalDataRequestId, _contract!.Contract,
                 $"5 {nameof(Duration.D)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000, false);
 
+            var candles = new SortedDictionary<long, CandleUpdate>();
             foreach (var item in historicalData)
             {
                 if (item.Volume == 0 || item is { Open: 0, High: 0, Low: 0, Close: 0 }) continue;
                 var time = long.Parse(item.Time);
                 var vwap = _vwapCalculator!.AddBar(time, (double)item.WAP, (double)item.Volume);
                 var color = _climaxExhaustionDetector!.ProcessCandle(time, item.Open, item.High, item.Low, item.Close, (double)item.Volume);
-                SendUpdate(UpdateMessageType.CANDLE_UPDATE, new CandleUpdate
+                candles[time] = new CandleUpdate
                 {
                     Time = time,
                     Open = item.Open,
@@ -113,8 +115,11 @@ namespace Trader
                     Close = item.Close,
                     Vwap = vwap,
                     Color = color
-                });
+                };
             }
+
+            _logger!.WriteLine($"[CHART] Setting {candles.Count} historical candles.");
+            SendUpdate(UpdateMessageType.CANDLE_SET, new CandleSet { Candles = new List<CandleUpdate>(candles.Values) });
         }
 
         private static void SendUpdate(string type, object data)

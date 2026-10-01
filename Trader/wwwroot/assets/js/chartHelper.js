@@ -30,6 +30,23 @@
     let lastOrderPrice = 0;
     const closeBtn = document.getElementById('close-btn');
 
+    window.setData = function (candles) {
+        candlesSeries.setData(candles.map(function (c) {
+            return {
+                time: c.Time,
+                open: c.Open,
+                high: c.High,
+                low: c.Low,
+                close: c.Close,
+                color: c.Color || undefined
+            };
+        }));
+        vwapSeries.setData(candles.map(function (c) {
+            return { time: c.Time, value: c.Vwap };
+        }));
+        chart.timeScale().scrollToRealTime();
+    };
+
     window.updateData = function (time, open, high, low, close, vwap, color){
         candlesSeries.update({
             time: time,
