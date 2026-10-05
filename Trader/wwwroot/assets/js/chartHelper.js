@@ -1,4 +1,6 @@
 (function () {
+    const CANDLE_COLOR = '#808080';
+
     const container = document.getElementById('chart');
     const chart = LightweightCharts.createChart(container, {
         width: container.clientWidth || 800,
@@ -15,6 +17,10 @@
     });
 
     const candlesSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
+        upColor: CANDLE_COLOR,
+        downColor: CANDLE_COLOR,
+        wickUpColor: CANDLE_COLOR,
+        wickDownColor: CANDLE_COLOR,
         borderVisible: false
     });
 
@@ -37,8 +43,7 @@
                 open: c.Open,
                 high: c.High,
                 low: c.Low,
-                close: c.Close,
-                color: c.Color || undefined
+                close: c.Close
             };
         }));
         vwapSeries.setData(candles.map(function (c) {
@@ -47,14 +52,13 @@
         chart.timeScale().scrollToRealTime();
     };
 
-    window.updateData = function (time, open, high, low, close, vwap, color){
+    window.updateData = function (time, open, high, low, close, vwap){
         candlesSeries.update({
             time: time,
             open: open,
             high: high,
             low: low,
-            close: close,
-            color: color || undefined
+            close: close
         });
         vwapSeries.update({ time: time, value: vwap });
     };

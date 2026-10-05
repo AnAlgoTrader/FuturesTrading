@@ -6,7 +6,6 @@ namespace Trader.Model;
 public class CandleAggregator
 {
     private readonly VwapCalculator _vwapCalculator;
-    private readonly ClimaxExhaustionDetector _climaxExhaustionDetector;
     private DateTime _currentMinute = DateTime.MinValue;
     private double _open;
     private double _high;
@@ -16,12 +15,11 @@ public class CandleAggregator
     private DateTime _candleTime;
     private bool _hasCandle;
 
-    public event Action<DateTime, double, double, double, double, double, string?>? OnCandleUpdate;
+    public event Action<DateTime, double, double, double, double, double>? OnCandleUpdate;
 
-    public CandleAggregator(VwapCalculator vwapCalculator, ClimaxExhaustionDetector? climaxExhaustionDetector = null)
+    public CandleAggregator(VwapCalculator vwapCalculator)
     {
         _vwapCalculator = vwapCalculator;
-        _climaxExhaustionDetector = climaxExhaustionDetector ?? new ClimaxExhaustionDetector();
     }
 
     public void AddBar(RealTimeBar bar)
@@ -52,7 +50,6 @@ public class CandleAggregator
         }
 
         var vwap = _vwapCalculator.AddBar(candleTimeUnix, (double)bar.Wap, (double)bar.Volume);
-        var color = _climaxExhaustionDetector.ProcessCandle(candleTimeUnix, _open, _high, _low, _close, _volume);
-        OnCandleUpdate?.Invoke(_candleTime, _open, _high, _low, _close, vwap, color);
+        OnCandleUpdate?.Invoke(_candleTime, _open, _high, _low, _close, vwap);
     }
 }

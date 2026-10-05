@@ -23,7 +23,6 @@ namespace Trader
         private static readonly IbClient _client = new();
         private static Logger? _logger;
         private static VwapCalculator? _vwapCalculator;
-        private static ClimaxExhaustionDetector? _climaxExhaustionDetector;
         private static CandleAggregator? _candleAggregator;
         private static OrderHelper? _orderHelper;
         private static ContractDetails? _contract;
@@ -40,8 +39,7 @@ namespace Trader
         {
             _logger = new Logger();
             _vwapCalculator = new VwapCalculator();
-            _climaxExhaustionDetector = new ClimaxExhaustionDetector();
-            _candleAggregator = new CandleAggregator(_vwapCalculator, _climaxExhaustionDetector);
+            _candleAggregator = new CandleAggregator(_vwapCalculator);
             _candleAggregator.OnCandleUpdate += SendCandleUpdate;
             _orderHelper = new OrderHelper(_logger);
             _orderHelper.OnOrdersChanged += _ => UpdateOrderLine();
@@ -112,7 +110,7 @@ namespace Trader
         }
 
         private static void SendCandleUpdate(DateTime candleTime, double open, double high, double low, double close,
-            double vwap, string? color)
+            double vwap)
         {
             SendUpdate(UpdateMessageType.CANDLE_UPDATE, new CandleUpdate
             {
@@ -121,8 +119,7 @@ namespace Trader
                 High = high,
                 Low = low,
                 Close = close,
-                Vwap = vwap,
-                Color = color
+                Vwap = vwap
             });
         }
 
@@ -149,16 +146,14 @@ namespace Trader
                 if (item.Volume == 0 || item is { Open: 0, High: 0, Low: 0, Close: 0 }) continue;
                 var time = long.Parse(item.Time);
                 var vwap = _vwapCalculator!.AddBar(time, (double)item.WAP, (double)item.Volume);
-                var color = _climaxExhaustionDetector!.ProcessCandle(time, item.Open, item.High, item.Low, item.Close, (double)item.Volume);
-                candles[time] = new CandleUpdate
+candles[time] = new CandleUpdate
                 {
                     Time = time,
                     Open = item.Open,
                     High = item.High,
                     Low = item.Low,
                     Close = item.Close,
-                    Vwap = vwap,
-                    Color = color
+                    Vwap = vwap
                 };
             }
 

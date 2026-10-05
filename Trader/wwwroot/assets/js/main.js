@@ -59,7 +59,7 @@ function candleSet(data){
 }
 
 function candleUpdate(data){
-    window.updateData(data.Time, data.Open, data.High, data.Low, data.Close, data.Vwap, data.Color);
+    window.updateData(data.Time, data.Open, data.High, data.Low, data.Close, data.Vwap);
 }
 
 function marketData(data){
