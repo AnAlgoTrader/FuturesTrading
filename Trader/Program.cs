@@ -17,7 +17,6 @@ namespace Trader
     {
         private static FootPrintHelper _footPrintHelper = new();
         private const int HistoricalDataRequestId = 1105;
-        private const int RealTimeBarRequestId = 1106;
         private const int MarketDataRequestId = 1108;
         private const int FootPrintPriceRequestId = 1109;
         private const int FootPrintTradesRequestId = 1110;
@@ -88,10 +87,14 @@ namespace Trader
             _client.Start("127.0.0.1", 4001, 0);
             _client.OnAccountUpdate += accountUpdate => SendUpdate(UpdateMessageType.ACCOUNT_UPDATE, accountUpdate);
             _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
-            _client.OnRealTimeBarUpdate += _candleAggregator!.AddBar;
             _client.OnOrderStatusUpdate += status => _ = _orderHelper.UpdateOrderStatus(status);
             _client.OnMarketDataPriceTickByTickUpdate += _footPrintHelper.UpdatePrice;
-            _client.OnMarketDataTradeTickByTickUpdate += _footPrintHelper.UpdateTrade;
+            _client.OnMarketDataTradeTickByTickUpdate += trade =>
+            {
+                _footPrintHelper.UpdateTrade(trade);
+                _vwapCalculator.AddTrade(trade.Time, trade.Price, (double)trade.Size);
+                _candleAggregator.UpdateVwap();
+            };
             _client.OnMarketDataPriceUpdate += updates =>
             {
                 foreach (var (key, marketPrice) in updates)
@@ -108,6 +111,11 @@ namespace Trader
                         Bid = _bid,
                         Ask = _ask
                     });
+
+                    if (_bid > 0)
+                    {
+                        _candleAggregator.AddPriceTick(_bid);
+                    }
                 }
 
                 UpdateOrderLine();
@@ -117,7 +125,6 @@ namespace Trader
             _tradeContract = await ContractHelper.GetContract(_client, TradingConfig.TradeSymbol);
             SendContractUpdate();
             await DisplayHistoricalData();
-            _client.SubscribeToRealTimeBars(RealTimeBarRequestId, _dataContract.Contract);
             _client.SubscribeToMarketData(MarketDataRequestId, _dataContract);
             _client.SubscribeToPriceTickByTick(FootPrintPriceRequestId, _dataContract.Contract);
             _client.SubscribeToTradesTickByTick(FootPrintTradesRequestId, _dataContract.Contract);

@@ -1,17 +1,16 @@
 using System;
-using Ib.Csharp.Api.Client.Implementation.Model;
 
 namespace Trader.Model;
 
 public class CandleAggregator
 {
+    private readonly object _lock = new();
     private readonly VwapCalculator _vwapCalculator;
     private DateTime _currentMinute = DateTime.MinValue;
     private double _open;
     private double _high;
     private double _low;
     private double _close;
-    private double _volume;
     private DateTime _candleTime;
     private bool _hasCandle;
 
@@ -22,34 +21,61 @@ public class CandleAggregator
         _vwapCalculator = vwapCalculator;
     }
 
-    public void AddBar(RealTimeBar bar)
+    public void AddPriceTick(double price, DateTime? time = null)
     {
-        if (bar.Volume == 0 || bar is { Open: 0, High: 0, Low: 0, Close: 0 }) return;
+        if (price <= 0) return;
 
-        var barTime = DateTimeOffset.FromUnixTimeSeconds(bar.Date).UtcDateTime;
-        var candleTime = new DateTime(barTime.Year, barTime.Month, barTime.Day, barTime.Hour, barTime.Minute, 0, DateTimeKind.Utc);
-        var candleTimeUnix = new DateTimeOffset(candleTime).ToUnixTimeSeconds();
+        DateTime candleTime;
+        double open, high, low, close, vwap;
 
-        if (!_hasCandle || candleTime != _currentMinute)
+        lock (_lock)
         {
-            _currentMinute = candleTime;
-            _hasCandle = true;
-            _open = bar.Open;
-            _high = bar.High;
-            _low = bar.Low;
-            _close = bar.Close;
-            _volume = (double)bar.Volume;
-            _candleTime = candleTime;
-        }
-        else
-        {
-            _high = Math.Max(_high, bar.High);
-            _low = Math.Min(_low, bar.Low);
-            _close = bar.Close;
-            _volume += (double)bar.Volume;
+            var now = time ?? DateTime.UtcNow;
+            candleTime = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, DateTimeKind.Utc);
+
+            if (!_hasCandle || candleTime != _currentMinute)
+            {
+                _currentMinute = candleTime;
+                _hasCandle = true;
+                _open = price;
+                _high = price;
+                _low = price;
+                _close = price;
+                _candleTime = candleTime;
+            }
+            else
+            {
+                _high = Math.Max(_high, price);
+                _low = Math.Min(_low, price);
+                _close = price;
+            }
+
+            open = _open;
+            high = _high;
+            low = _low;
+            close = _close;
+            vwap = _vwapCalculator.Current;
         }
 
-        var vwap = _vwapCalculator.AddBar(candleTimeUnix, (double)bar.Wap, (double)bar.Volume);
-        OnCandleUpdate?.Invoke(_candleTime, _open, _high, _low, _close, vwap);
+        OnCandleUpdate?.Invoke(candleTime, open, high, low, close, vwap);
+    }
+
+    public void UpdateVwap()
+    {
+        DateTime candleTime;
+        double open, high, low, close, vwap;
+
+        lock (_lock)
+        {
+            if (!_hasCandle) return;
+            candleTime = _candleTime;
+            open = _open;
+            high = _high;
+            low = _low;
+            close = _close;
+            vwap = _vwapCalculator.Current;
+        }
+
+        OnCandleUpdate?.Invoke(candleTime, open, high, low, close, vwap);
     }
 }
