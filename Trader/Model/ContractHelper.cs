@@ -9,11 +9,11 @@ namespace Trader.Model;
 
 public class ContractHelper
 {
-    public static async Task<ContractDetails> GetContract(IbClient client)
+    public static async Task<ContractDetails> GetContract(IbClient client, string symbol)
     {
         var contractDataList = await client.GetContractData(new Contract
         {
-            Symbol = TradingConfig.Symbol,
+            Symbol = symbol,
             SecType = TradingConfig.SecurityType,
             Currency = TradingConfig.Currency,
             Exchange = TradingConfig.Exchange

@@ -25,14 +25,15 @@ namespace Trader
         private static VwapCalculator? _vwapCalculator;
         private static CandleAggregator? _candleAggregator;
         private static OrderHelper? _orderHelper;
-        private static ContractDetails? _contract;
+        private static ContractDetails? _dataContract;
+        private static ContractDetails? _tradeContract;
         private static double _bid;
         private static double _ask;
         private static double _currentPrice;
         private static int _closeTradeInProgress;
 
         private static double TradeMultiplier =>
-            double.TryParse(_contract?.Contract.Multiplier, NumberStyles.Float, CultureInfo.InvariantCulture, out var m) ? m : 1;
+            double.TryParse(_tradeContract?.Contract.Multiplier, NumberStyles.Float, CultureInfo.InvariantCulture, out var m) ? m : 1;
 
         [STAThread]
         private static void Main()
@@ -102,11 +103,12 @@ namespace Trader
                 UpdateOrderLine();
             };
 
-            _contract = await ContractHelper.GetContract(_client);
+            _dataContract = await ContractHelper.GetContract(_client, TradingConfig.DataSymbol);
+            _tradeContract = await ContractHelper.GetContract(_client, TradingConfig.TradeSymbol);
             SendContractUpdate();
             await DisplayHistoricalData();
-            _client.SubscribeToRealTimeBars(RealTimeBarRequestId, _contract.Contract);
-            _client.SubscribeToMarketData(MarketDataRequestId, _contract);
+            _client.SubscribeToRealTimeBars(RealTimeBarRequestId, _dataContract.Contract);
+            _client.SubscribeToMarketData(MarketDataRequestId, _dataContract);
         }
 
         private static void SendCandleUpdate(DateTime candleTime, double open, double high, double low, double close,
@@ -125,7 +127,7 @@ namespace Trader
 
         private static void SendContractUpdate()
         {
-            var contract = _contract!.Contract;
+            var contract = _dataContract!.Contract;
             var expiration = DateTime.ParseExact(contract.LastTradeDateOrContractMonth, "yyyyMMdd",
                 CultureInfo.InvariantCulture);
             SendUpdate(UpdateMessageType.CONTRACT_UPDATE, new ContractUpdate
@@ -137,7 +139,7 @@ namespace Trader
 
         private static async Task DisplayHistoricalData()
         {
-            var historicalData = await _client.GetHistoricalData(HistoricalDataRequestId, _contract!.Contract,
+            var historicalData = await _client.GetHistoricalData(HistoricalDataRequestId, _dataContract!.Contract,
                 $"5 {nameof(Duration.D)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000, false);
 
             var candles = new SortedDictionary<long, CandleUpdate>();
@@ -178,7 +180,7 @@ candles[time] = new CandleUpdate
 
         private static async Task SubmitOrder(string action, decimal quantity, double price)
         {
-            if (_contract == null) return;
+            if (_tradeContract == null) return;
             var order = new Order
             {
                 OrderId = _client.GetNextValidId(),
@@ -190,7 +192,7 @@ candles[time] = new CandleUpdate
                 Tif = "DAY"
             };
             await _orderHelper!.PersistOrder(order);
-            _client.PlaceOrder(_contract.Contract, order);
+            _client.PlaceOrder(_tradeContract.Contract, order);
             _logger!.WriteLine($"[TRADE] OrderId:{order.OrderId} - Action:{order.Action} - Quantity:{order.TotalQuantity} - EntryPrice:{order.LmtPrice}");
         }
 
