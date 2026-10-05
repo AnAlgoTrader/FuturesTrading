@@ -22,6 +22,8 @@ namespace Trader
         private const int FootPrintPriceRequestId = 1109;
         private const int FootPrintTradesRequestId = 1110;
         private const decimal OrderQuantity = 2;
+        private static Timer? _footPrintTimer;
+        private static int _footPrintUpdating;
 
         private static PhotinoWindow? _window;
         private static readonly IbClient _client = new();
@@ -119,6 +121,7 @@ namespace Trader
             _client.SubscribeToMarketData(MarketDataRequestId, _dataContract);
             _client.SubscribeToPriceTickByTick(FootPrintPriceRequestId, _dataContract.Contract);
             _client.SubscribeToTradesTickByTick(FootPrintTradesRequestId, _dataContract.Contract);
+            _footPrintTimer = new Timer(_ => SendFootPrintUpdate(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         }
 
         private static void SendCandleUpdate(DateTime candleTime, double open, double high, double low, double close, double vwap)
@@ -132,15 +135,20 @@ namespace Trader
                 Close = close,
                 Vwap = vwap
             });
-
-            //using this method to trigger the footprint because IBKR calls it every 5 seconds. Acts like a timer.
-            SendFootPrintUpdate();
         }
 
         private static void SendFootPrintUpdate()
         {
-            var columns = _footPrintHelper.GetSnapshot();
-            SendUpdate(UpdateMessageType.FOOTPRINT_UPDATE, columns);
+            if (Interlocked.Exchange(ref _footPrintUpdating, 1) == 1) return;
+            try
+            {
+                var columns = _footPrintHelper.GetSnapshot();
+                SendUpdate(UpdateMessageType.FOOTPRINT_UPDATE, columns);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _footPrintUpdating, 0);
+            }
         }
 
         private static void SendContractUpdate()
