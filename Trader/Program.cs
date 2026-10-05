@@ -28,6 +28,7 @@ namespace Trader
         private static readonly IbClient _client = new();
         private static Logger _logger;
         private static VwapCalculator _vwapCalculator;
+        private static ReversalDetector _reversalDetector;
         private static CandleAggregator _candleAggregator;
         private static OrderHelper _orderHelper;
         private static ContractDetails _dataContract;
@@ -46,7 +47,8 @@ namespace Trader
             _footPrintHelper = new FootPrintHelper();
             _logger = new Logger();
             _vwapCalculator = new VwapCalculator();
-            _candleAggregator = new CandleAggregator(_vwapCalculator);
+            _reversalDetector = new ReversalDetector();
+            _candleAggregator = new CandleAggregator(_vwapCalculator, _reversalDetector);
             _candleAggregator.OnCandleUpdate += SendCandleUpdate;
             _orderHelper = new OrderHelper(_logger);
             _orderHelper.OnOrdersChanged += _ => UpdateOrderLine();
@@ -88,12 +90,16 @@ namespace Trader
             _client.OnAccountUpdate += accountUpdate => SendUpdate(UpdateMessageType.ACCOUNT_UPDATE, accountUpdate);
             _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
             _client.OnOrderStatusUpdate += status => _ = _orderHelper.UpdateOrderStatus(status);
-            _client.OnMarketDataPriceTickByTickUpdate += _footPrintHelper.UpdatePrice;
+            _client.OnMarketDataPriceTickByTickUpdate += price =>
+            {
+                _footPrintHelper.UpdatePrice(price);
+                _candleAggregator.UpdateQuote(price.Time, price.Bid, price.Ask);
+            };
             _client.OnMarketDataTradeTickByTickUpdate += trade =>
             {
                 _footPrintHelper.UpdateTrade(trade);
                 _vwapCalculator.AddTrade(trade.Time, trade.Price, (double)trade.Size);
-                _candleAggregator.UpdateVwap();
+                _candleAggregator.AddTrade(trade.Time, trade.Price, (double)trade.Size);
             };
             _client.OnMarketDataPriceUpdate += updates =>
             {
@@ -131,7 +137,7 @@ namespace Trader
             _footPrintTimer = new Timer(_ => SendFootPrintUpdate(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         }
 
-        private static void SendCandleUpdate(DateTime candleTime, double open, double high, double low, double close, double vwap)
+        private static void SendCandleUpdate(DateTime candleTime, double open, double high, double low, double close, double vwap, string color)
         {
             SendUpdate(UpdateMessageType.CANDLE_UPDATE, new CandleUpdate
             {
@@ -140,7 +146,8 @@ namespace Trader
                 High = high,
                 Low = low,
                 Close = close,
-                Vwap = vwap
+                Vwap = vwap,
+                Color = color
             });
         }
 
@@ -181,6 +188,7 @@ namespace Trader
                 if (item.Volume == 0 || item is { Open: 0, High: 0, Low: 0, Close: 0 }) continue;
                 var time = long.Parse(item.Time);
                 var vwap = _vwapCalculator!.AddBar(time, (double)item.WAP, (double)item.Volume);
+                var color = _reversalDetector!.ProcessHistoricalCandle(time, item.Open, item.High, item.Low, item.Close, (double)item.Volume);
                 candles[time] = new CandleUpdate
                 {
                     Time = time,
@@ -188,7 +196,8 @@ namespace Trader
                     High = item.High,
                     Low = item.Low,
                     Close = item.Close,
-                    Vwap = vwap
+                    Vwap = vwap,
+                    Color = color
                 };
             }
 

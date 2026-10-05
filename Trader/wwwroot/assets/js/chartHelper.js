@@ -43,7 +43,8 @@
                 open: c.Open,
                 high: c.High,
                 low: c.Low,
-                close: c.Close
+                close: c.Close,
+                color: c.Color || undefined
             };
         }));
         vwapSeries.setData(candles.map(function (c) {
@@ -52,13 +53,14 @@
         chart.timeScale().scrollToRealTime();
     };
 
-    window.updateData = function (time, open, high, low, close, vwap){
+    window.updateData = function (time, open, high, low, close, vwap, color){
         candlesSeries.update({
             time: time,
             open: open,
             high: high,
             low: low,
-            close: close
+            close: close,
+            color: color || undefined
         });
         vwapSeries.update({ time: time, value: vwap });
     };

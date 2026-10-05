@@ -8,4 +8,5 @@ public class CandleUpdate
     public double Low { get; set; }
     public double Close { get; set; }
     public double Vwap { get; set; }
+    public string Color { get; set; } = "";
 }
