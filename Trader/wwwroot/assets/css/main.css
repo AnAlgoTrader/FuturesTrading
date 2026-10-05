@@ -64,13 +64,33 @@ body {
 
 .action {
     border: none;
-    padding: 0.35rem 1.25rem;
+    padding: 0.35rem 1rem;
     border-radius: 4px;
     font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
     color: #fff;
     transition: filter 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    user-select: none;
+}
+
+.action * {
+    pointer-events: none;
+}
+
+.action-label {
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.action-price {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    opacity: 0.95;
 }
 
 .action:hover {

@@ -73,9 +73,9 @@ namespace Trader
             if (message == "applicationReady")
                 _ = InitAndSubscribe();
             else if (message == "buy")
-                _ = SubmitOrder("BUY", OrderQuantity, _ask);
+                _ = SubmitOrder("BUY", OrderQuantity, _ask > 0 ? _ask : _currentPrice);
             else if (message == "sell")
-                _ = SubmitOrder("SELL", OrderQuantity, _bid);
+                _ = SubmitOrder("SELL", OrderQuantity, _bid > 0 ? _bid : _currentPrice);
             else if (message == "closeTrade")
                 _ = CloseActiveTrade();
         }
@@ -206,7 +206,18 @@ namespace Trader
 
         private static async Task SubmitOrder(string action, decimal quantity, double price)
         {
-            if (_tradeContract == null) return;
+            if (_tradeContract == null)
+            {
+                _logger!.WriteLine($"[TRADE] SubmitOrder {action} REJECTED: Trade contract is not initialized.");
+                return;
+            }
+
+            if (price <= 0)
+            {
+                _logger!.WriteLine($"[TRADE] SubmitOrder {action} REJECTED: Invalid price {price:F2}.");
+                return;
+            }
+
             var order = new Order
             {
                 OrderId = _client.GetNextValidId(),

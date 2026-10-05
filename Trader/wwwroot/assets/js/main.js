@@ -64,12 +64,17 @@ function candleUpdate(data){
 }
 
 function marketData(data){
-    setPrice('btn-buy', data.Ask);
-    setPrice('btn-sell', data.Bid);
+    setPrice('price-buy', data.Ask);
+    setPrice('price-sell', data.Bid);
 }
 
 function setPrice(id, value){
-    document.getElementById(id).textContent = value > 0 ? value.toFixed(2) : '-';
+    const el = document.getElementById(id);
+    if (!el) return;
+    const text = value > 0 ? value.toFixed(2) : '-';
+    if (el.textContent !== text) {
+        el.textContent = text;
+    }
 }
 
 function orderLine(data){
