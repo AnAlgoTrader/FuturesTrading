@@ -22,7 +22,8 @@ const handlers = {
     CANDLE_SET: candleSet,
     CANDLE_UPDATE: candleUpdate,
     MARKET_DATA: marketData,
-    ORDER_LINE: orderLine
+    ORDER_LINE: orderLine,
+    FOOTPRINT_UPDATE: footprintUpdate
 };
 
 function receiveFromBackground(message){
@@ -73,4 +74,10 @@ function setPrice(id, value){
 
 function orderLine(data){
     window.setOrderLine(data.Price, data.Color, data.Title, data.ChartPrice);
+}
+
+function footprintUpdate(data){
+    if (window.renderFootprint) {
+        window.renderFootprint(data);
+    }
 }

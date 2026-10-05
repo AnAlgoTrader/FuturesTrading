@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
@@ -15,7 +15,7 @@ namespace Trader
 {
     internal class Program
     {
-        private static FootPrintHelper _footPrintHelper;
+        private static FootPrintHelper _footPrintHelper = new();
         private const int HistoricalDataRequestId = 1105;
         private const int RealTimeBarRequestId = 1106;
         private const int MarketDataRequestId = 1108;
@@ -140,8 +140,7 @@ namespace Trader
         private static void SendFootPrintUpdate()
         {
             var columns = _footPrintHelper.GetSnapshot();
-            
-            //TODO send the columns to the UI and display them in the side panel
+            SendUpdate(UpdateMessageType.FOOTPRINT_UPDATE, columns);
         }
 
         private static void SendContractUpdate()
