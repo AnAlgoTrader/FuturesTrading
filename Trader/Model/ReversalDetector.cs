@@ -16,8 +16,9 @@ public class ReversalDetector
     public static bool UseDirectionalColors { get; set; } = true;
 
     private readonly double _minWickRatio;
-    private readonly double _minRange;
-    private readonly int _lookBack;
+    private readonly double _minAbsoluteRange;
+    private readonly int _swingLookback;
+    private readonly int _statsLookback;
     private readonly object _lock = new();
 
     private readonly List<CandleSnapshot> _history = new();
@@ -32,11 +33,16 @@ public class ReversalDetector
         double Delta
     );
 
-    public ReversalDetector(double minWickRatio = 0.35, double minRange = 0.50, int lookBack = 20)
+    public ReversalDetector(
+        double minWickRatio = 0.50,
+        double minAbsoluteRange = 1.00,
+        int swingLookback = 6,
+        int statsLookback = 20)
     {
         _minWickRatio = minWickRatio;
-        _minRange = minRange;
-        _lookBack = Math.Max(2, lookBack);
+        _minAbsoluteRange = minAbsoluteRange;
+        _swingLookback = Math.Max(2, swingLookback);
+        _statsLookback = Math.Max(5, statsLookback);
     }
 
     /// <summary>
@@ -53,9 +59,9 @@ public class ReversalDetector
             {
                 var upperWick = high - Math.Max(open, close);
                 var lowerWick = Math.Min(open, close) - low;
-                if (upperWick > lowerWick && close <= low + range * 0.5)
+                if (upperWick >= range * 0.50 && close <= low + range * 0.35)
                     deltaProxy = -Math.Max(1, volume * 0.5);
-                else if (lowerWick > upperWick && close >= low + range * 0.5)
+                else if (lowerWick >= range * 0.50 && close >= low + range * 0.65)
                     deltaProxy = Math.Max(1, volume * 0.5);
             }
 
@@ -87,7 +93,8 @@ public class ReversalDetector
             else
             {
                 _history.Add(new CandleSnapshot(timeSeconds, open, high, low, close, volume, delta));
-                while (_history.Count > _lookBack + 5)
+                int maxKeep = Math.Max(_statsLookback, _swingLookback) + 20;
+                while (_history.Count > maxKeep)
                     _history.RemoveAt(0);
             }
         }
@@ -95,17 +102,42 @@ public class ReversalDetector
 
     private string EvaluateInternal(long timeSeconds, double open, double high, double low, double close, double volume, double delta)
     {
-        if (_history.Count == 0) return DefaultColor;
+        int count = _history.Count;
+        if (count > 0 && _history[^1].TimeSeconds == timeSeconds)
+            count--;
 
-        var prev = _history[^1];
-        if (prev.TimeSeconds == timeSeconds)
-        {
-            if (_history.Count < 2) return DefaultColor;
-            prev = _history[^2];
-        }
+        if (count < _swingLookback) return DefaultColor;
 
         var range = high - low;
-        if (range < _minRange) return DefaultColor;
+        if (range < _minAbsoluteRange) return DefaultColor;
+
+        // Volatility & volume filters relative to recent bars
+        int statsStart = Math.Max(0, count - _statsLookback);
+        int statsCount = count - statsStart;
+        double sumRange = 0;
+        double sumVolume = 0;
+        for (int i = statsStart; i < count; i++)
+        {
+            var h = _history[i];
+            sumRange += (h.High - h.Low);
+            sumVolume += h.Volume;
+        }
+        var avgRange = sumRange / statsCount;
+        if (range < avgRange * 0.75) return DefaultColor;
+
+        var avgVolume = sumVolume / statsCount;
+        if (volume > 0 && avgVolume > 0 && volume < avgVolume * 0.70) return DefaultColor;
+
+        // Swing extremum check over last _swingLookback bars
+        int swingStart = Math.Max(0, count - _swingLookback);
+        double maxPriorHigh = double.MinValue;
+        double minPriorLow = double.MaxValue;
+        for (int i = swingStart; i < count; i++)
+        {
+            var h = _history[i];
+            if (h.High > maxPriorHigh) maxPriorHigh = h.High;
+            if (h.Low < minPriorLow) minPriorLow = h.Low;
+        }
 
         var upperWick = high - Math.Max(open, close);
         var lowerWick = Math.Min(open, close) - low;
@@ -114,13 +146,13 @@ public class ReversalDetector
         var lowerWickRatio = lowerWick / range;
 
         // Bearish Reversal:
-        // 1. Tested or exceeded previous high
-        // 2. Significant upper rejection wick (>= 35% of total bar range)
-        // 3. Closed in lower half of the candle
-        // 4. Delta Divergence: negative delta (sellers dominated/absorbed at the top)
-        bool isBearishReversal = (high >= prev.High - 0.25) &&
+        // 1. Tested or exceeded highest high of last N bars
+        // 2. Strong upper rejection wick (>= 50% of range)
+        // 3. Closed in lower 35% of the candle
+        // 4. Delta Divergence: negative delta (sellers absorbed/dominated the high)
+        bool isBearishReversal = (high >= maxPriorHigh - 0.25) &&
                                  (upperWickRatio >= _minWickRatio) &&
-                                 (close <= low + range * 0.50) &&
+                                 (close <= low + range * 0.35) &&
                                  (delta < 0);
 
         if (isBearishReversal)
@@ -129,13 +161,13 @@ public class ReversalDetector
         }
 
         // Bullish Reversal:
-        // 1. Tested or dropped below previous low
-        // 2. Significant lower rejection wick (>= 35% of total bar range)
-        // 3. Closed in upper half of the candle
-        // 4. Delta Divergence: positive delta (buyers dominated/absorbed at the bottom)
-        bool isBullishReversal = (low <= prev.Low + 0.25) &&
+        // 1. Tested or broken lowest low of last N bars
+        // 2. Strong lower rejection wick (>= 50% of range)
+        // 3. Closed in upper 35% of the candle
+        // 4. Delta Divergence: positive delta (buyers absorbed/dominated the low)
+        bool isBullishReversal = (low <= minPriorLow + 0.25) &&
                                  (lowerWickRatio >= _minWickRatio) &&
-                                 (close >= low + range * 0.50) &&
+                                 (close >= low + range * 0.65) &&
                                  (delta > 0);
 
         if (isBullishReversal)
