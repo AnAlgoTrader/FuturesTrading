@@ -15,7 +15,7 @@ public class CandleAggregator
     private DateTime _candleTime;
     private bool _hasCandle;
 
-    public event Action<DateTime, double, double, double, double, double>? OnCandleUpdate;
+    public event Action<DateTime, double, double, double, double, double> OnCandleUpdate;
 
     public CandleAggregator(VwapCalculator vwapCalculator)
     {

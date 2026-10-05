@@ -22,17 +22,17 @@ namespace Trader
         private const int FootPrintPriceRequestId = 1109;
         private const int FootPrintTradesRequestId = 1110;
         private const decimal OrderQuantity = 2;
-        private static Timer? _footPrintTimer;
+        private static Timer _footPrintTimer;
         private static int _footPrintUpdating;
 
-        private static PhotinoWindow? _window;
+        private static PhotinoWindow _window;
         private static readonly IbClient _client = new();
-        private static Logger? _logger;
-        private static VwapCalculator? _vwapCalculator;
-        private static CandleAggregator? _candleAggregator;
-        private static OrderHelper? _orderHelper;
-        private static ContractDetails? _dataContract;
-        private static ContractDetails? _tradeContract;
+        private static Logger _logger;
+        private static VwapCalculator _vwapCalculator;
+        private static CandleAggregator _candleAggregator;
+        private static OrderHelper _orderHelper;
+        private static ContractDetails _dataContract;
+        private static ContractDetails _tradeContract;
         private static double _bid;
         private static double _ask;
         private static double _currentPrice;
@@ -68,7 +68,7 @@ namespace Trader
             _window.WaitForClose();
         }
 
-        private static void ReceiveMessage(object? sender, string message)
+        private static void ReceiveMessage(object sender, string message)
         {
             if (message == "applicationReady")
                 _ = InitAndSubscribe();

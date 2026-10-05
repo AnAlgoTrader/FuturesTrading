@@ -6,7 +6,7 @@ namespace Trader.Model;
 public class Logger : IDisposable
 {
     public const string DATA_DIR = "/home/oce/LocalDB/logs/trader";
-    private readonly StreamWriter? _writer;
+    private readonly StreamWriter _writer;
 
     public Logger()
     {

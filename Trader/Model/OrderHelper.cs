@@ -16,11 +16,11 @@ public class OrderHelper
     private PositionSummary _position = new();
     private readonly string _ordersPath;
     private readonly string _positionPath;
-    private readonly Logger? _logger;
+    private readonly Logger _logger;
     private readonly SemaphoreSlim _lock = new(1, 1);
     public double CurrentChartPrice { get; set; }
-    public event Action<IReadOnlyList<OrderPersistence>>? OnOrdersChanged;
-    public event Action<PositionSummary>? OnPositionChanged;
+    public event Action<IReadOnlyList<OrderPersistence>> OnOrdersChanged;
+    public event Action<PositionSummary> OnPositionChanged;
     public IReadOnlyList<OrderPersistence> ActiveOrders
     {
         get
@@ -48,7 +48,7 @@ public class OrderHelper
             }
         }
     }
-    public OrderHelper(Logger? logger = null)
+    public OrderHelper(Logger logger = null)
     {
         _logger = logger;
         _ordersPath = Path.Combine(Logger.DATA_DIR, "orders.json");
