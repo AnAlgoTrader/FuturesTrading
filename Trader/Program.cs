@@ -100,6 +100,7 @@ namespace Trader
                         Ask = _ask
                     });
                 }
+
                 UpdateOrderLine();
             };
 
@@ -111,8 +112,7 @@ namespace Trader
             _client.SubscribeToMarketData(MarketDataRequestId, _dataContract);
         }
 
-        private static void SendCandleUpdate(DateTime candleTime, double open, double high, double low, double close,
-            double vwap)
+        private static void SendCandleUpdate(DateTime candleTime, double open, double high, double low, double close, double vwap)
         {
             SendUpdate(UpdateMessageType.CANDLE_UPDATE, new CandleUpdate
             {
@@ -148,7 +148,7 @@ namespace Trader
                 if (item.Volume == 0 || item is { Open: 0, High: 0, Low: 0, Close: 0 }) continue;
                 var time = long.Parse(item.Time);
                 var vwap = _vwapCalculator!.AddBar(time, (double)item.WAP, (double)item.Volume);
-candles[time] = new CandleUpdate
+                candles[time] = new CandleUpdate
                 {
                     Time = time,
                     Open = item.Open,
