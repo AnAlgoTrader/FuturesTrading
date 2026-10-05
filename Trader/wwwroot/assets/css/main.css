@@ -91,13 +91,25 @@ body {
 
 .layout-main {
     height: 95vh;
+    display: flex;
+    flex-direction: row;
     background: #1f2937;
+    overflow: hidden;
 }
 
 #chart {
-    width: 100%;
+    flex: 1;
     height: 100%;
     position: relative;
+    min-width: 0;
+}
+
+#side-panel {
+    flex: 1;
+    height: 100%;
+    min-width: 0;
+    background: #2a3d4f;
+    border-left: 1px solid #1a2430;
 }
 
 #close-btn {
