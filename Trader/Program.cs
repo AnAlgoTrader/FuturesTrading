@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
+using Ib.Csharp.Api.Client.Implementation.Helper;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 using Photino.NET;
@@ -14,9 +15,12 @@ namespace Trader
 {
     internal class Program
     {
+        private static FootPrintHelper _footPrintHelper;
         private const int HistoricalDataRequestId = 1105;
         private const int RealTimeBarRequestId = 1106;
         private const int MarketDataRequestId = 1108;
+        private const int FootPrintPriceRequestId = 1109;
+        private const int FootPrintTradesRequestId = 1110;
         private const decimal OrderQuantity = 2;
 
         private static PhotinoWindow? _window;
@@ -38,6 +42,7 @@ namespace Trader
         [STAThread]
         private static void Main()
         {
+            _footPrintHelper = new FootPrintHelper();
             _logger = new Logger();
             _vwapCalculator = new VwapCalculator();
             _candleAggregator = new CandleAggregator(_vwapCalculator);
@@ -83,6 +88,8 @@ namespace Trader
             _client.OnAccountListUpdate += _client.SubscribeToPortfolioUpdates;
             _client.OnRealTimeBarUpdate += _candleAggregator!.AddBar;
             _client.OnOrderStatusUpdate += status => _ = _orderHelper.UpdateOrderStatus(status);
+            _client.OnMarketDataPriceTickByTickUpdate += _footPrintHelper.UpdatePrice;
+            _client.OnMarketDataTradeTickByTickUpdate += _footPrintHelper.UpdateTrade;
             _client.OnMarketDataPriceUpdate += updates =>
             {
                 foreach (var (key, marketPrice) in updates)
@@ -110,6 +117,8 @@ namespace Trader
             await DisplayHistoricalData();
             _client.SubscribeToRealTimeBars(RealTimeBarRequestId, _dataContract.Contract);
             _client.SubscribeToMarketData(MarketDataRequestId, _dataContract);
+            _client.SubscribeToPriceTickByTick(FootPrintPriceRequestId, _dataContract.Contract);
+            _client.SubscribeToTradesTickByTick(FootPrintTradesRequestId, _dataContract.Contract);
         }
 
         private static void SendCandleUpdate(DateTime candleTime, double open, double high, double low, double close, double vwap)
@@ -123,6 +132,16 @@ namespace Trader
                 Close = close,
                 Vwap = vwap
             });
+
+            //using this method to trigger the footprint because IBKR calls it every 5 seconds. Acts like a timer.
+            SendFootPrintUpdate();
+        }
+
+        private static void SendFootPrintUpdate()
+        {
+            var columns = _footPrintHelper.GetSnapshot();
+            
+            //TODO send the columns to the UI and display them in the side panel
         }
 
         private static void SendContractUpdate()
