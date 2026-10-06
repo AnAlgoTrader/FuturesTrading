@@ -7,4 +7,9 @@ public static class TradingConfig
     public const string SecurityType = "FUT";
     public const string Currency = "USD";
     public const string Exchange = "CME";
+
+    /// <summary>
+    /// Number of trade ticks aggregated into one candle / footprint column.
+    /// </summary>
+    public const int TicksPerBucket = 1000;
 }

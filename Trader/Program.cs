@@ -15,7 +15,7 @@ namespace Trader
 {
     internal class Program
     {
-        private static FootPrintHelper _footPrintHelper = new();
+        private static FootPrintHelper _footPrintHelper = new(TradingConfig.TicksPerBucket);
         private const int HistoricalDataRequestId = 1105;
         private const int MarketDataRequestId = 1108;
         private const int FootPrintPriceRequestId = 1109;
@@ -44,7 +44,7 @@ namespace Trader
         [STAThread]
         private static void Main()
         {
-            _footPrintHelper = new FootPrintHelper();
+            _footPrintHelper = new FootPrintHelper(TradingConfig.TicksPerBucket);
             _logger = new Logger();
             _vwapCalculator = new VwapCalculator();
             _reversalDetector = new ReversalDetector();
@@ -137,11 +137,11 @@ namespace Trader
             _footPrintTimer = new Timer(_ => SendFootPrintUpdate(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         }
 
-        private static void SendCandleUpdate(DateTime candleTime, double open, double high, double low, double close, double vwap, string color)
+        private static void SendCandleUpdate(long candleTime, double open, double high, double low, double close, double vwap, string color)
         {
             SendUpdate(UpdateMessageType.CANDLE_UPDATE, new CandleUpdate
             {
-                Time = new DateTimeOffset(candleTime).ToUnixTimeSeconds(),
+                Time = candleTime,
                 Open = open,
                 High = high,
                 Low = low,
@@ -183,10 +183,12 @@ namespace Trader
                 $"5 {nameof(Duration.D)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000, false);
 
             var candles = new SortedDictionary<long, CandleUpdate>();
+            var lastCandleTime = 0L;
             foreach (var item in historicalData)
             {
                 if (item.Volume == 0 || item is { Open: 0, High: 0, Low: 0, Close: 0 }) continue;
                 var time = long.Parse(item.Time);
+                if (time > lastCandleTime) lastCandleTime = time;
                 var vwap = _vwapCalculator!.AddBar(time, (double)item.WAP, (double)item.Volume);
                 var color = _reversalDetector!.ProcessHistoricalCandle(time, item.Open, item.High, item.Low, item.Close, (double)item.Volume);
                 candles[time] = new CandleUpdate
@@ -202,6 +204,7 @@ namespace Trader
             }
 
             _logger!.WriteLine($"[CHART] Setting {candles.Count} historical candles.");
+            _candleAggregator.SeedLastCandleTime(lastCandleTime);
             SendUpdate(UpdateMessageType.CANDLE_SET, new CandleSet { Candles = new List<CandleUpdate>(candles.Values) });
         }
 
