@@ -57,14 +57,17 @@ public static class IndicatorConfig
     public const double MomentumSqueezeAtrFactor = 1.5;
     public const double MomentumExpansionAtrRatio = 2.0;
 
-    // Outcome dashboard — forward-looking signal quality (backtest-only, never fed back into detection)
-    public const int OutcomeForwardBars = 10;
-    public const double OutcomeMinWinAtr = 0.25;
-    public const double OutcomeHitAtr = 1.0;
-
     // Confluence scoring (M7) — low-scoring events stay gray
     public const int ConfluenceGate = 2;
     public const int ConfluenceEmaPeriod = 50;
     public const double ConfluenceBodyAtr = 0.35;
+    public const double ConfluenceDisplaceAtr = 0.7;
     public const double ConfluenceVolumeFactor = 1.5;
+    public const double ConfluenceLevelToleranceAtr = 0.35;
+    public const int ConfluenceSwingWindowBars = 200;
+
+    // Outcome dashboard — forward-looking signal quality (backtest-only, never fed back into detection)
+    public const int OutcomeForwardBars = 10;
+    public const double OutcomeMinWinAtr = 0.25;
+    public const double OutcomeHitAtr = 1.0;
 }

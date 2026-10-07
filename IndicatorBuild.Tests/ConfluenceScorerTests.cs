@@ -23,10 +23,14 @@ public class ConfluenceScorerTests
     private static ConceptEvent Evt(Concept type, string dir) =>
         new() { Time = 0L, Type = type, Direction = dir };
 
+    private static List<Zone> EmptyZones() => new();
+
+    private static List<SwingPoint> EmptySwings() => new();
+
     [Fact]
-    public void BullishEvent_FullyAligned_ScoresFour_Qualified()
+    public void BullishEvent_FullyAligned_ScoresThree_Qualified()
     {
-        // rising prices -> EMA below close, RSI > 50; big bullish body + volume spike
+        // rising prices -> EMA below close; big bullish bar + volume spike; no levels supplied
         var candles = new List<Candle>();
         for (var i = 0; i < 70; i++)
             candles.Add(i < 60 ? CandleAt(i, 90 + i) : new Candle(i * 10L, 140, 146, 140, 146, 300));
@@ -34,11 +38,29 @@ public class ConfluenceScorerTests
         var analyses = candles.Select(c => new CandleAnalysis(c)).ToList();
         analyses[69].Events.Add(Evt(Concept.Breakout, "Bullish"));
 
-        ConfluenceScorer.Score(candles, analyses, gate: 2);
+        ConfluenceScorer.Score(candles, analyses, EmptyZones(), EmptySwings(), gate: 2);
 
         var evt = analyses[69].Events.Single();
-        Assert.Equal(4, evt.Score);
+        Assert.Equal(3, evt.Score);
         Assert.True(evt.Qualified);
+    }
+
+    [Fact]
+    public void LevelFactor_GrantsPointWhenCloseNearSwing()
+    {
+        var candles = new List<Candle>();
+        for (var i = 0; i < 70; i++)
+            candles.Add(CandleAt(i, 90 + i));
+        candles[69] = new Candle(690L, 155, 162, 155, 159, 300);
+        var analysis = Analysis(candles.Last(), Evt(Concept.Expansion, "Bullish"));
+        var analyses = candles.Select((c, i) => i == 69 ? analysis : new CandleAnalysis(c)).ToList();
+        var swings = new List<SwingPoint> { new(690L, 159, true, 69) };
+
+        ConfluenceScorer.Score(candles, analyses, EmptyZones(), swings, gate: 2);
+
+        // close 159 exactly on the swing level -> level factor must contribute
+        Assert.Equal(4, analysis.Events.Single().Score);
+        Assert.True(analysis.Events.Single().Qualified);
     }
 
     [Fact]
@@ -51,7 +73,7 @@ public class ConfluenceScorerTests
         var analysis = Analysis(candles.Last(), Evt(Concept.ChoCh, "Bearish"));
         var analyses = candles.Select((c, i) => i == 69 ? analysis : new CandleAnalysis(c)).ToList();
 
-        ConfluenceScorer.Score(candles, analyses, gate: 2);
+        ConfluenceScorer.Score(candles, analyses, EmptyZones(), EmptySwings(), gate: 2);
 
         Assert.Equal(0, analysis.Events.Single().Score);
         Assert.False(analysis.Events.Single().Qualified);
@@ -67,7 +89,7 @@ public class ConfluenceScorerTests
         var analysis = Analysis(candles[59], Evt(Concept.BOS, "Bullish"));
         var analyses = candles.Select((c, i) => i == 59 ? analysis : new CandleAnalysis(c)).ToList();
 
-        ConfluenceScorer.Score(candles, analyses, gate: 99);
+        ConfluenceScorer.Score(candles, analyses, EmptyZones(), EmptySwings(), gate: 99);
 
         var evt = analysis.Events.Single();
         Assert.True(evt.Qualified);
