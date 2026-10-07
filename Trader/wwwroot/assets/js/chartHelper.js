@@ -107,13 +107,6 @@
         { key: 'ibl', get: l => l.InitialBalanceLow, broken: l => l.InitialBalanceLowBroken, color: '#ab47bc', title: 'IBL', style: dashed }
     ];
 
-    const bandDefs = [
-        { key: 'u2', get: d => d.UpperBand2, color: '#ef5350', title: '+2σ', style: dotted },
-        { key: 'u1', get: d => d.UpperBand1, color: '#ef5350', title: '+1σ', style: dotted },
-        { key: 'l1', get: d => d.LowerBand1, color: '#26a69a', title: '-1σ', style: dotted },
-        { key: 'l2', get: d => d.LowerBand2, color: '#26a69a', title: '-2σ', style: dotted }
-    ];
-
     window.setOverlay = function (data) {
         if (!data || !data.Levels) return;
         const levels = data.Levels;
@@ -127,33 +120,6 @@
                 axisLabelVisible: true,
                 title: def.title
             });
-        });
-
-        bandDefs.forEach(function (def) {
-            upsertOverlayLine(def.key, def.get(data), {
-                color: def.color,
-                lineWidth: 1,
-                lineStyle: def.style,
-                axisLabelVisible: false,
-                title: def.title
-            });
-        });
-
-        const desiredSwings = {};
-        (data.ActiveSwings || []).forEach(function (swing) {
-            const key = 'sw_' + swing.Time + '_' + (swing.IsHigh ? 'h' : 'l');
-            desiredSwings[key] = true;
-            upsertOverlayLine(key, swing.Price, {
-                color: '#7e91a8',
-                lineWidth: 1,
-                lineStyle: dotted,
-                axisLabelVisible: false,
-                title: swing.IsHigh ? 'SH' : 'SL'
-            });
-        });
-
-        Object.keys(overlayLines).forEach(function (key) {
-            if (key.indexOf('sw_') === 0 && !desiredSwings[key]) removeOverlayLine(key);
         });
     };
 
