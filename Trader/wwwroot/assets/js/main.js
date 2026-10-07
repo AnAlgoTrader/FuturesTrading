@@ -57,10 +57,14 @@ function setStat(id, value){
 
 function candleSet(data){
     window.setData(data.Candles);
+    const candles = data.Candles;
+    if (candles && candles.length > 0 && window.setOverlay) {
+        window.setOverlay(candles[candles.length - 1]);
+    }
 }
 
 function candleUpdate(data){
-    window.updateData(data.Time, data.Open, data.High, data.Low, data.Close, data.Vwap, data.Color);
+    window.updateData(data);
 }
 
 function marketData(data){

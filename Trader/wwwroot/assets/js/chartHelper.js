@@ -53,16 +53,108 @@
         chart.timeScale().scrollToRealTime();
     };
 
-    window.updateData = function (time, open, high, low, close, vwap, color){
+    window.updateData = function (data){
         candlesSeries.update({
-            time: time,
-            open: open,
-            high: high,
-            low: low,
-            close: close,
-            color: color || undefined
+            time: data.Time,
+            open: data.Open,
+            high: data.High,
+            low: data.Low,
+            close: data.Close,
+            color: data.Color || undefined
         });
-        vwapSeries.update({ time: time, value: vwap });
+        vwapSeries.update({ time: data.Time, value: data.Vwap });
+        window.setOverlay(data);
+    };
+
+    const overlayLines = {};
+
+    function upsertOverlayLine(key, price, options) {
+        if (price === null || price === undefined || !(price > 0)) {
+            removeOverlayLine(key);
+            return;
+        }
+        const existing = overlayLines[key];
+        if (existing) {
+            if (existing.price !== price) {
+                existing.line.applyOptions({ price: price });
+                existing.price = price;
+            }
+            return;
+        }
+        overlayLines[key] = {
+            line: candlesSeries.createPriceLine(Object.assign({ price: price }, options)),
+            price: price
+        };
+    }
+
+    function removeOverlayLine(key) {
+        const existing = overlayLines[key];
+        if (!existing) return;
+        try { candlesSeries.removePriceLine(existing.line); } catch (e) {}
+        delete overlayLines[key];
+    }
+
+    const dashed = LightweightCharts.LineStyle.Dashed;
+    const dotted = LightweightCharts.LineStyle.Dotted;
+
+    const levelDefs = [
+        { key: 'pdh', get: l => l.PreviousDayHigh, broken: l => l.PreviousDayHighBroken, color: '#d1d4dc', title: 'PDH', style: dashed },
+        { key: 'pdl', get: l => l.PreviousDayLow, broken: l => l.PreviousDayLowBroken, color: '#d1d4dc', title: 'PDL', style: dashed },
+        { key: 'pdc', get: l => l.PreviousDayClose, broken: () => false, color: '#787b86', title: 'PDC', style: dotted },
+        { key: 'onh', get: l => l.OvernightHigh, broken: l => l.OvernightHighBroken, color: '#2962ff', title: 'ONH', style: dashed },
+        { key: 'onl', get: l => l.OvernightLow, broken: l => l.OvernightLowBroken, color: '#2962ff', title: 'ONL', style: dashed },
+        { key: 'ibh', get: l => l.InitialBalanceHigh, broken: l => l.InitialBalanceHighBroken, color: '#ab47bc', title: 'IBH', style: dashed },
+        { key: 'ibl', get: l => l.InitialBalanceLow, broken: l => l.InitialBalanceLowBroken, color: '#ab47bc', title: 'IBL', style: dashed }
+    ];
+
+    const bandDefs = [
+        { key: 'u2', get: d => d.UpperBand2, color: '#ef5350', title: '+2σ', style: dotted },
+        { key: 'u1', get: d => d.UpperBand1, color: '#ef5350', title: '+1σ', style: dotted },
+        { key: 'l1', get: d => d.LowerBand1, color: '#26a69a', title: '-1σ', style: dotted },
+        { key: 'l2', get: d => d.LowerBand2, color: '#26a69a', title: '-2σ', style: dotted }
+    ];
+
+    window.setOverlay = function (data) {
+        if (!data || !data.Levels) return;
+        const levels = data.Levels;
+
+        levelDefs.forEach(function (def) {
+            const price = def.broken(levels) ? null : def.get(levels);
+            upsertOverlayLine(def.key, price, {
+                color: def.color,
+                lineWidth: 1,
+                lineStyle: def.style,
+                axisLabelVisible: true,
+                title: def.title
+            });
+        });
+
+        bandDefs.forEach(function (def) {
+            upsertOverlayLine(def.key, def.get(data), {
+                color: def.color,
+                lineWidth: 1,
+                lineStyle: def.style,
+                axisLabelVisible: false,
+                title: def.title
+            });
+        });
+
+        const desiredSwings = {};
+        (data.ActiveSwings || []).forEach(function (swing) {
+            const key = 'sw_' + swing.Time + '_' + (swing.IsHigh ? 'h' : 'l');
+            desiredSwings[key] = true;
+            upsertOverlayLine(key, swing.Price, {
+                color: '#7e91a8',
+                lineWidth: 1,
+                lineStyle: dotted,
+                axisLabelVisible: false,
+                title: swing.IsHigh ? 'SH' : 'SL'
+            });
+        });
+
+        Object.keys(overlayLines).forEach(function (key) {
+            if (key.indexOf('sw_') === 0 && !desiredSwings[key]) removeOverlayLine(key);
+        });
     };
 
     function updateCloseButtonPosition() {

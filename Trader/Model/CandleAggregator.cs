@@ -22,7 +22,7 @@ public class CandleAggregator
     private double _sellVolume;
     private bool _hasCandle;
 
-    public event Action<long, double, double, double, double, double, string> OnCandleUpdate;
+    public event Action<CandleUpdate> OnCandleUpdate;
 
     public CandleAggregator(IndicatorEngine indicator, int ticksPerBucket = TradingConfig.TicksPerBucket)
     {
@@ -57,6 +57,7 @@ public class CandleAggregator
         long bucketUnix;
         double open, high, low, close, vwap;
         string color;
+        IndicatorResult overlay;
 
         lock (_lock)
         {
@@ -90,9 +91,21 @@ public class CandleAggregator
             var result = _indicator.EvaluateForming(new Candle(bucketUnix, open, high, low, close, _volume));
             vwap = result.Vwap;
             color = result.Color;
+            overlay = result;
         }
 
-        OnCandleUpdate?.Invoke(bucketUnix, open, high, low, close, vwap, color);
+        var update = new CandleUpdate
+        {
+            Time = bucketUnix,
+            Open = open,
+            High = high,
+            Low = low,
+            Close = close,
+            Vwap = vwap,
+            Color = color
+        };
+        update.ApplyOverlay(overlay);
+        OnCandleUpdate?.Invoke(update);
     }
 
     public void AddPriceTick(double price, DateTime? time = null)
@@ -102,6 +115,7 @@ public class CandleAggregator
         long bucketUnix;
         double open, high, low, close, vwap;
         string color;
+        IndicatorResult overlay;
 
         lock (_lock)
         {
@@ -125,9 +139,21 @@ public class CandleAggregator
             var result = _indicator.EvaluateForming(new Candle(bucketUnix, open, high, low, close, _volume));
             vwap = result.Vwap;
             color = result.Color;
+            overlay = result;
         }
 
-        OnCandleUpdate?.Invoke(bucketUnix, open, high, low, close, vwap, color);
+        var update = new CandleUpdate
+        {
+            Time = bucketUnix,
+            Open = open,
+            High = high,
+            Low = low,
+            Close = close,
+            Vwap = vwap,
+            Color = color
+        };
+        update.ApplyOverlay(overlay);
+        OnCandleUpdate?.Invoke(update);
     }
 
     private void StartBucket(DateTime bucketTime, double price)

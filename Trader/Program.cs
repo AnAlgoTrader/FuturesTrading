@@ -134,18 +134,9 @@ namespace Trader
             _footPrintTimer = new Timer(_ => SendFootPrintUpdate(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         }
 
-        private static void SendCandleUpdate(long candleTime, double open, double high, double low, double close, double vwap, string color)
+        private static void SendCandleUpdate(CandleUpdate update)
         {
-            SendUpdate(UpdateMessageType.CANDLE_UPDATE, new CandleUpdate
-            {
-                Time = candleTime,
-                Open = open,
-                High = high,
-                Low = low,
-                Close = close,
-                Vwap = vwap,
-                Color = color
-            });
+            SendUpdate(UpdateMessageType.CANDLE_UPDATE, update);
         }
 
         private static void SendFootPrintUpdate()
@@ -181,6 +172,7 @@ namespace Trader
 
             var candles = new SortedDictionary<long, CandleUpdate>();
             var lastCandleTime = 0L;
+            IndicatorResult lastResult = null;
             foreach (var item in historicalData)
             {
                 if (item.Volume <= 0 || item.Open <= 0 || item.High <= 0 || item.Low <= 0 || item.Close <= 0
@@ -190,7 +182,7 @@ namespace Trader
                 if (time > lastCandleTime) lastCandleTime = time;
                 var result = Indicator.ProcessCandle(new Candle(time, item.Open, item.High, item.Low, item.Close,
                     (double)item.Volume));
-                candles[time] = new CandleUpdate
+                var candle = new CandleUpdate
                 {
                     Time = time,
                     Open = item.Open,
@@ -200,7 +192,12 @@ namespace Trader
                     Vwap = result.Vwap,
                     Color = result.Color
                 };
+                candles[time] = candle;
+                lastResult = result;
             }
+
+            if (lastResult != null)
+                candles[lastCandleTime].ApplyOverlay(lastResult);
 
             _logger!.WriteLine($"[CHART] Setting {candles.Count} historical candles.");
             _candleAggregator.SeedLastCandleTime(lastCandleTime);
