@@ -26,8 +26,26 @@ public static class ColorResolver
 
         foreach (var evt in analysis.Events)
         {
+            if (evt.Type is Concept.Exhaustion or Concept.Divergence)
+                return "#FFB74D";
+        }
+
+        foreach (var evt in analysis.Events)
+        {
             if (evt.Type is Concept.SignOfStrength or Concept.SignOfWeakness
                 or Concept.AccumulationBreakout or Concept.DistributionBreakout)
+                return evt.Direction == "Bearish" ? IndicatorConfig.BearColor : IndicatorConfig.BullColor;
+        }
+
+        foreach (var evt in analysis.Events)
+        {
+            if (evt.Type == Concept.Compression)
+                return "#7E57C2";
+        }
+
+        foreach (var evt in analysis.Events)
+        {
+            if (evt.Type == Concept.Expansion)
                 return evt.Direction == "Bearish" ? IndicatorConfig.BearColor : IndicatorConfig.BullColor;
         }
 

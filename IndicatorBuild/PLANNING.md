@@ -191,8 +191,12 @@ Add `IndicatorConfig.cs`. Initial defaults (tunable from scan results — see Mi
 | Wyckoff | SOS/SOW displacement | ≥ ATR × 1.0 |
 | Momentum | ATR period | 14 |
 | Momentum | RSI period / oversold / overbought | 14 / 35 / 65 |
+| Momentum | exhaustion wick/body | ≥ 2.5 (tuned) |
+| Momentum | exhaustion volume factor | ≥ 1.8× avg (tuned) |
+| Momentum | divergence min price swing | 0.3% (tuned) |
+| Momentum | divergence min RSI move | 3 pts |
 | Momentum | squeeze (BB,KC) | 20/2, 20/1.5 |
-| Momentum | expansion ATR ratio | ≥ 1.3 |
+| Momentum | expansion (release + ATR ratio) | release on squeeze-out; ATR-ratio ≥ 2.0 (tuned; 1.3 flooded +247 events) |
 | Divergence | min price swing % | 0.3 |
 | Volume | avg period | 50 |
 
@@ -247,7 +251,7 @@ Coloring is sparse and disciplined:
 | **M2 — Done** | `MarketStructure` (HH/HL/LH/LL, BOS, CHoCH), `LiquiditySweepDetector`, `FvgDetector` (3-candle + ATR width filter + mitigation), markers + FVG zone overlay | 22 tests pass (9 M1 + 13 M2); chart shows green/red CHoCH+sweep candles, BOS/CHoCH/Sweep/FVG markers, FVG zone boxes; no repaint (close-only). **Tuned** CSV pass: 342 BOS / 332 CHoCH / 154 sweeps (64% confirm) / 453 FVG zones |
 | **M3 — Done** | `ConsolidationEngine`, `PullbackDetector` (impulse leg + Fib-band retrace, close-reclaim resumption), breakout markers + pullback markers + consolidation purple zone boxes | 30 tests pass (9 M1 + 13 M2 + 8 M3); chart shows green/red "BO" breakout candles & arrow markers + purple "PB" pullback circles + purple consolidation zone boxes. **Tuned**: `conBars=8, conAtr=1.5, hold=3` → 130 consolidation ranges (held 55%); `pb[0.236–0.786]`, close-reclaim resumption → 45 pullbacks from 390 retrace measurements |
 | **M4 — Done** | `WyckoffEngine` with prior-trend context and event recipes | 6 Wyckoff tests (recipe order, Spring, mirror distribution, UTAD, non-qualifying discard, flat/untyped). **Tuned** `wycSwings=5, wycBars=40, wycMaxAtr=4.0, wycPrior=0.5` → 24 ranges (8 accum / 16 dist), all finishing via orderly Phase E; events released only after the range completes end-to-end (labels place at their original swing times, no spurious markers) |
-| **M5 — Momentum** | `MomentumEngine` (exhaustion, divergence, compression, expansion) | momentum events coloring with min-swing filters |
+| **M5 — Done** | `MomentumEngine` (exhaustion, divergence, compression, expansion) | 8 momentum tests; exhaustion (wick/body + volume + RSI extreme), RSI/price divergence (regular + hidden), TTM squeeze compression + release expansion + ATR-ratio crossing. **Tuned** `momWi=2.5, momVol=1.8, momExp=2.0` → exhaust=130, divergence=22 (3 regular / 19 hidden), squeezes=283, expansions=339 (283 release / 56 vol) |
 | **M6 — Backtest-driven tuning** | A stats dashboard (counts per concept, win context heuristics) | sweep the defaults in Section 6 against the CSV; tune thresholds; update config |
 | **M7 — Confluence scoring** | `SignalScorer` wrapping engines; low-scoring events stay gray | measurable precision improvement on historical pass |
 | **M8 — Live streaming** | EVENT-based param (`prevents lookahead`), per-bar feed identical to historical loop | same code path can consume a tick feed; drop-in reuse in Trader if wanted |
@@ -288,4 +292,10 @@ Coloring is sparse and disciplined:
   - Two consecutive decisive poke-outs (≥2 overflows) **discard** the band (range violated before an orderly Phase E) instead of closing a zone; only orderly Phase-E ends render boxes. Raising `--wycmaxatr` 4→5 lifted 24→39 ranges (rejected — kept 4.0 for precision).
   - CSV result: **24 ranges (accum=8 dist=16), 100% Phase-E completion**; recipe events released: AR=24 ST=16 SOS=4 SOW=14 LPS=3 LPSY=1 Spring=2 UTAD=6 SC=1 BC=8 (SC counts low because the terminal downtrend low can precede classification — the band then seeds with AR-first).
   - Next: SOS/SOW displacement default (ATR×1.0) is generous — revisit during M7 confluence rather than tightening on a 24-range sample.
+- [x] **M5 tuning log (done):** added `MomentumEngine`, `MomentumEngineTests` (8 tests), metrics + CLI `--momwi --momvol --momdiv --momexp`.
+  - Exhaustion = rejection wick ≥ 2.5× body + volume ≥ 1.8× avg + RSI < 35 / > 65 → **130** events (71 bull / 59 bear; 0.63% of bars). Wick ratio 2.0→153, 3.0→106 — kept 2.5.
+  - Divergence = swing-paired price vs RSI (regular = LL+RSI-HL, HH+RSI-LH; hidden = HL+RSI-LL, LH+RSI-HH; min 0.3% price move + 3 RSI pts) → **22** (3 regular / 19 hidden). Regular divergences are genuinely rare on 5m — kept honest.
+  - TTM squeeze (BB-20/2 inside KC-20/1.5) emits `Compression` only on on-transition (detail=tier) → **283**. Release fires one `Expansion` per squeeze-out (direction = close vs mid) → 283; ATR-ratio crossings (`atr > X × atr-50-sma`) at 1.3 added **+247** noisy events, **2.0** keeps ~56. Defaults set accordingly.
+  - Markers/colors: Exh = orange circle, Div/DivH = orange diamond, Sq = purple diamond, Exp = directional green/red arrow + candle color; exhaustion/divergence color orange candles ahead of Wyckoff per Section 8 priority. No zones (bar-level only).
+  - Total chart markers now ≈1 028 — under the 3 000 cap.
 - [ ] Priority ordering for multi-concept candles (Section 8) — pending backtest evidence.

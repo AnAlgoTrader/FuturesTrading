@@ -52,6 +52,17 @@ public sealed class M2Metrics
     public int WyAccumBreakout { get; set; }
     public int WyDistBreakout { get; set; }
 
+    public int MomExhBull { get; set; }
+    public int MomExhBear { get; set; }
+    public int MomExhTotal => MomExhBull + MomExhBear;
+    public int MomDivRegular { get; set; }
+    public int MomDivHidden { get; set; }
+    public int MomDivTotal => MomDivRegular + MomDivHidden;
+    public int MomSqueeze { get; set; }
+    public int MomExpansion { get; set; }
+    public int MomExpRelease { get; set; }
+    public int MomExpVolatility { get; set; }
+
     public override string ToString()
     {
         var sb = new StringBuilder();
@@ -74,6 +85,9 @@ public sealed class M2Metrics
         sb.AppendLine($"  Wyckoff: accum={AccumRanges} dist={DistRanges} ranges  completion={WyPhaseE} ({wyRate:0.0}%)"
             + $"\n      SC={WySc} BC={WyBc}  AR={WyAr}  ST={WySt}  Spring={WySpring} UTAD={WyUtad}  "
             + $"SOS={WySos} SOW={WySow}  LPS={WyLps} LPSY={WyLpsy}  PhaseE(acc)={WyAccumBreakout} PhaseE(dist)={WyDistBreakout}");
+        sb.AppendLine($"  Momentum: exhaust={MomExhTotal} (bull={MomExhBull} bear={MomExhBear})  "
+            + $"divergence={MomDivTotal} (regular={MomDivRegular} hidden={MomDivHidden})  "
+            + $"squeezes={MomSqueeze} expansions={MomExpansion} (release={MomExpRelease} vol={MomExpVolatility})");
         return sb.ToString();
     }
 }
@@ -185,6 +199,29 @@ public static class BacktestStats
                 case Concept.LastPointOfSupply: m.WyLpsy++; break;
                 case Concept.AccumulationBreakout: m.WyAccumBreakout++; break;
                 case Concept.DistributionBreakout: m.WyDistBreakout++; break;
+            }
+        }
+
+        foreach (var e in events)
+        {
+            switch (e.Type)
+            {
+                case Concept.Exhaustion:
+                    if (e.Direction == "Bullish") m.MomExhBull++;
+                    else m.MomExhBear++;
+                    break;
+                case Concept.Divergence:
+                    if (e.Detail == "Hidden") m.MomDivHidden++;
+                    else m.MomDivRegular++;
+                    break;
+                case Concept.Compression:
+                    m.MomSqueeze++;
+                    break;
+                case Concept.Expansion:
+                    m.MomExpansion++;
+                    if (e.Detail == "release") m.MomExpRelease++;
+                    else m.MomExpVolatility++;
+                    break;
             }
         }
 

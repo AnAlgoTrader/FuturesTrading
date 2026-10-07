@@ -30,6 +30,10 @@ var wycSwings = IndicatorConfig.WyckoffRangeMinSwings;
 var wycBars = IndicatorConfig.WyckoffRangeMinBars;
 var wycMaxAtr = IndicatorConfig.WyckoffRangeMaxHeightAtr;
 var wycPrior = IndicatorConfig.WyckoffPriorTrendAtr;
+var momWi = IndicatorConfig.MomentumExhaustWickBody;
+var momVol = IndicatorConfig.MomentumExhaustVolumeFactor;
+var momDiv = IndicatorConfig.MomentumDivMinSwingFrac;
+var momExp = IndicatorConfig.MomentumExpansionAtrRatio;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -50,6 +54,10 @@ for (var i = 0; i < args.Length; i++)
         case "--wycbars" when i + 1 < args.Length: wycBars = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
         case "--wycmaxatr" when i + 1 < args.Length: wycMaxAtr = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
         case "--wycprior" when i + 1 < args.Length: wycPrior = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+        case "--momwi" when i + 1 < args.Length: momWi = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+        case "--momvol" when i + 1 < args.Length: momVol = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+        case "--momdiv" when i + 1 < args.Length: momDiv = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+        case "--momexp" when i + 1 < args.Length: momExp = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
     }
 }
 
@@ -69,7 +77,8 @@ var pipeline = new IndicatorPipeline(
     new FvgDetector(fvgWidth, fvgBodies, fvgFill),
     new ConsolidationEngine(conBars, conAtr, holdBars),
     new PullbackDetector(pbLeg, pbMin, pbMax),
-    new WyckoffEngine(wycSwings, wycBars, IndicatorConfig.WyckoffRangeMinHeightAtr, wycMaxAtr, wycPrior));
+    new WyckoffEngine(wycSwings, wycBars, IndicatorConfig.WyckoffRangeMinHeightAtr, wycMaxAtr, wycPrior),
+    new MomentumEngine(momWi, momVol, momDiv, momExp));
 var analyses = pipeline.Run(candles);
 var swingHighs = pipeline.Swings.Count(s => s.IsHigh);
 var swingLows = pipeline.Swings.Count(s => !s.IsHigh);
@@ -79,8 +88,9 @@ Console.WriteLine($"Loaded {candles.Count} candles from {csvPath}");
 Console.WriteLine($"Pipeline: {analyses.Count} bars analysed, {swingHighs} swing highs, {swingLows} swing lows.");
 Console.WriteLine($"Params: pivot={pivot} sweepWick={sweepWick:0.00} fvgWidth={fvgWidth:0.00} fvgBodies={fvgBodies} fvgFill={fvgFill:0.00} "
     + $"conBars={conBars} conAtr={conAtr:0.00} hold={holdBars} pbLeg={pbLeg:0.00} pb[{pbMin:0.000}-{pbMax:0.000}] "
-    + $"wycSwings={wycSwings} wycBars={wycBars} wycMaxAtr={wycMaxAtr:0.00} wycPrior={wycPrior:0.00}");
-Console.WriteLine("M2-M4 quality metrics:");
+    + $"wycSwings={wycSwings} wycBars={wycBars} wycMaxAtr={wycMaxAtr:0.00} wycPrior={wycPrior:0.00} "
+    + $"momWi={momWi:0.00} momVol={momVol:0.00} momDiv={momDiv:0.000} momExp={momExp:0.00}");
+Console.WriteLine("M2-M5 quality metrics:");
 Console.WriteLine(metrics);
 Console.WriteLine($"Structure totals: {pipeline.Events.Count(e => e.Type == Concept.BOS)} BOS, "
     + $"{pipeline.Events.Count(e => e.Type == Concept.ChoCh)} CHoCH, "

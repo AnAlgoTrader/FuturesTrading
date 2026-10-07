@@ -191,6 +191,49 @@ public sealed class ChartModelBuilder
                     "LPSY"));
                 break;
             }
+            case Concept.Exhaustion:
+            {
+                var bull = evt.Direction == "Bullish";
+                markers.Add(new ChartMarker(
+                    evt.Time,
+                    bull ? "aboveBar" : "belowBar",
+                    "circle",
+                    "#FFB74D",
+                    "Exh"));
+                break;
+            }
+            case Concept.Divergence:
+            {
+                var bull = evt.Direction == "Bullish";
+                markers.Add(new ChartMarker(
+                    evt.Time,
+                    bull ? "aboveBar" : "belowBar",
+                    "diamond",
+                    "#FFB74D",
+                    evt.Detail == "Hidden" ? "DivH" : "Div"));
+                break;
+            }
+            case Concept.Compression:
+            {
+                markers.Add(new ChartMarker(
+                    evt.Time,
+                    "belowBar",
+                    "diamond",
+                    "#7E57C2",
+                    "Sq"));
+                break;
+            }
+            case Concept.Expansion:
+            {
+                var bull = evt.Direction != "Bearish";
+                markers.Add(new ChartMarker(
+                    evt.Time,
+                    bull ? "aboveBar" : "belowBar",
+                    bull ? "arrowUp" : "arrowDown",
+                    bull ? IndicatorConfig.BullColor : IndicatorConfig.BearColor,
+                    "Exp"));
+                break;
+            }
             case Concept.AccumulationBreakout:
             case Concept.DistributionBreakout:
             {

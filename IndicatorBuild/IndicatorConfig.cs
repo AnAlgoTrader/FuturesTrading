@@ -38,5 +38,22 @@ public static class IndicatorConfig
 
     // Shared calculators
     public const int AtrPeriod = 14;
+    public const int RsiPeriod = 14;
     public const int VolumeAveragePeriod = 50;
+
+    // Momentum — exhaustion (wick/body rejection + volume spike + extreme RSI)
+    public const double MomentumExhaustWickBody = 2.5;
+    public const double MomentumExhaustVolumeFactor = 1.8;
+    public const double MomentumExhaustRsiLow = 35;
+    public const double MomentumExhaustRsiHigh = 65;
+
+    // Momentum — RSI/price divergence (swing-paired; min price swing and RSI move)
+    public const double MomentumDivMinSwingFrac = 0.003;
+    public const double MomentumDivMinRsiDelta = 3.0;
+
+    // Momentum — TTM squeeze (BB inside KC) + expansion (release + ATR-ratio crossing)
+    public const int MomentumBbPeriod = 20;
+    public const double MomentumBbMultiplier = 2.0;
+    public const double MomentumSqueezeAtrFactor = 1.5;
+    public const double MomentumExpansionAtrRatio = 2.0;
 }
