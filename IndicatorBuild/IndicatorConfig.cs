@@ -8,13 +8,14 @@ public static class IndicatorConfig
     public const string BearColor = "#EF5350";
 
     // Swings / structure
-    public const int SwingPivotLookback = 5;
+    public const int SwingPivotLookback = 7;
 
     // Sweeps
-    public const double SweepMinWickFraction = 0.35;
+    public const double SweepMinWickFraction = 0.5;
 
-    // FVG
-    public const double FvgMinWidthAtrFactor = 1.0;
+    // FVG (full-candle gaps; width in ATR units; fill = fraction of zone depth required to mitigate)
+    public const double FvgMinWidthAtrFactor = 3.0;
+    public const double FvgFillFraction = 0.5;
 
     // Shared calculators
     public const int AtrPeriod = 14;

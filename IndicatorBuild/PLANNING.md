@@ -173,8 +173,10 @@ Add `IndicatorConfig.cs`. Initial defaults (tunable from scan results — see Mi
 | Swings | pivot lookback (left/right) | 5 |
 | Break confirm | mode (close/wick/body) | close |
 | Sweep | min penetration (% of level or ATR) | 0.25 × swing-to-swing distance |
-| Sweep | min wick % of candle range | 0.5 → **0.35** (M2 tuning, fewer false flags on 5m data) |
-| FVG | min width | ATR × 0.25 → **ATR × 1.0** (M2 tuning; 0.2–0.75 flooded ~10k/20k zones) |
+| Sweep | min wick % of candle range | 0.5 (tuned) |
+| FVG | min width | ATR × **3.0** (tuned; 1.0–1.5 flooded the chart) |
+| FVG | detection mode | **full candle** (bodies-only is *less* selective on 5m data) |
+| FVG | mitigation | candle reaches **midline** (fill fraction 0.5; edge-touch fills 99% within 1 bar — too weak) |
 | FVG | detection mode | full candle |
 | Consolidation | min bars | 10 |
 | Consolidation | max range height | ATR × 2.0 |
@@ -235,7 +237,7 @@ Coloring is sparse and disciplined:
 |---|---|---|
 | **M0 — Done** | CSV parsing + candle chart + VWAP | gray candles, orange VWAP, 20,635 bars |
 | **M1 — Done** | `IndicatorConfig`, `SharedCalculators` (EMA/SMA/ATR/RSI), `SwingDetector`, `CandleAnalysis`/`ConceptEvent`, `ColorResolver` (gray), `IndicatorPipeline`, xunit tests | 9 tests pass (swings + calculators); pipeline reports 1032 swing highs / 1042 swing lows; chart unchanged (all gray) |
-| **M2 — Done** | `MarketStructure` (HH/HL/LH/LL, BOS, CHoCH), `LiquiditySweepDetector`, `FvgDetector` (3-candle + ATR width filter + mitigation), markers + FVG zone overlay | 22 tests pass (9 M1 + 13 M2); chart shows green/red CHoCH+sweep candles, BOS/CHoCH/Sweep/FVG markers, FVG zone boxes; no repaint (close-only). CSV pass: 455 BOS / 479 CHoCH / 508 sweep events / 4 733 FVG zones (ATR×1.0 filter) |
+| **M2 — Done** | `MarketStructure` (HH/HL/LH/LL, BOS, CHoCH), `LiquiditySweepDetector`, `FvgDetector` (3-candle + ATR width filter + mitigation), markers + FVG zone overlay | 22 tests pass (9 M1 + 13 M2); chart shows green/red CHoCH+sweep candles, BOS/CHoCH/Sweep/FVG markers, FVG zone boxes; no repaint (close-only). **Tuned** CSV pass: 342 BOS / 332 CHoCH / 154 sweeps (64% confirm) / 453 FVG zones |
 | **M3 — Consolidation/Breakout/Pullback** | `ConsolidationEngine`, `PullbackDetector`, zone overlay rendering | zones + breakout/retrace markers over the CSV feed |
 | **M4 — Wyckoff phases** | `WyckoffEngine` with prior-trend context and event recipes | accumulation/distribution ranges detected with SC/AR/ST/Spring/SOS and mirror events |
 | **M5 — Momentum** | `MomentumEngine` (exhaustion, divergence, compression, expansion) | momentum events coloring with min-swing filters |
@@ -262,6 +264,12 @@ Coloring is sparse and disciplined:
 - [ ] CHoCH+ requirement (intervening HL/LH) — yes by default?
 - [x] FVG detection mode default: **full-candle** (wick piercing counts); mitigation on candle touching zone boundary (bar after creation only).
 - [x] Break confirmation mode: **close** (non-repainting). CHoCH flips trend state immediately on close-break.
-- [ ] Marker/zone rendering is capped for UX (last 3 000 markers, last 2 000 zones) — presentation only; full counts are reported on the console. Consider a zoom-aware lazy renderer in an interactive milestone.
+- [x] Marker/zone rendering is capped for UX (last 3 000 markers, last 2 000 zones) — presentation only; full counts are reported on the console. Consider a zoom-aware lazy renderer in an interactive milestone.
 - [ ] Should a Wyckoff phase tint candles inside the range, or only mark events? (start: events + range box only)
+- [x] **M2 tuning log (done):** built `Analytics/BacktestStats` metrics (structure flip-leg buckets, sweep confirm/fade, FVG fill rate + median bars-to-fill) and CLI overrides `--pivot --sweep --fvg --fvgbodies --fvgfill` in Program.
+  - `pivot=7` — whipsaw flips (<20-bar legs) drop 32%→21%, median leg 30→46 bars, still 332 CHoCH.
+  - `sweepWick=0.5` — 154 sweeps (0.75% of bars), confirm/fade 64%/36%.
+  - `fvg=ATR×3.0, fill=0.5, full-candle` — 453 zones (2.2% of bars), median 17 bars to fill.
+  - Bodies-only gaps were *less* selective (5 184 vs 4 733 zones) — rejected.
+  - Open: FVG "mitigated" is near-100% on a 20k-bar history because everything gets revisited eventually; judge by **count + median fill time**, not mitigation%.
 - [ ] Priority ordering for multi-concept candles (Section 8) — pending backtest evidence.

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using IndicatorBuild.Model;
@@ -7,15 +8,19 @@ namespace IndicatorBuild.Indicators;
 public class FvgDetector : BarEngine
 {
     private readonly double _minWidthAtrFactor;
+    private readonly bool _bodiesOnly;
+    private readonly double _fillFraction;
     private readonly List<Candle> _lastThree = new();
     private readonly List<Zone> _zones = new();
 
     public override string Name => "FvgDetector";
     public override IReadOnlyList<Zone> Zones => _zones;
 
-    public FvgDetector(double minWidthAtrFactor)
+    public FvgDetector(double minWidthAtrFactor, bool bodiesOnly = false, double fillFraction = 0)
     {
         _minWidthAtrFactor = minWidthAtrFactor;
+        _bodiesOnly = bodiesOnly;
+        _fillFraction = Math.Clamp(fillFraction, 0, 1);
     }
 
     public override void OnBar(BarContext context)
@@ -34,13 +39,19 @@ public class FvgDetector : BarEngine
             if (zone.State != ZoneState.Active || candle.Time <= zone.EndTime)
                 continue;
 
+            var depth = zone.Top - zone.Bottom;
+            var target = zone.Direction == "Bullish"
+                ? zone.Top - _fillFraction * depth
+                : zone.Bottom + _fillFraction * depth;
+
             var touched = zone.Direction == "Bullish"
-                ? candle.Low <= zone.Top
-                : candle.High >= zone.Bottom;
+                ? candle.Low <= target
+                : candle.High >= target;
 
             if (touched)
             {
                 zone.State = ZoneState.Mitigated;
+                zone.MitigatedTime = candle.Time;
                 Emit(Concept.FairValueGap, zone.Direction, candle.Time, "Mitigated");
             }
         }
@@ -48,12 +59,20 @@ public class FvgDetector : BarEngine
 
     private void DetectGap(BarContext context, Candle gapBase, Candle gapForm)
     {
-        var bullish = gapForm.Low > gapBase.High;
-        var bearish = gapForm.High < gapBase.Low;
+        var bullish = _bodiesOnly
+            ? Math.Min(gapForm.Open, gapForm.Close) > Math.Max(gapBase.Open, gapBase.Close)
+            : gapForm.Low > gapBase.High;
+        var bearish = _bodiesOnly
+            ? Math.Max(gapForm.Open, gapForm.Close) < Math.Min(gapBase.Open, gapBase.Close)
+            : gapForm.High < gapBase.Low;
         if (bullish == bearish) return;
 
-        var top = bullish ? gapForm.Low : gapBase.Low;
-        var bottom = bullish ? gapBase.High : gapForm.High;
+        var top = bullish
+            ? (_bodiesOnly ? Math.Min(gapForm.Open, gapForm.Close) : gapForm.Low)
+            : (_bodiesOnly ? Math.Min(gapBase.Open, gapBase.Close) : gapBase.Low);
+        var bottom = bullish
+            ? (_bodiesOnly ? Math.Max(gapBase.Open, gapBase.Close) : gapBase.High)
+            : (_bodiesOnly ? Math.Max(gapForm.Open, gapForm.Close) : gapForm.High);
         var width = top - bottom;
         if (width <= 0) return;
 

@@ -24,4 +24,5 @@ public class Zone
     public ZoneKind Kind { get; set; } = ZoneKind.FairValueGap;
     public ZoneState State { get; set; } = ZoneState.Active;
     public string Direction { get; set; } = "";
+    public long MitigatedTime { get; set; }
 }
