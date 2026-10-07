@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using IndicatorBuild;
+using IndicatorBuild.Indicators;
 using IndicatorBuild.Model;
 
 var projectRoot = FindProjectRoot();
@@ -19,12 +21,18 @@ foreach (var candle in candles)
     vwap.Add(new VwapPoint(candle.Time, vwapCalculator.AddBar(candle.Time, typicalPrice, candle.Volume)));
 }
 
+var pipeline = new IndicatorPipeline(new SwingDetector(IndicatorConfig.SwingPivotLookback, IndicatorConfig.SwingPivotLookback));
+var analyses = pipeline.Run(candles);
+var swingHighs = pipeline.Swings.Count(s => s.IsHigh);
+var swingLows = pipeline.Swings.Count(s => !s.IsHigh);
+
 var html = ChartHtmlGenerator.Build(candles, vwap, libraryPath);
 
 Directory.CreateDirectory(outputDir);
 File.WriteAllText(outputPath, html);
 
 Console.WriteLine($"Loaded {candles.Count} candles from {csvPath}");
+Console.WriteLine($"Pipeline: {analyses.Count} bars analysed, {swingHighs} swing highs, {swingLows} swing lows.");
 Console.WriteLine($"Generated chart: {outputPath}");
 
 static string FindProjectRoot()

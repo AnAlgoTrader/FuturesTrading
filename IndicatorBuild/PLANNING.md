@@ -234,7 +234,7 @@ Coloring is sparse and disciplined:
 | Milestone | Deliverable | Acceptance |
 |---|---|---|
 | **M0 — Done** | CSV parsing + candle chart + VWAP | gray candles, orange VWAP, 20,635 bars |
-| **M1 — Foundation** | `IndicatorConfig`, `SwingDetector`, `SharedCalculators`, neutral `CandleAnalysis`, `ColorResolver` architecture | unit tests on synthetic swings; pipeline skeleton compiles; output unchanged (all gray) |
+| **M1 — Done** | `IndicatorConfig`, `SharedCalculators` (EMA/SMA/ATR/RSI), `SwingDetector`, `CandleAnalysis`/`ConceptEvent`, `ColorResolver` (gray), `IndicatorPipeline`, xunit tests | 9 tests pass (swings + calculators); pipeline reports 1032 swing highs / 1042 swing lows; chart unchanged (all gray) |
 | **M2 — Structure events** | `MarketStructure` (HH/HL/LH/LL, BOS, CHoCH), `LiquiditySweepDetector`, `FvgDetector` | chart shows markers + first zones; no repaint (close-only) |
 | **M3 — Consolidation/Breakout/Pullback** | `ConsolidationEngine`, `PullbackDetector`, zone overlay rendering | zones + breakout/retrace markers over the CSV feed |
 | **M4 — Wyckoff phases** | `WyckoffEngine` with prior-trend context and event recipes | accumulation/distribution ranges detected with SC/AR/ST/Spring/SOS and mirror events |

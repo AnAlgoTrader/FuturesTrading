@@ -17,3 +17,5 @@ sweep_results.txt
 /IndicatorBuild/bin
 /IndicatorBuild/obj
 /IndicatorBuild/output
+/IndicatorBuild.Tests/bin
+/IndicatorBuild.Tests/obj
