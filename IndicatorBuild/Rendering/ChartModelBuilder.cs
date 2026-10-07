@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using IndicatorBuild.Indicators;
 using IndicatorBuild.Model;
 
 namespace IndicatorBuild.Rendering;
@@ -49,6 +50,9 @@ public sealed class ChartModelBuilder
 
     private static void AddMarker(List<ChartMarker> markers, ConceptEvent evt)
     {
+        if (Indicators.ConfluenceScorer.MarkerGated.Contains(evt.Type) && !evt.Qualified)
+            return;
+
         switch (evt.Type)
         {
             case Concept.ChoCh:

@@ -61,4 +61,10 @@ public static class IndicatorConfig
     public const int OutcomeForwardBars = 10;
     public const double OutcomeMinWinAtr = 0.25;
     public const double OutcomeHitAtr = 1.0;
+
+    // Confluence scoring (M7) — low-scoring events stay gray
+    public const int ConfluenceGate = 2;
+    public const int ConfluenceEmaPeriod = 50;
+    public const double ConfluenceBodyAtr = 0.35;
+    public const double ConfluenceVolumeFactor = 1.5;
 }

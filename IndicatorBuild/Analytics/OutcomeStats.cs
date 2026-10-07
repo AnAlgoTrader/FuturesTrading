@@ -39,7 +39,8 @@ public static class OutcomeStats
         IReadOnlyList<ConceptEvent> events,
         int forwardBars = IndicatorConfig.OutcomeForwardBars,
         double minWinAtr = IndicatorConfig.OutcomeMinWinAtr,
-        double hitAtr = IndicatorConfig.OutcomeHitAtr)
+        double hitAtr = IndicatorConfig.OutcomeHitAtr,
+        System.Func<ConceptEvent, bool>? include = null)
     {
         var timeToIndex = new Dictionary<long, int>(candles.Count);
         for (var i = 0; i < candles.Count; i++)
@@ -54,6 +55,7 @@ public static class OutcomeStats
 
         foreach (var evt in events)
         {
+            if (include is not null && !include(evt)) continue;
             var dir = ExpectedDirection(evt.Type, evt.Detail) * (evt.Direction == "Bearish" ? -1 : 1);
             if (dir == 0) continue;
             if (!timeToIndex.TryGetValue(evt.Time, out var idx)) continue;
@@ -158,5 +160,52 @@ public static class OutcomeStats
         }
 
         return label + "\u0001" + detail + "\u0001" + (evt.Direction == "Bearish" ? "Bearish" : "Bullish");
+    }
+}
+
+public sealed class OutcomeComparison
+{
+    public string Label { get; init; } = "";
+    public string Detail { get; init; } = "";
+    public string Direction { get; init; } = "";
+    public int AllCount { get; init; }
+    public int GatedCount { get; init; }
+    public double? AllWin { get; init; }
+    public double? GatedWin { get; init; }
+
+    public string ToTable()
+    {
+        var delta = AllWin is null || GatedWin is null ? "  -" : (GatedWin - AllWin).Value.ToString("+0;-0;0");
+        var allW = AllWin is null ? "-" : ((int)AllWin.Value).ToString();
+        var gatedW = GatedWin is null ? "-" : ((int)GatedWin.Value).ToString();
+        return $"  {Label,-12}{(Detail == "" ? "" : "/" + Detail),-13}{Direction,-9}"
+            + $"all N={AllCount,-5}win={allW,-5}gated N={GatedCount,-5}win={gatedW,-5}delta={delta,-4}";
+    }
+}
+
+public static class OutcomeCompare
+{
+    public static List<OutcomeComparison> Build(
+        IReadOnlyList<OutcomeRow> all,
+        IReadOnlyList<OutcomeRow> gated)
+    {
+        var gatedByKey = gated.ToDictionary(
+            r => r.Label + "\u0001" + r.Detail + "\u0001" + r.Direction);
+
+        return all.Select(r =>
+        {
+            var key = r.Label + "\u0001" + r.Detail + "\u0001" + r.Direction;
+            gatedByKey.TryGetValue(key, out var g);
+            return new OutcomeComparison
+            {
+                Label = r.Label,
+                Detail = r.Detail,
+                Direction = r.Direction,
+                AllCount = r.Count,
+                AllWin = r.WinRate,
+                GatedCount = g?.Count ?? 0,
+                GatedWin = g?.WinRate
+            };
+        }).ToList();
     }
 }

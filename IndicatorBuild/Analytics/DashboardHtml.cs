@@ -7,8 +7,8 @@ namespace IndicatorBuild.Analytics;
 
 public static class DashboardHtml
 {
-    public static string Build(
-        IReadOnlyList<OutcomeRow> rows,
+    public static string BuildComparison(
+        IReadOnlyList<OutcomeComparison> rows,
         string title,
         string paramsLine)
     {
@@ -20,39 +20,45 @@ public static class DashboardHtml
         sb.AppendLine("  body{font-family:system-ui,sans-serif;margin:24px;color:#222;background:#fff}");
         sb.AppendLine("  h1{font-size:20px;margin:0 0 4px}");
         sb.AppendLine("  .sub{color:#666;font-size:12px;margin-bottom:16px}");
-        sb.AppendLine("  table{border-collapse:collapse;font-size:13px;width:100%;max-width:980px}");
+        sb.AppendLine("  table{border-collapse:collapse;font-size:13px;width:100%;max-width:1100px}");
         sb.AppendLine("  th,td{border:1px solid #ddd;padding:4px 8px;text-align:right;white-space:nowrap}");
         sb.AppendLine("  th{background:#f5f5f5;text-align:center}");
         sb.AppendLine("  td:first-child,td:nth-child(2),td:nth-child(3){text-align:left}");
         sb.AppendLine("  tr:nth-child(even){background:#fafafa}");
         sb.AppendLine("  .good{color:#1b8a4c}.bad{color:#c62828}.warn{color:#b26a00}");
-        sb.AppendLine("  .card{border:1px solid #e0e0e0;border-radius:6px;padding:12px 16px;margin-bottom:12px;max-width:960px;font-size:13px}");
+        sb.AppendLine("  .card{border:1px solid #e0e0e0;border-radius:6px;padding:12px 16px;margin-bottom:12px;max-width:1080px;font-size:13px}");
         sb.AppendLine("</style></head><body>");
         sb.AppendLine($"<h1>Outcome Dashboard — {title}</h1>");
-        sb.AppendLine($"<div class=\"sub\">{paramsLine}</div>");
-        sb.AppendLine("<div class=\"card\">Columns: <b>N</b> events with a full forward window; "
-            + "<b>win%</b> fraction whose forward close moved ≥ 0.25×ATR in the predicted direction; "
-            + "<b>avg/med</b> forward move in predicted direction (×ATR); "
-            + "<b>hit1/fail1</b> fraction that showed ≥ 1×ATR favorable/adverse excursion inside the window. "
-            + "Backtest-only; outcomes are never fed back into detection.</div>");
-        sb.AppendLine("<table><tr><th>Signal</th><th>Detail</th><th>Direction</th><th>N</th>"
-            + "<th>win%</th><th>avg(ATR)</th><th>med(ATR)</th><th>hit≥1ATR%</th><th>fail≥1ATR%</th></tr>");
+        sb.AppendLine($"<div class=\"sub\">{Html(paramsLine)}</div>");
+        sb.AppendLine("<div class=\"card\"><b>Confluence gate M7.</b> \"all\" = every event with a full 10-bar forward window; "
+            + "\"gated\" = the subset that passed the confluence gate score (summing the bar's trend/RSI/body/volume factors). "
+            + "win% = forward close moved &gt;= 0.25x ATR in the predicted direction. "
+            + "The &#916; column is the precision change from gating (positive = gating improved that signal). "
+            + "Outcomes are backtest-only and never fed back into detection.</div>");
+        sb.AppendLine("<table><tr><th>Signal</th><th>Detail</th><th>Direction</th>"
+            + "<th>All N</th><th>All win%</th><th>Gated N</th><th>Gated win%</th><th>&#916;</th></tr>");
 
         foreach (var r in rows)
         {
-            var winClass = r.WinRate is null ? "" : r.WinRate >= 55 ? "good" : r.WinRate >= 45 ? "warn" : "bad";
+            var gatedWin = r.GatedWin;
+            var delta = r.AllWin is null || gatedWin is null ? (double?)null : gatedWin - r.AllWin;
+            var winClass = gatedWin is null ? "" : gatedWin >= 55 ? "good" : gatedWin >= 45 ? "warn" : "bad";
+            var deltaClass = delta is null ? "" : delta > 0 ? "good" : delta < 0 ? "bad" : "";
             sb.AppendLine("<tr>"
-                + $"<td>{Html(r.Label)}</td><td>{Html(r.Detail)}</td><td>{Html(r.Direction)}</td><td>{r.Count}</td>"
-                + $"<td class=\"{winClass}\">{(r.WinRate is null ? "-" : r.WinRate.Value.ToString("0", CultureInfo.InvariantCulture))}</td>"
-                + $"<td>{Fmt(r.AvgMoveAtr)}</td><td>{Fmt(r.MedianMoveAtr)}</td>"
-                + $"<td>{r.Hit1AtrRate:0}</td><td>{r.Fail1AtrRate:0}</td></tr>");
+                + $"<td>{Html(r.Label)}</td><td>{Html(r.Detail)}</td><td>{Html(r.Direction)}</td>"
+                + $"<td>{r.AllCount}</td><td>{FmtInt(r.AllWin)}</td>"
+                + $"<td>{r.GatedCount}</td><td class=\"{winClass}\">{FmtInt(gatedWin)}</td>"
+                + $"<td class=\"{deltaClass}\">{FmtDelta(delta)}</td></tr>");
         }
 
         sb.AppendLine("</table></body></html>");
         return sb.ToString();
     }
 
-    private static string Fmt(double? v) => v is null ? "-" : v.Value.ToString("0.00", CultureInfo.InvariantCulture);
+    private static string FmtInt(double? v) => v is null ? "-" : ((int)v.Value).ToString(CultureInfo.InvariantCulture);
+
+    private static string FmtDelta(double? v) =>
+        v is null ? "-" : v.Value.ToString("+0;-0;0", CultureInfo.InvariantCulture);
 
     private static string Html(string s) => s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
 }
