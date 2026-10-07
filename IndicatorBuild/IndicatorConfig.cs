@@ -27,6 +27,15 @@ public static class IndicatorConfig
     public const double PullbackHealthyMin = 0.236;
     public const double PullbackHealthyMax = 0.786;
 
+    // Wyckoff ranges (typed by prior-trend context)
+    public const int WyckoffRangeMinSwings = 5;
+    public const int WyckoffRangeMinBars = 40;
+    public const double WyckoffRangeMinHeightAtr = 1.0;
+    public const double WyckoffRangeMaxHeightAtr = 4.0;
+    public const double WyckoffPriorTrendAtr = 0.5;
+    public const double WyckoffSosVolumeFactor = 1.2;
+    public const double WyckoffSosDisplacementAtr = 1.0;
+
     // Shared calculators
     public const int AtrPeriod = 14;
     public const int VolumeAveragePeriod = 50;

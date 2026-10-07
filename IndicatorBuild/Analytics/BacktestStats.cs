@@ -36,6 +36,22 @@ public sealed class M2Metrics
     public int RetracementCount { get; set; }
     public int PullbackCount { get; set; }
 
+    public int AccumRanges { get; set; }
+    public int DistRanges { get; set; }
+    public int WySc { get; set; }
+    public int WyBc { get; set; }
+    public int WyAr { get; set; }
+    public int WySt { get; set; }
+    public int WySpring { get; set; }
+    public int WyUtad { get; set; }
+    public int WySos { get; set; }
+    public int WySow { get; set; }
+    public int WyLps { get; set; }
+    public int WyLpsy { get; set; }
+    public int WyPhaseE => WyAccumBreakout + WyDistBreakout;
+    public int WyAccumBreakout { get; set; }
+    public int WyDistBreakout { get; set; }
+
     public override string ToString()
     {
         var sb = new StringBuilder();
@@ -54,6 +70,10 @@ public sealed class M2Metrics
         sb.AppendLine($"  Consolidation: ranges={ConZones} (up={ConUp} down={ConDown}) "
             + $"breakouts held={BreakoutHeld} ({heldRate:0.0}%) failed={BreakoutFailed}");
         sb.AppendLine($"  Pullback: pullbacks={PullbackCount} (retracement measurements={RetracementCount})");
+        var wyRate = WyPhaseE == 0 ? 0 : 100.0 * WyPhaseE / (AccumRanges + DistRanges);
+        sb.AppendLine($"  Wyckoff: accum={AccumRanges} dist={DistRanges} ranges  completion={WyPhaseE} ({wyRate:0.0}%)"
+            + $"\n      SC={WySc} BC={WyBc}  AR={WyAr}  ST={WySt}  Spring={WySpring} UTAD={WyUtad}  "
+            + $"SOS={WySos} SOW={WySow}  LPS={WyLps} LPSY={WyLpsy}  PhaseE(acc)={WyAccumBreakout} PhaseE(dist)={WyDistBreakout}");
         return sb.ToString();
     }
 }
@@ -143,6 +163,28 @@ public static class BacktestStats
                 case Concept.Pullback:
                     m.PullbackCount++;
                     break;
+            }
+        }
+
+        m.AccumRanges = zones.Count(z => z.Kind == ZoneKind.AccumulationRange);
+        m.DistRanges = zones.Count(z => z.Kind == ZoneKind.DistributionRange);
+
+        foreach (var e in events)
+        {
+            switch (e.Type)
+            {
+                case Concept.SellingClimax: m.WySc++; break;
+                case Concept.BuyingClimax: m.WyBc++; break;
+                case Concept.AutomaticRally: m.WyAr++; break;
+                case Concept.SecondaryTest: m.WySt++; break;
+                case Concept.Spring: m.WySpring++; break;
+                case Concept.UpthrustAfterDistribution: m.WyUtad++; break;
+                case Concept.SignOfStrength: m.WySos++; break;
+                case Concept.SignOfWeakness: m.WySow++; break;
+                case Concept.LastPointOfSupport: m.WyLps++; break;
+                case Concept.LastPointOfSupply: m.WyLpsy++; break;
+                case Concept.AccumulationBreakout: m.WyAccumBreakout++; break;
+                case Concept.DistributionBreakout: m.WyDistBreakout++; break;
             }
         }
 

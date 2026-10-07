@@ -24,6 +24,13 @@ public static class ColorResolver
                 return evt.Direction == "Bearish" ? IndicatorConfig.BearColor : IndicatorConfig.BullColor;
         }
 
+        foreach (var evt in analysis.Events)
+        {
+            if (evt.Type is Concept.SignOfStrength or Concept.SignOfWeakness
+                or Concept.AccumulationBreakout or Concept.DistributionBreakout)
+                return evt.Direction == "Bearish" ? IndicatorConfig.BearColor : IndicatorConfig.BullColor;
+        }
+
         return IndicatorConfig.DefaultColor;
     }
 }

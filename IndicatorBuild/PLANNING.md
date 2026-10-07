@@ -183,6 +183,12 @@ Add `IndicatorConfig.cs`. Initial defaults (tunable from scan results — see Mi
 | Breakout | confirm bars outside range to call "Held" | 3 |
 | Pullback | healthy retrace band (Fib) | 0.236–0.786 (tuned); resumption = close reclaims dip extreme |
 | Wyckoff | ATR/volume event thresholds | SC volume ≥ 3× avg etc. |
+| Wyckoff | range min swings | 5 (tuned) |
+| Wyckoff | range min span (bars) | 40 (tuned) |
+| Wyckoff | range height window | ATR × 1.0 – 4.0 (tuned; poke tolerance 2× max) |
+| Wyckoff | prior-trend drift for typing | ATR × 0.5 (tuned; requires a full 6 prior swings) |
+| Wyckoff | SOS/SOW volume factor | 1.2× avg |
+| Wyckoff | SOS/SOW displacement | ≥ ATR × 1.0 |
 | Momentum | ATR period | 14 |
 | Momentum | RSI period / oversold / overbought | 14 / 35 / 65 |
 | Momentum | squeeze (BB,KC) | 20/2, 20/1.5 |
@@ -240,7 +246,7 @@ Coloring is sparse and disciplined:
 | **M1 — Done** | `IndicatorConfig`, `SharedCalculators` (EMA/SMA/ATR/RSI), `SwingDetector`, `CandleAnalysis`/`ConceptEvent`, `ColorResolver` (gray), `IndicatorPipeline`, xunit tests | 9 tests pass (swings + calculators); pipeline reports 1032 swing highs / 1042 swing lows; chart unchanged (all gray) |
 | **M2 — Done** | `MarketStructure` (HH/HL/LH/LL, BOS, CHoCH), `LiquiditySweepDetector`, `FvgDetector` (3-candle + ATR width filter + mitigation), markers + FVG zone overlay | 22 tests pass (9 M1 + 13 M2); chart shows green/red CHoCH+sweep candles, BOS/CHoCH/Sweep/FVG markers, FVG zone boxes; no repaint (close-only). **Tuned** CSV pass: 342 BOS / 332 CHoCH / 154 sweeps (64% confirm) / 453 FVG zones |
 | **M3 — Done** | `ConsolidationEngine`, `PullbackDetector` (impulse leg + Fib-band retrace, close-reclaim resumption), breakout markers + pullback markers + consolidation purple zone boxes | 30 tests pass (9 M1 + 13 M2 + 8 M3); chart shows green/red "BO" breakout candles & arrow markers + purple "PB" pullback circles + purple consolidation zone boxes. **Tuned**: `conBars=8, conAtr=1.5, hold=3` → 130 consolidation ranges (held 55%); `pb[0.236–0.786]`, close-reclaim resumption → 45 pullbacks from 390 retrace measurements |
-| **M4 — Wyckoff phases** | `WyckoffEngine` with prior-trend context and event recipes | accumulation/distribution ranges detected with SC/AR/ST/Spring/SOS and mirror events |
+| **M4 — Done** | `WyckoffEngine` with prior-trend context and event recipes | 6 Wyckoff tests (recipe order, Spring, mirror distribution, UTAD, non-qualifying discard, flat/untyped). **Tuned** `wycSwings=5, wycBars=40, wycMaxAtr=4.0, wycPrior=0.5` → 24 ranges (8 accum / 16 dist), all finishing via orderly Phase E; events released only after the range completes end-to-end (labels place at their original swing times, no spurious markers) |
 | **M5 — Momentum** | `MomentumEngine` (exhaustion, divergence, compression, expansion) | momentum events coloring with min-swing filters |
 | **M6 — Backtest-driven tuning** | A stats dashboard (counts per concept, win context heuristics) | sweep the defaults in Section 6 against the CSV; tune thresholds; update config |
 | **M7 — Confluence scoring** | `SignalScorer` wrapping engines; low-scoring events stay gray | measurable precision improvement on historical pass |
@@ -276,4 +282,10 @@ Coloring is sparse and disciplined:
 - [x] **M3 tuning log (done):** extended metrics + CLI (`--conbars --conatr --hold --pbleg --pbmin --pbmax`).
   - `conBars=8, conAtr=1.5` — 130 ranges (up=66 down=64), held 55% / failed 45% at 3-closes. `10/1.5` was only 40 ranges (too sparse); `8/1.2` 48 ranges but 52% held. `pbLeg` (impulse ≥ 1×ATR) is a **no-op** on this data — every swing leg exceeds it.
   - Original pullback design required resumption "beyond prior leg top" — only 8/390 counter-moves qualified. Rewrote resumption as **close-reclaims-the-dip-bar's-extreme** (structural reclaim): 45 pullbacks with a Fib band of 23.6–78.6% (390 neutral `Retracement` measurements emitted too). Band 38.2–61.8% gave only 14 (too selective for a chart).
+- [x] **M4 tuning log (done):** extended metrics + CLI (`--wycswings --wycbars --wycmaxatr --wycprior`).
+  - Wyckoff **events are confirmed-only**: recipe labels (SC/AR/ST/Spring/SOS/LPS/…) are queued during a range and flushed at the moment the range closes as a *qualified* zone, so unqualified bands (which start ~4× more often than they finish) never leak stray markers. Markers still render at their historical swing times; only bar-time events (SOS/SOW/Phase E) color candles, so on-chart color count equals released events.
+  - Bands typed by prior-trend context require a **full 6 prior swings** (`take 6, first→last drift ≥ 0.5×ATR`) — the 4-swing version typed mid-downtrend at t5 instead of the true range start t7 and produced wrong SC/extreme and no Spring/ST.
+  - Two consecutive decisive poke-outs (≥2 overflows) **discard** the band (range violated before an orderly Phase E) instead of closing a zone; only orderly Phase-E ends render boxes. Raising `--wycmaxatr` 4→5 lifted 24→39 ranges (rejected — kept 4.0 for precision).
+  - CSV result: **24 ranges (accum=8 dist=16), 100% Phase-E completion**; recipe events released: AR=24 ST=16 SOS=4 SOW=14 LPS=3 LPSY=1 Spring=2 UTAD=6 SC=1 BC=8 (SC counts low because the terminal downtrend low can precede classification — the band then seeds with AR-first).
+  - Next: SOS/SOW displacement default (ATR×1.0) is generous — revisit during M7 confluence rather than tightening on a 24-range sample.
 - [ ] Priority ordering for multi-concept candles (Section 8) — pending backtest evidence.
