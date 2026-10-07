@@ -9,7 +9,7 @@ public static class TradingConfig
     public const string Exchange = "CME";
 
     /// <summary>
-    /// Number of trade ticks aggregated into one candle / footprint column.
+    /// Number of trade ticks aggregated into one candle.
     /// </summary>
     public const int TicksPerBucket = 1000;
 }

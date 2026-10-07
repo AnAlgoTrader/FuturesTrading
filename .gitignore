@@ -14,12 +14,3 @@ BetterVolumeTuner/sweep_results.txt
 sweep_results.txt
 /DayTrader/bin
 /DayTrader/obj
-/IndicatorBuild/bin
-/IndicatorBuild/obj
-/IndicatorBuild/output
-/IndicatorBuild.Tests/bin
-/IndicatorBuild.Tests/obj
-/Indicator/obj
-/Indicator/bin
-/Indicator.Tests/obj
-/Indicator.Tests/bin

@@ -51,11 +51,6 @@
         <div id="chart">
             <button id="close-btn" title="Close Position"><img src="assets/img/close.png" alt="×"></button>
         </div>
-        <div id="side-panel">
-            <div id="footprint-container" class="footprint-container">
-                <div class="footprint-empty">Waiting for footprint data...</div>
-            </div>
-        </div>
     </main>
 </div>
 
@@ -63,7 +58,6 @@
 <script src="assets/js/main.js"></script>
 <script src="assets/js/lightweight-charts.standalone.production.js"></script>
 <script src="assets/js/chartHelper.js"></script>
-<script src="assets/js/footprintHelper.js"></script>
 <script>    
     window.external.receiveMessage(message => receiveFromBackground(message));
     callBackground('applicationReady');

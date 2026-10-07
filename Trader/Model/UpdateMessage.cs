@@ -16,5 +16,4 @@ public class UpdateMessageType
     public const string CANDLE_UPDATE = "CANDLE_UPDATE";
     public const string MARKET_DATA = "MARKET_DATA";
     public const string ORDER_LINE = "ORDER_LINE";
-    public const string FOOTPRINT_UPDATE = "FOOTPRINT_UPDATE";
 }

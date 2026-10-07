@@ -22,8 +22,7 @@ const handlers = {
     CANDLE_SET: candleSet,
     CANDLE_UPDATE: candleUpdate,
     MARKET_DATA: marketData,
-    ORDER_LINE: orderLine,
-    FOOTPRINT_UPDATE: footprintUpdate
+    ORDER_LINE: orderLine
 };
 
 function receiveFromBackground(message){
@@ -57,10 +56,6 @@ function setStat(id, value){
 
 function candleSet(data){
     window.setData(data.Candles);
-    const candles = data.Candles;
-    if (candles && candles.length > 0 && window.setOverlay) {
-        window.setOverlay(candles[candles.length - 1]);
-    }
 }
 
 function candleUpdate(data){
@@ -83,10 +78,4 @@ function setPrice(id, value){
 
 function orderLine(data){
     window.setOrderLine(data.Price, data.Color, data.Title, data.ChartPrice);
-}
-
-function footprintUpdate(data){
-    if (window.renderFootprint) {
-        window.renderFootprint(data);
-    }
 }

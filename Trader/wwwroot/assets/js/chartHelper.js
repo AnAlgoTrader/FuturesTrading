@@ -24,14 +24,6 @@
         borderVisible: false
     });
 
-    const vwapSeries = chart.addSeries(LightweightCharts.LineSeries, {
-        color: '#FF9900',
-        lineWidth: 1,
-        priceLineVisible: false,
-        crosshairMarkerVisible: false,
-        lastValueVisible: false
-    });
-
     let activePriceLine = null;
     let lastOrderPrice = 0;
     const closeBtn = document.getElementById('close-btn');
@@ -43,12 +35,8 @@
                 open: c.Open,
                 high: c.High,
                 low: c.Low,
-                close: c.Close,
-                color: c.Color || undefined
+                close: c.Close
             };
-        }));
-        vwapSeries.setData(candles.map(function (c) {
-            return { time: c.Time, value: c.Vwap };
         }));
         chart.timeScale().scrollToRealTime();
     };
@@ -59,67 +47,7 @@
             open: data.Open,
             high: data.High,
             low: data.Low,
-            close: data.Close,
-            color: data.Color || undefined
-        });
-        vwapSeries.update({ time: data.Time, value: data.Vwap });
-        window.setOverlay(data);
-    };
-
-    const overlayLines = {};
-
-    function upsertOverlayLine(key, price, options) {
-        if (price === null || price === undefined || !(price > 0)) {
-            removeOverlayLine(key);
-            return;
-        }
-        const existing = overlayLines[key];
-        if (existing) {
-            if (existing.price !== price) {
-                existing.line.applyOptions({ price: price });
-                existing.price = price;
-            }
-            return;
-        }
-        overlayLines[key] = {
-            line: candlesSeries.createPriceLine(Object.assign({ price: price }, options)),
-            price: price
-        };
-    }
-
-    function removeOverlayLine(key) {
-        const existing = overlayLines[key];
-        if (!existing) return;
-        try { candlesSeries.removePriceLine(existing.line); } catch (e) {}
-        delete overlayLines[key];
-    }
-
-    const dashed = LightweightCharts.LineStyle.Dashed;
-    const dotted = LightweightCharts.LineStyle.Dotted;
-
-    const levelDefs = [
-        { key: 'pdh', get: l => l.PreviousDayHigh, broken: l => l.PreviousDayHighBroken, color: '#d1d4dc', title: 'PDH', style: dashed },
-        { key: 'pdl', get: l => l.PreviousDayLow, broken: l => l.PreviousDayLowBroken, color: '#d1d4dc', title: 'PDL', style: dashed },
-        { key: 'pdc', get: l => l.PreviousDayClose, broken: () => false, color: '#787b86', title: 'PDC', style: dotted },
-        { key: 'onh', get: l => l.OvernightHigh, broken: l => l.OvernightHighBroken, color: '#2962ff', title: 'ONH', style: dashed },
-        { key: 'onl', get: l => l.OvernightLow, broken: l => l.OvernightLowBroken, color: '#2962ff', title: 'ONL', style: dashed },
-        { key: 'ibh', get: l => l.InitialBalanceHigh, broken: l => l.InitialBalanceHighBroken, color: '#ab47bc', title: 'IBH', style: dashed },
-        { key: 'ibl', get: l => l.InitialBalanceLow, broken: l => l.InitialBalanceLowBroken, color: '#ab47bc', title: 'IBL', style: dashed }
-    ];
-
-    window.setOverlay = function (data) {
-        if (!data || !data.Levels) return;
-        const levels = data.Levels;
-
-        levelDefs.forEach(function (def) {
-            const price = def.broken(levels) ? null : def.get(levels);
-            upsertOverlayLine(def.key, price, {
-                color: def.color,
-                lineWidth: 1,
-                lineStyle: def.style,
-                axisLabelVisible: true,
-                title: def.title
-            });
+            close: data.Close
         });
     };
 

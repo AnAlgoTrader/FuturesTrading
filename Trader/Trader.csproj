@@ -27,16 +27,12 @@
       <Content Update="wwwroot\assets\js\chartHelper.js">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
-      <Content Update="wwwroot\assets\js\footprintHelper.js">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Content>
       <Content Update="wwwroot\assets\img\close.png">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Indicator\Indicator.csproj" />
       <ProjectReference Include="..\..\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client.csproj" />
     </ItemGroup>
 

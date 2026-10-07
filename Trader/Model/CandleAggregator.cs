@@ -1,5 +1,4 @@
 using System;
-using Indicator;
 using Ib.Csharp.Api.Client.Implementation.Helper;
 
 namespace Trader.Model;
@@ -7,7 +6,6 @@ namespace Trader.Model;
 public class CandleAggregator
 {
     private readonly object _lock = new();
-    private readonly IndicatorEngine _indicator;
     private readonly LeeReadyClassifier _classifier = new();
     private readonly int _ticksPerBucket;
 
@@ -24,9 +22,8 @@ public class CandleAggregator
 
     public event Action<CandleUpdate> OnCandleUpdate;
 
-    public CandleAggregator(IndicatorEngine indicator, int ticksPerBucket = TradingConfig.TicksPerBucket)
+    public CandleAggregator(int ticksPerBucket = TradingConfig.TicksPerBucket)
     {
-        _indicator = indicator;
         _ticksPerBucket = Math.Max(1, ticksPerBucket);
     }
 
@@ -55,9 +52,7 @@ public class CandleAggregator
         if (price <= 0) return;
 
         long bucketUnix;
-        double open, high, low, close, vwap;
-        string color;
-        IndicatorResult overlay;
+        double open, high, low, close;
 
         lock (_lock)
         {
@@ -87,25 +82,16 @@ public class CandleAggregator
             high = _high;
             low = _low;
             close = _close;
-
-            var result = _indicator.EvaluateForming(new Candle(bucketUnix, open, high, low, close, _volume));
-            vwap = result.Vwap;
-            color = result.Color;
-            overlay = result;
         }
 
-        var update = new CandleUpdate
+        OnCandleUpdate?.Invoke(new CandleUpdate
         {
             Time = bucketUnix,
             Open = open,
             High = high,
             Low = low,
-            Close = close,
-            Vwap = vwap,
-            Color = color
-        };
-        update.ApplyOverlay(overlay);
-        OnCandleUpdate?.Invoke(update);
+            Close = close
+        });
     }
 
     public void AddPriceTick(double price, DateTime? time = null)
@@ -113,9 +99,7 @@ public class CandleAggregator
         if (price <= 0) return;
 
         long bucketUnix;
-        double open, high, low, close, vwap;
-        string color;
-        IndicatorResult overlay;
+        double open, high, low, close;
 
         lock (_lock)
         {
@@ -135,35 +119,20 @@ public class CandleAggregator
             high = _high;
             low = _low;
             close = _close;
-
-            var result = _indicator.EvaluateForming(new Candle(bucketUnix, open, high, low, close, _volume));
-            vwap = result.Vwap;
-            color = result.Color;
-            overlay = result;
         }
 
-        var update = new CandleUpdate
+        OnCandleUpdate?.Invoke(new CandleUpdate
         {
             Time = bucketUnix,
             Open = open,
             High = high,
             Low = low,
-            Close = close,
-            Vwap = vwap,
-            Color = color
-        };
-        update.ApplyOverlay(overlay);
-        OnCandleUpdate?.Invoke(update);
+            Close = close
+        });
     }
 
     private void StartBucket(DateTime bucketTime, double price)
     {
-        if (_hasCandle)
-        {
-            _indicator.ProcessCandle(
-                new Candle(_currentBucketUnix, _open, _high, _low, _close, _volume));
-        }
-
         var unix = new DateTimeOffset(bucketTime).ToUnixTimeSeconds();
         if (unix <= _currentBucketUnix)
         {

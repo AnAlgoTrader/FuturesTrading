@@ -8,7 +8,6 @@ using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Helper;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
-using Indicator;
 using Photino.NET;
 using Trader.Model;
 
@@ -16,19 +15,13 @@ namespace Trader
 {
     internal class Program
     {
-        private static FootPrintHelper _footPrintHelper = new(TradingConfig.TicksPerBucket);
         private const int HistoricalDataRequestId = 1105;
         private const int MarketDataRequestId = 1108;
-        private const int FootPrintPriceRequestId = 1109;
-        private const int FootPrintTradesRequestId = 1110;
         private const decimal OrderQuantity = 2;
-        private static Timer _footPrintTimer;
-        private static int _footPrintUpdating;
 
         private static PhotinoWindow _window;
         private static readonly IbClient _client = new();
         private static Logger _logger;
-        private static readonly IndicatorEngine Indicator = new();
         private static CandleAggregator _candleAggregator;
         private static OrderHelper _orderHelper;
         private static ContractDetails _dataContract;
@@ -44,9 +37,8 @@ namespace Trader
         [STAThread]
         private static void Main()
         {
-            _footPrintHelper = new FootPrintHelper(TradingConfig.TicksPerBucket);
             _logger = new Logger();
-            _candleAggregator = new CandleAggregator(Indicator);
+            _candleAggregator = new CandleAggregator();
             _candleAggregator.OnCandleUpdate += SendCandleUpdate;
             _orderHelper = new OrderHelper(_logger);
             _orderHelper.OnOrdersChanged += _ => UpdateOrderLine();
@@ -90,12 +82,10 @@ namespace Trader
             _client.OnOrderStatusUpdate += status => _ = _orderHelper.UpdateOrderStatus(status);
             _client.OnMarketDataPriceTickByTickUpdate += price =>
             {
-                _footPrintHelper.UpdatePrice(price);
                 _candleAggregator.UpdateQuote(price.Time, price.Bid, price.Ask);
             };
             _client.OnMarketDataTradeTickByTickUpdate += trade =>
             {
-                _footPrintHelper.UpdateTrade(trade);
                 _candleAggregator.AddTrade(trade.Time, trade.Price, (double)trade.Size);
             };
             _client.OnMarketDataPriceUpdate += updates =>
@@ -129,28 +119,11 @@ namespace Trader
             SendContractUpdate();
             await DisplayHistoricalData();
             _client.SubscribeToMarketData(MarketDataRequestId, _dataContract);
-            _client.SubscribeToPriceTickByTick(FootPrintPriceRequestId, _dataContract.Contract);
-            _client.SubscribeToTradesTickByTick(FootPrintTradesRequestId, _dataContract.Contract);
-            _footPrintTimer = new Timer(_ => SendFootPrintUpdate(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         }
 
         private static void SendCandleUpdate(CandleUpdate update)
         {
             SendUpdate(UpdateMessageType.CANDLE_UPDATE, update);
-        }
-
-        private static void SendFootPrintUpdate()
-        {
-            if (Interlocked.Exchange(ref _footPrintUpdating, 1) == 1) return;
-            try
-            {
-                var columns = _footPrintHelper.GetSnapshot();
-                SendUpdate(UpdateMessageType.FOOTPRINT_UPDATE, columns);
-            }
-            finally
-            {
-                Interlocked.Exchange(ref _footPrintUpdating, 0);
-            }
         }
 
         private static void SendContractUpdate()
@@ -172,7 +145,6 @@ namespace Trader
 
             var candles = new SortedDictionary<long, CandleUpdate>();
             var lastCandleTime = 0L;
-            IndicatorResult lastResult = null;
             foreach (var item in historicalData)
             {
                 if (item.Volume <= 0 || item.Open <= 0 || item.High <= 0 || item.Low <= 0 || item.Close <= 0
@@ -180,24 +152,15 @@ namespace Trader
                     continue;
                 var time = long.Parse(item.Time);
                 if (time > lastCandleTime) lastCandleTime = time;
-                var result = Indicator.ProcessCandle(new Candle(time, item.Open, item.High, item.Low, item.Close,
-                    (double)item.Volume));
-                var candle = new CandleUpdate
+                candles[time] = new CandleUpdate
                 {
                     Time = time,
                     Open = item.Open,
                     High = item.High,
                     Low = item.Low,
-                    Close = item.Close,
-                    Vwap = result.Vwap,
-                    Color = result.Color
+                    Close = item.Close
                 };
-                candles[time] = candle;
-                lastResult = result;
             }
-
-            if (lastResult != null)
-                candles[lastCandleTime].ApplyOverlay(lastResult);
 
             _logger!.WriteLine($"[CHART] Setting {candles.Count} historical candles.");
             _candleAggregator.SeedLastCandleTime(lastCandleTime);
