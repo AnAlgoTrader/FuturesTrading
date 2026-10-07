@@ -13,19 +13,21 @@ public static class ChartHtmlGenerator
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public static string Build(IReadOnlyList<Candle> candles, string chartLibraryPath)
+    public static string Build(IReadOnlyList<Candle> candles, IReadOnlyList<VwapPoint> vwap, string chartLibraryPath)
     {
         if (!File.Exists(chartLibraryPath))
             throw new FileNotFoundException($"Chart library not found: {chartLibraryPath}", chartLibraryPath);
 
         var library = File.ReadAllText(chartLibraryPath);
-        var data = JsonSerializer.Serialize(
+        var candleData = JsonSerializer.Serialize(
             candles.Select(c => new ChartCandle(c.Time, c.Open, c.High, c.Low, c.Close)),
             JsonOptions);
+        var vwapData = JsonSerializer.Serialize(vwap, JsonOptions);
 
         return Template
             .Replace("__CHART_LIBRARY__", library)
-            .Replace("__CANDLE_DATA__", data)
+            .Replace("__CANDLE_DATA__", candleData)
+            .Replace("__VWAP_DATA__", vwapData)
             .Replace("__CANDLE_COUNT__", candles.Count.ToString());
     }
 
@@ -55,6 +57,7 @@ public static class ChartHtmlGenerator
 <script>__CHART_LIBRARY__</script>
 <script>
     const candles = __CANDLE_DATA__;
+    const vwap = __VWAP_DATA__;
 
     const container = document.getElementById('chart');
     const chart = LightweightCharts.createChart(container, {
@@ -76,6 +79,16 @@ public static class ChartHtmlGenerator
     });
 
     candleSeries.setData(candles);
+
+    const vwapSeries = chart.addSeries(LightweightCharts.LineSeries, {
+        color: '#FF9900',
+        lineWidth: 1,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false
+    });
+    vwapSeries.setData(vwap);
+
     chart.timeScale().fitContent();
 
     window.addEventListener('resize', () => {

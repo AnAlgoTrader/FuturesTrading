@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using IndicatorBuild;
+using IndicatorBuild.Model;
 
 var projectRoot = FindProjectRoot();
 var csvPath = Path.Combine(projectRoot, "data", "historicalData.csv");
@@ -9,7 +11,15 @@ var outputDir = Path.Combine(projectRoot, "output");
 var outputPath = Path.Combine(outputDir, "index.html");
 
 var candles = HistoricalDataSource.LoadFromCsv(csvPath);
-var html = ChartHtmlGenerator.Build(candles, libraryPath);
+var vwap = new List<VwapPoint>(candles.Count);
+var vwapCalculator = new VwapCalculator();
+foreach (var candle in candles)
+{
+    var typicalPrice = (candle.High + candle.Low + candle.Close) / 3.0;
+    vwap.Add(new VwapPoint(candle.Time, vwapCalculator.AddBar(candle.Time, typicalPrice, candle.Volume)));
+}
+
+var html = ChartHtmlGenerator.Build(candles, vwap, libraryPath);
 
 Directory.CreateDirectory(outputDir);
 File.WriteAllText(outputPath, html);
