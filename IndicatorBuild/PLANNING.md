@@ -178,9 +178,10 @@ Add `IndicatorConfig.cs`. Initial defaults (tunable from scan results — see Mi
 | FVG | detection mode | **full candle** (bodies-only is *less* selective on 5m data) |
 | FVG | mitigation | candle reaches **midline** (fill fraction 0.5; edge-touch fills 99% within 1 bar — too weak) |
 | FVG | detection mode | full candle |
-| Consolidation | min bars | 10 |
-| Consolidation | max range height | ATR × 2.0 |
+| Consolidation | min bars | 8 (tuned; 130 ranges shown) |
+| Consolidation | max range height | ATR × 1.5 (tuned) |
 | Breakout | confirm bars outside range to call "Held" | 3 |
+| Pullback | healthy retrace band (Fib) | 0.236–0.786 (tuned); resumption = close reclaims dip extreme |
 | Wyckoff | ATR/volume event thresholds | SC volume ≥ 3× avg etc. |
 | Momentum | ATR period | 14 |
 | Momentum | RSI period / oversold / overbought | 14 / 35 / 65 |
@@ -238,7 +239,7 @@ Coloring is sparse and disciplined:
 | **M0 — Done** | CSV parsing + candle chart + VWAP | gray candles, orange VWAP, 20,635 bars |
 | **M1 — Done** | `IndicatorConfig`, `SharedCalculators` (EMA/SMA/ATR/RSI), `SwingDetector`, `CandleAnalysis`/`ConceptEvent`, `ColorResolver` (gray), `IndicatorPipeline`, xunit tests | 9 tests pass (swings + calculators); pipeline reports 1032 swing highs / 1042 swing lows; chart unchanged (all gray) |
 | **M2 — Done** | `MarketStructure` (HH/HL/LH/LL, BOS, CHoCH), `LiquiditySweepDetector`, `FvgDetector` (3-candle + ATR width filter + mitigation), markers + FVG zone overlay | 22 tests pass (9 M1 + 13 M2); chart shows green/red CHoCH+sweep candles, BOS/CHoCH/Sweep/FVG markers, FVG zone boxes; no repaint (close-only). **Tuned** CSV pass: 342 BOS / 332 CHoCH / 154 sweeps (64% confirm) / 453 FVG zones |
-| **M3 — Consolidation/Breakout/Pullback** | `ConsolidationEngine`, `PullbackDetector`, zone overlay rendering | zones + breakout/retrace markers over the CSV feed |
+| **M3 — Done** | `ConsolidationEngine`, `PullbackDetector` (impulse leg + Fib-band retrace, close-reclaim resumption), breakout markers + pullback markers + consolidation purple zone boxes | 30 tests pass (9 M1 + 13 M2 + 8 M3); chart shows green/red "BO" breakout candles & arrow markers + purple "PB" pullback circles + purple consolidation zone boxes. **Tuned**: `conBars=8, conAtr=1.5, hold=3` → 130 consolidation ranges (held 55%); `pb[0.236–0.786]`, close-reclaim resumption → 45 pullbacks from 390 retrace measurements |
 | **M4 — Wyckoff phases** | `WyckoffEngine` with prior-trend context and event recipes | accumulation/distribution ranges detected with SC/AR/ST/Spring/SOS and mirror events |
 | **M5 — Momentum** | `MomentumEngine` (exhaustion, divergence, compression, expansion) | momentum events coloring with min-swing filters |
 | **M6 — Backtest-driven tuning** | A stats dashboard (counts per concept, win context heuristics) | sweep the defaults in Section 6 against the CSV; tune thresholds; update config |
@@ -272,4 +273,7 @@ Coloring is sparse and disciplined:
   - `fvg=ATR×3.0, fill=0.5, full-candle` — 453 zones (2.2% of bars), median 17 bars to fill.
   - Bodies-only gaps were *less* selective (5 184 vs 4 733 zones) — rejected.
   - Open: FVG "mitigated" is near-100% on a 20k-bar history because everything gets revisited eventually; judge by **count + median fill time**, not mitigation%.
+- [x] **M3 tuning log (done):** extended metrics + CLI (`--conbars --conatr --hold --pbleg --pbmin --pbmax`).
+  - `conBars=8, conAtr=1.5` — 130 ranges (up=66 down=64), held 55% / failed 45% at 3-closes. `10/1.5` was only 40 ranges (too sparse); `8/1.2` 48 ranges but 52% held. `pbLeg` (impulse ≥ 1×ATR) is a **no-op** on this data — every swing leg exceeds it.
+  - Original pullback design required resumption "beyond prior leg top" — only 8/390 counter-moves qualified. Rewrote resumption as **close-reclaims-the-dip-bar's-extreme** (structural reclaim): 45 pullbacks with a Fib band of 23.6–78.6% (390 neutral `Retracement` measurements emitted too). Band 38.2–61.8% gave only 14 (too selective for a chart).
 - [ ] Priority ordering for multi-concept candles (Section 8) — pending backtest evidence.
