@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using IndicatorBuild.Model;
 
 namespace IndicatorBuild.Indicators;
@@ -25,6 +26,13 @@ public class SwingDetector
     public IReadOnlyList<SwingPoint> Swings => _swings;
 
     public void ProcessBar(Candle candle) => ProcessBar(candle, _index++);
+
+    public void ProcessBar(Candle candle, out IReadOnlyList<SwingPoint> newSwings)
+    {
+        var countBefore = _swings.Count;
+        ProcessBar(candle, _index++);
+        newSwings = _swings.Skip(countBefore).ToList();
+    }
 
     public void ProcessBar(Candle candle, int index)
     {

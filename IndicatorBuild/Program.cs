@@ -5,6 +5,7 @@ using System.Linq;
 using IndicatorBuild;
 using IndicatorBuild.Indicators;
 using IndicatorBuild.Model;
+using IndicatorBuild.Rendering;
 
 var projectRoot = FindProjectRoot();
 var csvPath = Path.Combine(projectRoot, "data", "historicalData.csv");
@@ -21,18 +22,28 @@ foreach (var candle in candles)
     vwap.Add(new VwapPoint(candle.Time, vwapCalculator.AddBar(candle.Time, typicalPrice, candle.Volume)));
 }
 
-var pipeline = new IndicatorPipeline(new SwingDetector(IndicatorConfig.SwingPivotLookback, IndicatorConfig.SwingPivotLookback));
+var pipeline = new IndicatorPipeline(
+    new SwingDetector(IndicatorConfig.SwingPivotLookback, IndicatorConfig.SwingPivotLookback),
+    new MarketStructureEngine(),
+    new LiquiditySweepDetector(IndicatorConfig.SweepMinWickFraction),
+    new FvgDetector(IndicatorConfig.FvgMinWidthAtrFactor));
 var analyses = pipeline.Run(candles);
 var swingHighs = pipeline.Swings.Count(s => s.IsHigh);
 var swingLows = pipeline.Swings.Count(s => !s.IsHigh);
+var bosCount = pipeline.Events.Count(e => e.Type == Concept.BOS);
+var chochCount = pipeline.Events.Count(e => e.Type == Concept.ChoCh);
+var sweepCount = pipeline.Events.Count(e => e.Type == Concept.LiquiditySweep);
+var fvgZones = pipeline.Zones.Count(z => z.Kind == ZoneKind.FairValueGap);
 
-var html = ChartHtmlGenerator.Build(candles, vwap, libraryPath);
+var model = new ChartModelBuilder().Build(candles, vwap, analyses, pipeline.Zones);
+var html = ChartHtmlGenerator.Build(model, libraryPath);
 
 Directory.CreateDirectory(outputDir);
 File.WriteAllText(outputPath, html);
 
 Console.WriteLine($"Loaded {candles.Count} candles from {csvPath}");
 Console.WriteLine($"Pipeline: {analyses.Count} bars analysed, {swingHighs} swing highs, {swingLows} swing lows.");
+Console.WriteLine($"Structure: {bosCount} BOS, {chochCount} CHoCH, {sweepCount} sweep events, {fvgZones} FVG zones.");
 Console.WriteLine($"Generated chart: {outputPath}");
 
 static string FindProjectRoot()
