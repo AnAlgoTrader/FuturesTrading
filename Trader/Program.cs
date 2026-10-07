@@ -17,6 +17,8 @@ namespace Trader
     {
         private const int HistoricalDataRequestId = 1105;
         private const int MarketDataRequestId = 1108;
+        private const int PriceTickRequestId = 1109;
+        private const int TradeTickRequestId = 1110;
         private const decimal OrderQuantity = 2;
         private const double RoundTripCommission = 0.7 * 2;
 
@@ -120,6 +122,8 @@ namespace Trader
             SendContractUpdate();
             await DisplayHistoricalData();
             _client.SubscribeToMarketData(MarketDataRequestId, _dataContract);
+            _client.SubscribeToPriceTickByTick(PriceTickRequestId, _dataContract.Contract);
+            _client.SubscribeToTradesTickByTick(TradeTickRequestId, _dataContract.Contract);
         }
 
         private static void SendCandleUpdate(CandleUpdate update)
