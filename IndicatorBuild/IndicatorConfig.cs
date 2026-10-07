@@ -56,4 +56,9 @@ public static class IndicatorConfig
     public const double MomentumBbMultiplier = 2.0;
     public const double MomentumSqueezeAtrFactor = 1.5;
     public const double MomentumExpansionAtrRatio = 2.0;
+
+    // Outcome dashboard — forward-looking signal quality (backtest-only, never fed back into detection)
+    public const int OutcomeForwardBars = 10;
+    public const double OutcomeMinWinAtr = 0.25;
+    public const double OutcomeHitAtr = 1.0;
 }

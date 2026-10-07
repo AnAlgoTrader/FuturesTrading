@@ -189,6 +189,9 @@ Add `IndicatorConfig.cs`. Initial defaults (tunable from scan results — see Mi
 | Wyckoff | prior-trend drift for typing | ATR × 0.5 (tuned; requires a full 6 prior swings) |
 | Wyckoff | SOS/SOW volume factor | 1.2× avg |
 | Wyckoff | SOS/SOW displacement | ≥ ATR × 1.0 |
+| Outcome dashboard | forward window (bars) | 10 |
+| Outcome dashboard | min win move | 0.25× ATR |
+| Outcome dashboard | favorable/adverse excursion threshold | 1.0× ATR |
 | Momentum | ATR period | 14 |
 | Momentum | RSI period / oversold / overbought | 14 / 35 / 65 |
 | Momentum | exhaustion wick/body | ≥ 2.5 (tuned) |
@@ -252,7 +255,7 @@ Coloring is sparse and disciplined:
 | **M3 — Done** | `ConsolidationEngine`, `PullbackDetector` (impulse leg + Fib-band retrace, close-reclaim resumption), breakout markers + pullback markers + consolidation purple zone boxes | 30 tests pass (9 M1 + 13 M2 + 8 M3); chart shows green/red "BO" breakout candles & arrow markers + purple "PB" pullback circles + purple consolidation zone boxes. **Tuned**: `conBars=8, conAtr=1.5, hold=3` → 130 consolidation ranges (held 55%); `pb[0.236–0.786]`, close-reclaim resumption → 45 pullbacks from 390 retrace measurements |
 | **M4 — Done** | `WyckoffEngine` with prior-trend context and event recipes | 6 Wyckoff tests (recipe order, Spring, mirror distribution, UTAD, non-qualifying discard, flat/untyped). **Tuned** `wycSwings=5, wycBars=40, wycMaxAtr=4.0, wycPrior=0.5` → 24 ranges (8 accum / 16 dist), all finishing via orderly Phase E; events released only after the range completes end-to-end (labels place at their original swing times, no spurious markers) |
 | **M5 — Done** | `MomentumEngine` (exhaustion, divergence, compression, expansion) | 8 momentum tests; exhaustion (wick/body + volume + RSI extreme), RSI/price divergence (regular + hidden), TTM squeeze compression + release expansion + ATR-ratio crossing. **Tuned** `momWi=2.5, momVol=1.8, momExp=2.0` → exhaust=130, divergence=22 (3 regular / 19 hidden), squeezes=283, expansions=339 (283 release / 56 vol) |
-| **M6 — Backtest-driven tuning** | A stats dashboard (counts per concept, win context heuristics) | sweep the defaults in Section 6 against the CSV; tune thresholds; update config |
+| **M6 — Done** | Outcome dashboard (`OutcomeStats` + `DashboardHtml`) | 4 outcome tests; forward-window heuristics per signal (win% ≥ 0.25×ATR, avg/med move, hit≥1ATR/fail≥1ATR excursions); console block + `output/dashboard.html`. Findings: pullbacks (88%) and divergences (83–100%) are high-conviction; CHoCH/breakout/exhaustion/expansion are ≤ coin-flip on 5m → to be gated by M7 confluence, not re-tuned |
 | **M7 — Confluence scoring** | `SignalScorer` wrapping engines; low-scoring events stay gray | measurable precision improvement on historical pass |
 | **M8 — Live streaming** | EVENT-based param (`prevents lookahead`), per-bar feed identical to historical loop | same code path can consume a tick feed; drop-in reuse in Trader if wanted |
 
@@ -298,4 +301,9 @@ Coloring is sparse and disciplined:
   - TTM squeeze (BB-20/2 inside KC-20/1.5) emits `Compression` only on on-transition (detail=tier) → **283**. Release fires one `Expansion` per squeeze-out (direction = close vs mid) → 283; ATR-ratio crossings (`atr > X × atr-50-sma`) at 1.3 added **+247** noisy events, **2.0** keeps ~56. Defaults set accordingly.
   - Markers/colors: Exh = orange circle, Div/DivH = orange diamond, Sq = purple diamond, Exp = directional green/red arrow + candle color; exhaustion/divergence color orange candles ahead of Wyckoff per Section 8 priority. No zones (bar-level only).
   - Total chart markers now ≈1 028 — under the 3 000 cap.
+- [x] **M6 tuning log (done):** added `OutcomeStats` (forward-window heuristics: win% ≥ 0.25×ATR move, avg/median move in ATR, hit1/fail1 = 1×ATR favorable/adverse excursion inside the window; truncated windows skipped; outcomes never fed back into detection) + `DashboardHtml` (`output/dashboard.html`) + CLI `--outwin --outmin`. 10 bars / 0.25 ATR / 1.0 ATR.
+  - Measured signal quality on the CSV (per-direction, forward 10 bars):
+    - **High conviction:** Pullback Bullish **88%** win (avg +4.05 ATR, hit1 100% / fail1 7%); Divergence Hidden **83–86%**; Divergence Regular Bearish 100% (N=2); Wyckoff Dist-Out 62% / Accum-Out 50%.
+    - **Coin-flip / sell-the-close:** Breakout 43–56% (avg ≈ 0, hit1≈fail1); CHoCH 45–46% (avg adverse, median 0 → chop marker, not a trade); Sweep Confirmed 43–47%; Exhaustion 42–45% (avg *negative*); Expansion 38–43%.
+  - Swept exhaustion `--momwi 2.5→4.0 / --momvol 1.8→2.5`: win% stayed 42–45% — tightening only cuts N, never improves quality, so **kept defaults**. Conclusion: exhaustion/expansion/CHoCH are *context/regime* signals, not standalone entries on 5m; **no threshold changes were justified** — M7's confluence scorer will weight signals by these measured rates (and can suppress sub-coin-flip events from coloring) rather than us overfitting one CSV.
 - [ ] Priority ordering for multi-concept candles (Section 8) — pending backtest evidence.
