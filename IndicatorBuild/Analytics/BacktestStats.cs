@@ -27,6 +27,15 @@ public sealed class M2Metrics
     public int FvgMitigated { get; set; }
     public double? FvgMedianMitigationBars { get; set; }
 
+    public int ConZones { get; set; }
+    public int ConUp { get; set; }
+    public int ConDown { get; set; }
+    public int BreakoutHeld { get; set; }
+    public int BreakoutFailed { get; set; }
+
+    public int RetracementCount { get; set; }
+    public int PullbackCount { get; set; }
+
     public override string ToString()
     {
         var sb = new StringBuilder();
@@ -41,6 +50,10 @@ public sealed class M2Metrics
         var mitRate = FvgZones == 0 ? 0 : 100.0 * FvgMitigated / FvgZones;
         sb.AppendLine($"  FVG (width>{FvgWidthAtrFactor:0.00}xATR): zones={FvgZones} "
             + $"mitigated={FvgMitigated} ({mitRate:0.0}%) median-fill={FvgMedianMitigationBars:0.#} bars");
+        var heldRate = ConUp + ConDown == 0 ? 0 : 100.0 * BreakoutHeld / (BreakoutHeld + BreakoutFailed);
+        sb.AppendLine($"  Consolidation: ranges={ConZones} (up={ConUp} down={ConDown}) "
+            + $"breakouts held={BreakoutHeld} ({heldRate:0.0}%) failed={BreakoutFailed}");
+        sb.AppendLine($"  Pullback: pullbacks={PullbackCount} (retracement measurements={RetracementCount})");
         return sb.ToString();
     }
 }
@@ -111,6 +124,27 @@ public static class BacktestStats
                 fillBars.Add(end - start);
         }
         m.FvgMedianMitigationBars = fillBars.Count == 0 ? null : Median(fillBars);
+
+        m.ConZones = zones.Count(z => z.Kind == ZoneKind.Consolidation);
+
+        foreach (var e in events)
+        {
+            switch (e.Type)
+            {
+                case Concept.Breakout:
+                    if (e.Detail == "Held") m.BreakoutHeld++;
+                    else if (e.Detail == "Failed") m.BreakoutFailed++;
+                    else if (e.Direction == "Bullish") m.ConUp++;
+                    else if (e.Direction == "Bearish") m.ConDown++;
+                    break;
+                case Concept.Retracement:
+                    m.RetracementCount++;
+                    break;
+                case Concept.Pullback:
+                    m.PullbackCount++;
+                    break;
+            }
+        }
 
         return m;
     }

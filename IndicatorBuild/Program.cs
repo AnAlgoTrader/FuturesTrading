@@ -20,6 +20,12 @@ var sweepWick = IndicatorConfig.SweepMinWickFraction;
 var fvgWidth = IndicatorConfig.FvgMinWidthAtrFactor;
 var fvgBodies = false;
 var fvgFill = IndicatorConfig.FvgFillFraction;
+var conBars = IndicatorConfig.ConsolidationMinBars;
+var conAtr = IndicatorConfig.ConsolidationRangeAtrFactor;
+var holdBars = IndicatorConfig.BreakoutConfirmBars;
+var pbLeg = IndicatorConfig.PullbackLegMinAtr;
+var pbMin = IndicatorConfig.PullbackHealthyMin;
+var pbMax = IndicatorConfig.PullbackHealthyMax;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -30,6 +36,12 @@ for (var i = 0; i < args.Length; i++)
         case "--fvg" when i + 1 < args.Length: fvgWidth = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
         case "--fvgbodies": fvgBodies = true; break;
         case "--fvgfill" when i + 1 < args.Length: fvgFill = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+        case "--conbars" when i + 1 < args.Length: conBars = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
+        case "--conatr" when i + 1 < args.Length: conAtr = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+        case "--hold" when i + 1 < args.Length: holdBars = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
+        case "--pbleg" when i + 1 < args.Length: pbLeg = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+        case "--pbmin" when i + 1 < args.Length: pbMin = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+        case "--pbmax" when i + 1 < args.Length: pbMax = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
     }
 }
 
@@ -46,7 +58,9 @@ var pipeline = new IndicatorPipeline(
     new SwingDetector(pivot, pivot),
     new MarketStructureEngine(),
     new LiquiditySweepDetector(sweepWick),
-    new FvgDetector(fvgWidth, fvgBodies, fvgFill));
+    new FvgDetector(fvgWidth, fvgBodies, fvgFill),
+    new ConsolidationEngine(conBars, conAtr, holdBars),
+    new PullbackDetector(pbLeg, pbMin, pbMax));
 var analyses = pipeline.Run(candles);
 var swingHighs = pipeline.Swings.Count(s => s.IsHigh);
 var swingLows = pipeline.Swings.Count(s => !s.IsHigh);
@@ -54,8 +68,9 @@ var swingLows = pipeline.Swings.Count(s => !s.IsHigh);
 var metrics = BacktestStats.Collect(candles, pipeline.Events, pipeline.Zones, pivot, sweepWick, fvgWidth);
 Console.WriteLine($"Loaded {candles.Count} candles from {csvPath}");
 Console.WriteLine($"Pipeline: {analyses.Count} bars analysed, {swingHighs} swing highs, {swingLows} swing lows.");
-Console.WriteLine($"Params: pivot={pivot} sweepWick={sweepWick:0.00} fvgWidth={fvgWidth:0.00} fvgBodies={fvgBodies} fvgFill={fvgFill:0.00}");
-Console.WriteLine("M2 quality metrics:");
+Console.WriteLine($"Params: pivot={pivot} sweepWick={sweepWick:0.00} fvgWidth={fvgWidth:0.00} fvgBodies={fvgBodies} fvgFill={fvgFill:0.00} "
+    + $"conBars={conBars} conAtr={conAtr:0.00} hold={holdBars} pbLeg={pbLeg:0.00} pb[{pbMin:0.000}-{pbMax:0.000}]");
+Console.WriteLine("M2/M3 quality metrics:");
 Console.WriteLine(metrics);
 Console.WriteLine($"Structure totals: {pipeline.Events.Count(e => e.Type == Concept.BOS)} BOS, "
     + $"{pipeline.Events.Count(e => e.Type == Concept.ChoCh)} CHoCH, "

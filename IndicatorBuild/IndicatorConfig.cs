@@ -17,6 +17,16 @@ public static class IndicatorConfig
     public const double FvgMinWidthAtrFactor = 3.0;
     public const double FvgFillFraction = 0.5;
 
+    // Consolidation / breakout
+    public const int ConsolidationMinBars = 10;
+    public const double ConsolidationRangeAtrFactor = 1.5;
+    public const int BreakoutConfirmBars = 3;
+
+    // Pullback / retracement
+    public const double PullbackLegMinAtr = 1.0;
+    public const double PullbackHealthyMin = 0.382;
+    public const double PullbackHealthyMax = 0.618;
+
     // Shared calculators
     public const int AtrPeriod = 14;
     public const int VolumeAveragePeriod = 50;

@@ -27,14 +27,15 @@ public sealed class ChartModelBuilder
         }
 
         var chartZones = zones
-            .Where(z => z.Kind == ZoneKind.FairValueGap)
+            .Where(z => z.Kind is ZoneKind.FairValueGap or ZoneKind.Consolidation)
             .OrderBy(z => z.StartTime)
             .TakeLast(ZoneCap)
-            .Select(z => new ChartZone(
-                z.StartTime, z.EndTime, z.Top, z.Bottom,
-                z.Direction == "Bearish"
-                    ? "rgba(239,83,80,0.16)"
-                    : "rgba(38,166,154,0.16)"))
+            .Select(z => z.Kind == ZoneKind.Consolidation
+                ? new ChartZone(z.StartTime, z.EndTime, z.Top, z.Bottom, "rgba(126,87,194,0.14)")
+                : new ChartZone(z.StartTime, z.EndTime, z.Top, z.Bottom,
+                    z.Direction == "Bearish"
+                        ? "rgba(239,83,80,0.16)"
+                        : "rgba(38,166,154,0.16)"))
             .ToList();
 
         return new ChartModel(chartCandles, vwap, markers.TakeLast(MarkerCap).ToList(), chartZones);
@@ -79,6 +80,28 @@ public sealed class ChartModelBuilder
                     "square",
                     bull ? IndicatorConfig.BullColor : IndicatorConfig.BearColor,
                     "FVG"));
+                break;
+            }
+            case Concept.Breakout when evt.Detail == "":
+            {
+                var bull = evt.Direction == "Bullish";
+                markers.Add(new ChartMarker(
+                    evt.Time,
+                    bull ? "aboveBar" : "belowBar",
+                    bull ? "arrowUp" : "arrowDown",
+                    bull ? IndicatorConfig.BullColor : IndicatorConfig.BearColor,
+                    "BO"));
+                break;
+            }
+            case Concept.Pullback:
+            {
+                var bull = evt.Direction == "Bullish";
+                markers.Add(new ChartMarker(
+                    evt.Time,
+                    bull ? "aboveBar" : "belowBar",
+                    "circle",
+                    "#7E57C2",
+                    "PB"));
                 break;
             }
         }

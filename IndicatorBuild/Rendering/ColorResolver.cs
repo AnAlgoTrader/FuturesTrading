@@ -18,6 +18,12 @@ public static class ColorResolver
                 return evt.Direction == "Bearish" ? IndicatorConfig.BearColor : IndicatorConfig.BullColor;
         }
 
+        foreach (var evt in analysis.Events)
+        {
+            if (evt.Type == Concept.Breakout && evt.Detail == "")
+                return evt.Direction == "Bearish" ? IndicatorConfig.BearColor : IndicatorConfig.BullColor;
+        }
+
         return IndicatorConfig.DefaultColor;
     }
 }
