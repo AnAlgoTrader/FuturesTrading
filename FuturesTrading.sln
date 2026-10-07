@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Trader", "Trader\Trader.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Indicator", "Indicator\Indicator.csproj", "{6A30A35B-FD38-4C40-8B83-3404B2FECD13}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Indicator.Tests", "Indicator.Tests\Indicator.Tests.csproj", "{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +54,18 @@ Global
 		{6A30A35B-FD38-4C40-8B83-3404B2FECD13}.Release|x64.Build.0 = Release|Any CPU
 		{6A30A35B-FD38-4C40-8B83-3404B2FECD13}.Release|x86.ActiveCfg = Release|Any CPU
 		{6A30A35B-FD38-4C40-8B83-3404B2FECD13}.Release|x86.Build.0 = Release|Any CPU
+		{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}.Debug|x64.Build.0 = Debug|Any CPU
+		{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}.Debug|x86.Build.0 = Debug|Any CPU
+		{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}.Release|x64.ActiveCfg = Release|Any CPU
+		{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}.Release|x64.Build.0 = Release|Any CPU
+		{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}.Release|x86.ActiveCfg = Release|Any CPU
+		{09C2222E-3CB8-4BF7-B821-D46519FC6EE5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

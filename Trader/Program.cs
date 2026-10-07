@@ -8,6 +8,7 @@ using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Helper;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
+using Indicator;
 using Photino.NET;
 using Trader.Model;
 
@@ -27,8 +28,7 @@ namespace Trader
         private static PhotinoWindow _window;
         private static readonly IbClient _client = new();
         private static Logger _logger;
-        private static VwapCalculator _vwapCalculator;
-        private static ReversalDetector _reversalDetector;
+        private static readonly IndicatorEngine Indicator = new();
         private static CandleAggregator _candleAggregator;
         private static OrderHelper _orderHelper;
         private static ContractDetails _dataContract;
@@ -46,9 +46,7 @@ namespace Trader
         {
             _footPrintHelper = new FootPrintHelper(TradingConfig.TicksPerBucket);
             _logger = new Logger();
-            _vwapCalculator = new VwapCalculator();
-            _reversalDetector = new ReversalDetector();
-            _candleAggregator = new CandleAggregator(_vwapCalculator, _reversalDetector);
+            _candleAggregator = new CandleAggregator(Indicator);
             _candleAggregator.OnCandleUpdate += SendCandleUpdate;
             _orderHelper = new OrderHelper(_logger);
             _orderHelper.OnOrdersChanged += _ => UpdateOrderLine();
@@ -98,7 +96,6 @@ namespace Trader
             _client.OnMarketDataTradeTickByTickUpdate += trade =>
             {
                 _footPrintHelper.UpdateTrade(trade);
-                _vwapCalculator.AddTrade(trade.Time, trade.Price, (double)trade.Size);
                 _candleAggregator.AddTrade(trade.Time, trade.Price, (double)trade.Size);
             };
             _client.OnMarketDataPriceUpdate += updates =>
@@ -186,11 +183,13 @@ namespace Trader
             var lastCandleTime = 0L;
             foreach (var item in historicalData)
             {
-                if (item.Volume == 0 || item is { Open: 0, High: 0, Low: 0, Close: 0 }) continue;
+                if (item.Volume <= 0 || item.Open <= 0 || item.High <= 0 || item.Low <= 0 || item.Close <= 0
+                    || item.High < item.Low)
+                    continue;
                 var time = long.Parse(item.Time);
                 if (time > lastCandleTime) lastCandleTime = time;
-                var vwap = _vwapCalculator!.AddBar(time, (double)item.WAP, (double)item.Volume);
-                var color = _reversalDetector!.ProcessHistoricalCandle(time, item.Open, item.High, item.Low, item.Close, (double)item.Volume);
+                var result = Indicator.ProcessCandle(new Candle(time, item.Open, item.High, item.Low, item.Close,
+                    (double)item.Volume));
                 candles[time] = new CandleUpdate
                 {
                     Time = time,
@@ -198,8 +197,8 @@ namespace Trader
                     High = item.High,
                     Low = item.Low,
                     Close = item.Close,
-                    Vwap = vwap,
-                    Color = color
+                    Vwap = result.Vwap,
+                    Color = result.Color
                 };
             }
 

@@ -1,4 +1,5 @@
 using System;
+using Indicator;
 using Ib.Csharp.Api.Client.Implementation.Helper;
 
 namespace Trader.Model;
@@ -6,8 +7,7 @@ namespace Trader.Model;
 public class CandleAggregator
 {
     private readonly object _lock = new();
-    private readonly VwapCalculator _vwapCalculator;
-    private readonly ReversalDetector _reversalDetector;
+    private readonly IndicatorEngine _indicator;
     private readonly LeeReadyClassifier _classifier = new();
     private readonly int _ticksPerBucket;
 
@@ -24,11 +24,9 @@ public class CandleAggregator
 
     public event Action<long, double, double, double, double, double, string> OnCandleUpdate;
 
-    public CandleAggregator(VwapCalculator vwapCalculator, ReversalDetector reversalDetector,
-        int ticksPerBucket = TradingConfig.TicksPerBucket)
+    public CandleAggregator(IndicatorEngine indicator, int ticksPerBucket = TradingConfig.TicksPerBucket)
     {
-        _vwapCalculator = vwapCalculator;
-        _reversalDetector = reversalDetector;
+        _indicator = indicator;
         _ticksPerBucket = Math.Max(1, ticksPerBucket);
     }
 
@@ -88,9 +86,10 @@ public class CandleAggregator
             high = _high;
             low = _low;
             close = _close;
-            vwap = _vwapCalculator.Current;
-            var delta = _buyVolume - _sellVolume;
-            color = _reversalDetector.EvaluateCandle(bucketUnix, open, high, low, close, _volume, delta);
+
+            var result = _indicator.EvaluateForming(new Candle(bucketUnix, open, high, low, close, _volume));
+            vwap = result.Vwap;
+            color = result.Color;
         }
 
         OnCandleUpdate?.Invoke(bucketUnix, open, high, low, close, vwap, color);
@@ -122,31 +121,10 @@ public class CandleAggregator
             high = _high;
             low = _low;
             close = _close;
-            vwap = _vwapCalculator.Current;
-            var delta = _buyVolume - _sellVolume;
-            color = _reversalDetector.EvaluateCandle(bucketUnix, open, high, low, close, _volume, delta);
-        }
 
-        OnCandleUpdate?.Invoke(bucketUnix, open, high, low, close, vwap, color);
-    }
-
-    public void UpdateVwap()
-    {
-        long bucketUnix;
-        double open, high, low, close, vwap;
-        string color;
-
-        lock (_lock)
-        {
-            if (!_hasCandle) return;
-            bucketUnix = _currentBucketUnix;
-            open = _open;
-            high = _high;
-            low = _low;
-            close = _close;
-            vwap = _vwapCalculator.Current;
-            var delta = _buyVolume - _sellVolume;
-            color = _reversalDetector.EvaluateCandle(bucketUnix, open, high, low, close, _volume, delta);
+            var result = _indicator.EvaluateForming(new Candle(bucketUnix, open, high, low, close, _volume));
+            vwap = result.Vwap;
+            color = result.Color;
         }
 
         OnCandleUpdate?.Invoke(bucketUnix, open, high, low, close, vwap, color);
@@ -156,7 +134,8 @@ public class CandleAggregator
     {
         if (_hasCandle)
         {
-            _reversalDetector.OnCandleCompleted(_currentBucketUnix, _open, _high, _low, _close, _volume, _buyVolume - _sellVolume);
+            _indicator.ProcessCandle(
+                new Candle(_currentBucketUnix, _open, _high, _low, _close, _volume));
         }
 
         var unix = new DateTimeOffset(bucketTime).ToUnixTimeSeconds();
