@@ -18,6 +18,7 @@ namespace Trader
         private const int HistoricalDataRequestId = 1105;
         private const int MarketDataRequestId = 1108;
         private const decimal OrderQuantity = 2;
+        private const double RoundTripCommission = 0.7 * 2;
 
         private static PhotinoWindow _window;
         private static readonly IbClient _client = new();
@@ -253,6 +254,7 @@ namespace Trader
                 double pnlDollar = isBuy
                     ? (evalPrice - entryPrice) * (double)position.NetQuantity * TradeMultiplier
                     : (entryPrice - evalPrice) * (double)Math.Abs(position.NetQuantity) * TradeMultiplier;
+                pnlDollar -= RoundTripCommission * Math.Abs((double)position.NetQuantity);
                 var color = pnlDollar >= 0 ? "#26a69a" : "#ef5350";
 
                 string sign = pnlDollar >= 0 ? "+" : "";
