@@ -38,6 +38,7 @@ var momExp = IndicatorConfig.MomentumExpansionAtrRatio;
 var outWin = IndicatorConfig.OutcomeForwardBars;
 var outMin = IndicatorConfig.OutcomeMinWinAtr;
 var gate = IndicatorConfig.ConfluenceGate;
+var holdoutFraction = IndicatorConfig.OutcomeHoldoutFraction;
 var stream = false;
 var streamLimit = 0;
 
@@ -67,6 +68,7 @@ for (var i = 0; i < args.Length; i++)
         case "--outwin" when i + 1 < args.Length: outWin = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
         case "--outmin" when i + 1 < args.Length: outMin = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
         case "--gate" when i + 1 < args.Length: gate = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
+        case "--holdout" when i + 1 < args.Length: holdoutFraction = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
         case "--stream": stream = true; break;
         case "--streamlimit" when i + 1 < args.Length: streamLimit = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
     }
@@ -93,7 +95,8 @@ var paramsLine = $"Params: pivot={pivot} sweepWick={sweepWick:0.00} fvgWidth={fv
     + $"fvgBodies={fvgBodies} fvgFill={fvgFill:0.00} conBars={conBars} conAtr={conAtr:0.00} hold={holdBars} "
     + $"pbLeg={pbLeg:0.00} pb[{pbMin:0.000}-{pbMax:0.000}] wycSwings={wycSwings} wycBars={wycBars} "
     + $"wycMaxAtr={wycMaxAtr:0.00} wycPrior={wycPrior:0.00} momWi={momWi:0.00} momVol={momVol:0.00} "
-    + $"momDiv={momDiv:0.000} momExp={momExp:0.00} outWin={outWin} outMin={outMin:0.00} gate={gate}";
+    + $"momDiv={momDiv:0.000} momExp={momExp:0.00} outWin={outWin} outMin={outMin:0.00} gate={gate}"
+    + $" holdout={holdoutFraction:0.00}";
 
 var metrics = BacktestStats.Collect(candles, pipeline.Events, pipeline.Zones, pivot, sweepWick, fvgWidth);
 Console.WriteLine($"Loaded {candles.Count} candles from {csvPath}");
@@ -118,16 +121,31 @@ var outcomesGated = OutcomeStats.Collect(candles, pipeline.Events, outWin, outMi
     include: e => e.Qualified || !ConfluenceScorer.ColoredGated.Contains(e.Type));
 var comparisons = OutcomeCompare.Build(outcomesAll, outcomesGated);
 
+// M9 holdout: the reserved never-tuned tail. Split by bar count (feed is 1-minute, time-sorted).
+var holdoutStart = candles[(int)(candles.Count * (1.0 - Math.Clamp(holdoutFraction, 0, 0.49)))].Time;
+var outcomesInSample = OutcomeStats.Collect(candles, pipeline.Events, outWin, outMin,
+    include: e => e.Time < holdoutStart);
+var outcomesHoldout = OutcomeStats.Collect(candles, pipeline.Events, outWin, outMin,
+    include: e => e.Time >= holdoutStart);
+var outcomesHoldoutGated = OutcomeStats.Collect(candles, pipeline.Events, outWin, outMin,
+    include: e => e.Time >= holdoutStart && (e.Qualified || !ConfluenceScorer.ColoredGated.Contains(e.Type)));
+var holdoutRows = OutcomeHoldout.Build(outcomesInSample, outcomesHoldout, outcomesHoldoutGated);
+
 var summary = new System.Text.StringBuilder();
 summary.AppendLine("M7 gating report (win%: all -> gated, delta):");
 foreach (var row in comparisons)
+    summary.AppendLine(row.ToTable());
+summary.AppendLine();
+summary.AppendLine($"M9 holdout report (last {holdoutFraction:0%} of bars — never tuned; win%: in-sample | holdout | holdout-gated):");
+summary.AppendLine($"  split at bar {(int)(candles.Count * (1.0 - Math.Clamp(holdoutFraction, 0, 0.49)))} of {candles.Count} (time {holdoutStart})");
+foreach (var row in holdoutRows)
     summary.AppendLine(row.ToTable());
 var outcomeText = summary.ToString();
 
 Directory.CreateDirectory(outputDir);
 File.WriteAllText(outputPath, html);
 File.WriteAllText(Path.Combine(outputDir, "dashboard.html"),
-    DashboardHtml.BuildComparison(comparisons, $"SMC indicator — {candles.Count} bars", paramsLine));
+    DashboardHtml.BuildComparison(comparisons, holdoutRows, $"SMC indicator — {candles.Count} bars", paramsLine));
 
 Console.WriteLine($"Generated chart: {outputPath}");
 Console.WriteLine($"Generated dashboard: {Path.Combine(outputDir, "dashboard.html")}");

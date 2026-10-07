@@ -9,6 +9,7 @@ public static class DashboardHtml
 {
     public static string BuildComparison(
         IReadOnlyList<OutcomeComparison> rows,
+        IReadOnlyList<OutcomeHoldoutRow>? holdout,
         string title,
         string paramsLine)
     {
@@ -51,7 +52,29 @@ public static class DashboardHtml
                 + $"<td class=\"{deltaClass}\">{FmtDelta(delta)}</td></tr>");
         }
 
-        sb.AppendLine("</table></body></html>");
+        sb.AppendLine("</table>");
+
+        if (holdout is { Count: > 0 })
+        {
+            sb.AppendLine("<h2 style=\"font-size:15px;margin:20px 0 6px\">M9 holdout validation — never-tuned tail</h2>");
+            sb.AppendLine("<div class=\"sub\">Reserved last bars (default 20%). Tuning never saw these. "
+                + "If the holdout win% collapses vs in-sample, the edge was overfit.</div>");
+            sb.AppendLine("<table><tr><th>Signal</th><th>Detail</th><th>Direction</th>"
+                + "<th>In-sample N</th><th>In-sample win%</th><th>Holdout N</th><th>Holdout win%</th>"
+                + "<th>Holdout gated N</th><th>Holdout gated win%</th></tr>");
+            foreach (var r in holdout)
+            {
+                var cls = r.HoldoutWin is null ? "" : r.HoldoutWin >= 55 ? "good" : r.HoldoutWin >= 45 ? "warn" : "bad";
+                sb.AppendLine("<tr>"
+                    + $"<td>{Html(r.Label)}</td><td>{Html(r.Detail)}</td><td>{Html(r.Direction)}</td>"
+                    + $"<td>{r.InCount}</td><td>{FmtInt(r.InWin)}</td>"
+                    + $"<td>{r.HoldoutCount}</td><td class=\"{cls}\">{FmtInt(r.HoldoutWin)}</td>"
+                    + $"<td>{r.GatedCount}</td><td>{FmtInt(r.GatedWin)}</td></tr>");
+            }
+            sb.AppendLine("</table>");
+        }
+
+        sb.AppendLine("</body></html>");
         return sb.ToString();
     }
 

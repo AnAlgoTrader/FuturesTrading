@@ -70,4 +70,7 @@ public static class IndicatorConfig
     public const int OutcomeForwardBars = 10;
     public const double OutcomeMinWinAtr = 0.25;
     public const double OutcomeHitAtr = 1.0;
+
+    // Holdout validation (M9) — reserve this fraction (of the last bars) as a never-tuned test tail.
+    public const double OutcomeHoldoutFraction = 0.2;
 }
