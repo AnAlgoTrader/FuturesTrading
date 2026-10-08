@@ -17,4 +17,8 @@
         <PackageReference Include="Photino.NET" Version="4.0.16" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\..\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client.csproj" />
+    </ItemGroup>
+
 </Project>
