@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Common.Model;
 using Ib.Csharp.Api.Client.Implementation.Helper;
 
@@ -6,7 +7,7 @@ namespace Trader.Model;
 
 public class CandleAggregator
 {
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private readonly LeeReadyClassifier _classifier = new();
     private readonly int _ticksPerBucket;
 
