@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Common.Helper;
@@ -74,6 +75,19 @@ namespace FootPrintTrader
         private static void TimerCallback(object state)
         {
             var snap = _footprintClassifier.GetSnapshot();
+            if (snap.Current == null) return;
+
+            SendUpdate(UpdateMessageType.FOOTPRINT_CURRENT, snap.Current);
+        }
+
+        private static void SendUpdate(string type, object data)
+        {
+            var message = new UpdateMessage
+            {
+                Type = type,
+                Data = JsonSerializer.SerializeToElement(data)
+            };
+            _window?.SendWebMessage(JsonSerializer.Serialize(message));
         }
     }
 }
