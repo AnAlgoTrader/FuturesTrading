@@ -48,21 +48,25 @@
       custom = nc; wrap.style.background = nc.panel || '';
       labels = Array.isArray(meta.footerLabels) ? meta.footerLabels.map(String) : [];
       hud = Array.isArray(meta.analysis) ? meta.analysis.filter(l => l && typeof l.text === 'string') : [];
-      bars = nb; hover = null; refreshMeta();
-      V.colW = 92; V.x0 = Math.max(0, bars.length * V.colW - (W - AXIS) + 30); fit(); limits(); redraw();
+      const oldFirst = bars.length ? bars[0].id : null, hv = hover;
+      bars = nb; refreshMeta();
+      if (oldFirst === null) {                                              // first snapshot: frame the chart
+        V.colW = 92;
+        V.x0 = Math.max(0, bars.length * V.colW - (W - AXIS) + 30);
+        fit();
+        hover = null;
+      } else {
+        if (bars[0].id !== oldFirst) { V.x0 -= V.colW; if (hv) hv.i--; }     // history slid one slot: keep visible bars in place
+        hover = hv && hv.i >= 0 && bars[hv.i] && bars[hv.i].map[hv.k] ? hv : null;
+      }
+      limits(); redraw();
     }
-    // Replace the last bar (append=false) or add a new one (append=true). Keeps following the newest bar if the viewer is there.
+    // Replace the last bar (append=false) or add a new one (append=true). The view never moves by itself.
     function put(raw, append) {
       if (!bars.length) throw new Error('call load() with a snapshot first');
       const nb = parseBar(raw, append ? bars.length : bars.length - 1, R);
-      const follow = V.x0 >= Math.max(0, bars.length * V.colW - (W - AXIS) + 30) - V.colW;   // viewer is at the right edge
       if (append) bars.push(nb); else bars[bars.length - 1] = nb;
       refreshMeta();
-      if (follow) {
-        V.x0 = Infinity;                                                          // limits() clamps to the newest bar
-        const ch = H - FOOT, span = ch / V.ppu, bot = V.top - span, c = nb.close !== null ? nb.close : nb.hi, pad = Math.max(R * 2, span * .1);
-        if (c > V.top - pad || c < bot + pad) V.top = c + span / 2;
-      }
       limits(); redraw();
     }
     function limits() {
