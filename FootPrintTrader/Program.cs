@@ -16,7 +16,7 @@ namespace FootPrintTrader
             };
 
             _window = window
-                .SetTitle("Trader")
+                .SetTitle("FootPrintTrader")
                 .SetUseOsDefaultSize(false)
                 .SetMaximized(true)
                 .RegisterWebMessageReceivedHandler(ReceiveMessage)
@@ -27,7 +27,8 @@ namespace FootPrintTrader
         
         private static void ReceiveMessage(object sender, string message)
         {
-            
+            if (message == "applicationReady")
+                Console.WriteLine("The application is ready");
         }
     }
 }
