@@ -9,9 +9,16 @@
 </head>
 <body>
 
-<div id="footprint-dump" class="footprint-dump">waiting for data...</div>
+<div id="app">
+    <div id="wrap">
+        <canvas id="cv"></canvas>
+        <div id="msg"></div>
+    </div>
+    <pre id="footprint-dump" class="footprint-dump">waiting for data...</pre>
+</div>
 
 <script src="app://dynamic.js"></script>
+<script src="assets/js/footprint-render.js"></script>
 <script src="assets/js/main.js"></script>
 <script>
     window.external.receiveMessage(message => receiveFromBackground(message));

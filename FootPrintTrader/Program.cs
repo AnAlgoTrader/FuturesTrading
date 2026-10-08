@@ -24,11 +24,12 @@ namespace FootPrintTrader
         
         private const int PriceTickRequestId = 1109;
         private const int TradeTickRequestId = 1110;
+        private const double TickSize = 0.25;
         
         [STAThread]
         private static void Main()
         {
-            _footprintClassifier = new FootprintClassifier(tickSize: 0.25, tradesPerBar: 1000);
+            _footprintClassifier = new FootprintClassifier(tickSize: TickSize, tradesPerBar: 1000);
             _logger = new Logger();
             var window = new PhotinoWindow
             {
@@ -75,9 +76,9 @@ namespace FootPrintTrader
         private static void TimerCallback(object state)
         {
             var snap = _footprintClassifier.GetSnapshot();
-            if (snap.Current == null) return;
+            if (snap.Current == null && snap.Completed.Length == 0) return;
 
-            SendUpdate(UpdateMessageType.FOOTPRINT_CURRENT, snap.Current);
+            SendUpdate(UpdateMessageType.FOOTPRINT_SNAPSHOT, FootprintRenderBuilder.Build(snap, TickSize));
         }
 
         private static void SendUpdate(string type, object data)
@@ -85,7 +86,7 @@ namespace FootPrintTrader
             var message = new UpdateMessage
             {
                 Type = type,
-                Data = JsonSerializer.SerializeToElement(data)
+                Data = JsonSerializer.SerializeToElement(data, FootprintRenderBuilder.JsonOptions)
             };
             _window?.SendWebMessage(JsonSerializer.Serialize(message));
         }

@@ -10,5 +10,5 @@ public class UpdateMessage
 
 public class UpdateMessageType
 {
-    public const string FOOTPRINT_CURRENT = "FOOTPRINT_CURRENT";
+    public const string FOOTPRINT_SNAPSHOT = "FOOTPRINT_SNAPSHOT";
 }
