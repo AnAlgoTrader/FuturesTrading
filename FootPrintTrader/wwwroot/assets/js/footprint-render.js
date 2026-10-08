@@ -85,7 +85,9 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const cs = getComputedStyle(document.documentElement), C = n => cs.getPropertyValue(n).trim();
       const col = {text: C('--text'), muted: C('--muted'), grid: C('--grid'), up: C('--up'), down: C('--down'), vol: C('--vol'), panel: C('--panel')}; Object.assign(col, custom);
-      ctx.clearRect(0, 0, W, H); ctx.font = '11px ui-monospace,Menlo,Consolas,monospace'; ctx.textBaseline = 'middle';
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = col.panel; ctx.fillRect(0, 0, W, H);
+      ctx.font = '11px ui-monospace,Menlo,Consolas,monospace'; ctx.textBaseline = 'middle';
       if (!bars.length) {ctx.fillStyle = col.muted; ctx.textAlign = 'center'; ctx.fillText('Waiting for data\u2026', W / 2, H / 2); return }
       const cw = W - AXIS, ch = H - FOOT, ppu = V.ppu, cwid = V.colW, rowH = R * ppu, showNum = rowH >= 12 && cwid >= 60, pBot = V.top - ch / ppu;
       const i0 = Math.max(0, Math.floor(V.x0 / cwid)), i1 = Math.min(bars.length - 1, Math.floor((V.x0 + cw) / cwid));
