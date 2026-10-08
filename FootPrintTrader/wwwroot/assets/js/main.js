@@ -17,9 +17,6 @@ function receiveFromBackground(message){
 }
 
 function footprintSnapshot(data){
-    const el = document.getElementById('footprint-dump');
-    if (el) el.textContent = JSON.stringify(data, null, 2);
-
     if (!window.footprint || !Array.isArray(data.bars) || !data.bars.length) return;
 
     const bars = data.bars;
