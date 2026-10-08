@@ -39,12 +39,19 @@ public class FootprintRenderBar
     public List<FootprintRenderFooter> Footer { get; set; } = new();
 }
 
+public class FootprintRenderLine
+{
+    public string Text { get; set; } = "";
+    public string Tone { get; set; }
+}
+
 public class FootprintRenderSnapshot
 {
     public double RowSize { get; set; }
     public string[] FooterLabels { get; set; } = { "Delta", "Vol" };
     public Dictionary<string, string> Colors { get; set; } = new();
     public List<FootprintRenderBar> Bars { get; set; } = new();
+    public List<FootprintRenderLine> Analysis { get; set; }
 }
 
 public static class FootprintRenderBuilder
@@ -85,6 +92,10 @@ public static class FootprintRenderBuilder
             result.Bars.Add(ConvertBar(bar));
         if (snapshot.Current != null)
             result.Bars.Add(ConvertBar(snapshot.Current));
+
+        var analysis = FootprintAnalyzer.Analyze(snapshot, tickSize);
+        if (analysis.Count > 0)
+            result.Analysis = analysis;
         return result;
     }
 
@@ -156,7 +167,7 @@ public static class FootprintRenderBuilder
         };
     }
 
-    private static string FormatTime(long unixSeconds)
+    public static string FormatTime(long unixSeconds)
     {
         if (unixSeconds <= 0 || unixSeconds > 4102444800) return "";
         return DateTimeOffset.FromUnixTimeSeconds(unixSeconds)

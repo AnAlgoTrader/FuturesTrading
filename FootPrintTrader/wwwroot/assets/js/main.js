@@ -19,6 +19,8 @@ function receiveFromBackground(message){
 function footprintSnapshot(data){
     if (!window.footprint || !Array.isArray(data.bars) || !data.bars.length) return;
 
+    if (window.footprint.setAnalysis) window.footprint.setAnalysis(data.analysis || []);
+
     const bars = data.bars;
     const signature = bars.length + ':' + bars[0].id;
 
