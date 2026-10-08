@@ -4,6 +4,8 @@ using System.Globalization;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Common.Helper;
+using Common.Model;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;

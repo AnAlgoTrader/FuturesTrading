@@ -2,10 +2,11 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Common.Model;
 using Ib.Csharp.Api.Client.Implementation;
 using IBApi;
 
-namespace Trader.Model;
+namespace Common.Helper;
 
 public class ContractHelper
 {

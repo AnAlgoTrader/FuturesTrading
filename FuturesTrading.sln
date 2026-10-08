@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Trader", "Trader\Trader.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FootPrintTrader", "FootPrintTrader\FootPrintTrader.csproj", "{AC47B5CA-965F-4A2B-BF2F-412B09FEB432}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "Common\Common.csproj", "{A967F984-C142-4BC2-8A6E-45E6347CF397}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +54,18 @@ Global
 		{AC47B5CA-965F-4A2B-BF2F-412B09FEB432}.Release|x64.Build.0 = Release|Any CPU
 		{AC47B5CA-965F-4A2B-BF2F-412B09FEB432}.Release|x86.ActiveCfg = Release|Any CPU
 		{AC47B5CA-965F-4A2B-BF2F-412B09FEB432}.Release|x86.Build.0 = Release|Any CPU
+		{A967F984-C142-4BC2-8A6E-45E6347CF397}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A967F984-C142-4BC2-8A6E-45E6347CF397}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A967F984-C142-4BC2-8A6E-45E6347CF397}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A967F984-C142-4BC2-8A6E-45E6347CF397}.Debug|x64.Build.0 = Debug|Any CPU
+		{A967F984-C142-4BC2-8A6E-45E6347CF397}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A967F984-C142-4BC2-8A6E-45E6347CF397}.Debug|x86.Build.0 = Debug|Any CPU
+		{A967F984-C142-4BC2-8A6E-45E6347CF397}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A967F984-C142-4BC2-8A6E-45E6347CF397}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A967F984-C142-4BC2-8A6E-45E6347CF397}.Release|x64.ActiveCfg = Release|Any CPU
+		{A967F984-C142-4BC2-8A6E-45E6347CF397}.Release|x64.Build.0 = Release|Any CPU
+		{A967F984-C142-4BC2-8A6E-45E6347CF397}.Release|x86.ActiveCfg = Release|Any CPU
+		{A967F984-C142-4BC2-8A6E-45E6347CF397}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

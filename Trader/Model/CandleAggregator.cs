@@ -1,4 +1,5 @@
 using System;
+using Common.Model;
 using Ib.Csharp.Api.Client.Implementation.Helper;
 
 namespace Trader.Model;

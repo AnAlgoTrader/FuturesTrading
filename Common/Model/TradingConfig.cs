@@ -1,4 +1,4 @@
-namespace Trader.Model;
+namespace Common.Model;
 
 public static class TradingConfig
 {

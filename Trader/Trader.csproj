@@ -33,7 +33,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client.csproj" />
+      <ProjectReference Include="..\Common\Common.csproj" />
     </ItemGroup>
 
 </Project>
