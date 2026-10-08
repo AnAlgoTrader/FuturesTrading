@@ -5,7 +5,6 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Ib.Csharp.Api.Client.Implementation;
-using Ib.Csharp.Api.Client.Implementation.Helper;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 using Photino.NET;
