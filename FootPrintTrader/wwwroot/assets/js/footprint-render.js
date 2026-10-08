@@ -86,7 +86,6 @@
       const cs = getComputedStyle(document.documentElement), C = n => cs.getPropertyValue(n).trim();
       const col = {text: C('--text'), muted: C('--muted'), grid: C('--grid'), up: C('--up'), down: C('--down'), vol: C('--vol'), panel: C('--panel')}; Object.assign(col, custom);
       ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = col.panel; ctx.fillRect(0, 0, W, H);
       ctx.font = '11px ui-monospace,Menlo,Consolas,monospace'; ctx.textBaseline = 'middle';
       if (!bars.length) {ctx.fillStyle = col.muted; ctx.textAlign = 'center'; ctx.fillText('Waiting for data\u2026', W / 2, H / 2); return }
       const cw = W - AXIS, ch = H - FOOT, ppu = V.ppu, cwid = V.colW, rowH = R * ppu, showNum = rowH >= 12 && cwid >= 60, pBot = V.top - ch / ppu;
@@ -195,7 +194,18 @@
     window.footprint = {
       load: api(d => load(parse(d))),                 // full snapshot: {rowSize, colors, footerLabels, bars:[...]}
       updateLast: api(b => put(parse(b), false)),      // replace the last (live) bar with a rebuilt version
-      append: api(b => put(parse(b), true))            // start a new bar after the last one
+      append: api(b => put(parse(b), true)),           // start a new bar after the last one
+      showAll: function () {                           // scroll to the oldest bar and shrink columns so every bar fits
+        if (!bars.length) return {ok: false, error: 'no data'};
+        size();
+        V.x0 = 0;
+        const available = Math.max(AXIS + 60, W - AXIS);
+        if (bars.length * V.colW > available) V.colW = Math.max(24, available / bars.length);
+        fit();
+        limits();
+        draw();
+        return {ok: true};
+      }
     };
 
     size(); draw();

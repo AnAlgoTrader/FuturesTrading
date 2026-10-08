@@ -11,6 +11,4 @@ public class UpdateMessage
 public class UpdateMessageType
 {
     public const string FOOTPRINT_SNAPSHOT = "FOOTPRINT_SNAPSHOT";
-    public const string CAPTURE_CHART = "CAPTURE_CHART";
-    public const string CHART_CAPTURE = "CHART_CAPTURE";
 }

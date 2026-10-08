@@ -26,11 +26,7 @@ namespace FootPrintTrader
         private const int PriceTickRequestId = 1109;
         private const int TradeTickRequestId = 1110;
         private const double TickSize = 0.25;
-        private static readonly TimeSpan CaptureTimeout = TimeSpan.FromSeconds(5);
 
-        private static bool _allowClose;
-        private static int _captureStarted;
-        private static int _captureCompleted;
         private static int _snapshotWritten;
         
         [STAThread]
@@ -51,7 +47,7 @@ namespace FootPrintTrader
                 .Load("wwwroot/index.html");
 
             _window.WindowClosing += OnWindowClosing;
-            AppDomain.CurrentDomain.ProcessExit += (_, _) => WriteSnapshot(null);
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => WriteSnapshot();
 
             _window.WaitForClose();
         }
@@ -59,68 +55,17 @@ namespace FootPrintTrader
         private static void ReceiveMessage(object sender, string message)
         {
             if (message == "applicationReady")
-            {
                 _ = InitAndSubscribe();
-                return;
-            }
-
-            HandleUiMessage(message);
-        }
-
-        private static void HandleUiMessage(string message)
-        {
-            if (string.IsNullOrWhiteSpace(message) || message[0] != '{') return;
-
-            try
-            {
-                var update = JsonSerializer.Deserialize<UpdateMessage>(message);
-                if (update?.Type == UpdateMessageType.CHART_CAPTURE)
-                {
-                    var data = update.Data.ValueKind == JsonValueKind.String ? update.Data.GetString() : null;
-                    CompleteCapture(DecodePng(data));
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.WriteLine($"[SNAPSHOT] Failed to read UI message: {ex.Message}");
-            }
         }
 
         private static bool OnWindowClosing(object sender, EventArgs e)
         {
-            if (_allowClose) return false;
-
-            StartCapture();
-            return true;
-        }
-
-        private static void StartCapture()
-        {
-            if (Interlocked.Exchange(ref _captureStarted, 1) == 1) return;
-
-            SendUpdate(UpdateMessageType.CAPTURE_CHART, null);
-            _ = Task.Delay(CaptureTimeout).ContinueWith(_ => CompleteCapture(null), TaskScheduler.Default);
-        }
-
-        private static void CompleteCapture(byte[] png)
-        {
-            if (Interlocked.Exchange(ref _captureCompleted, 1) == 1) return;
-
             _threadedTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-            WriteSnapshot(png);
-
-            _allowClose = true;
-            try
-            {
-                _window?.Close();
-            }
-            catch (Exception ex)
-            {
-                _logger?.WriteLine($"[SNAPSHOT] Close failed: {ex.Message}");
-            }
+            WriteSnapshot();
+            return false;
         }
 
-        private static void WriteSnapshot(byte[] png)
+        private static void WriteSnapshot()
         {
             if (Interlocked.Exchange(ref _snapshotWritten, 1) == 1) return;
 
@@ -135,31 +80,17 @@ namespace FootPrintTrader
 
                 var jsonPath = Path.Combine(Logger.DATA_DIR, $"footprint-{stamp}.json");
                 File.WriteAllText(jsonPath, JsonSerializer.Serialize(payload, FootprintRenderBuilder.JsonOptions));
-                var written = $"[SNAPSHOT] {Path.GetFileName(jsonPath)}";
 
-                if (png is { Length: > 0 })
-                {
-                    var pngPath = Path.Combine(Logger.DATA_DIR, $"footprint-{stamp}.png");
-                    File.WriteAllBytes(pngPath, png);
-                    written += $" + {Path.GetFileName(pngPath)} ({png.Length:N0} bytes)";
-                }
+                var htmlPath = Path.Combine(Logger.DATA_DIR, $"footprint-{stamp}.html");
+                File.WriteAllText(htmlPath, FootprintHtmlExporter.Build(payload, DateTime.Now));
 
-                _logger?.WriteLine(written);
+                _logger?.WriteLine($"[SNAPSHOT] {Path.GetFileName(jsonPath)} + {Path.GetFileName(htmlPath)}");
             }
             catch (Exception ex)
             {
                 Interlocked.Exchange(ref _snapshotWritten, 0);
                 _logger?.WriteLine($"[SNAPSHOT] Write failed: {ex}");
             }
-        }
-
-        private static byte[] DecodePng(string dataUrl)
-        {
-            if (string.IsNullOrWhiteSpace(dataUrl)) return null;
-
-            var marker = dataUrl.IndexOf("base64,", StringComparison.Ordinal);
-            var base64 = marker >= 0 ? dataUrl[(marker + 7)..] : dataUrl;
-            return Convert.FromBase64String(base64);
         }
 
         private static async Task InitAndSubscribe()
