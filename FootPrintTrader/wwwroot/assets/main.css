@@ -195,6 +195,155 @@ html, body {
     text-transform: uppercase;
 }
 
+/* ---- Action Trading Buttons ---- */
+.actions-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.action-btn {
+    border: none;
+    border-radius: 6px;
+    padding: 9px 10px;
+    cursor: pointer;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    transition: filter 0.15s ease, transform 0.08s ease;
+    user-select: none;
+}
+
+.action-btn:hover {
+    filter: brightness(1.12);
+}
+
+.action-btn:active {
+    transform: scale(0.97);
+}
+
+.action-buy {
+    background: #2f9c5c;
+    border: 1px solid rgba(47, 156, 92, 0.6);
+}
+
+.action-sell {
+    background: #d64545;
+    border: 1px solid rgba(214, 69, 69, 0.6);
+}
+
+.action-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+}
+
+.action-price {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+}
+
+/* ---- Position Card ---- */
+.position-card {
+    background: #171c26;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+
+.btn-flatten {
+    background: rgba(240, 100, 123, 0.18);
+    color: var(--down);
+    border: 1px solid rgba(240, 100, 123, 0.4);
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.btn-flatten:hover {
+    background: var(--down);
+    color: #fff;
+}
+
+.position-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(38, 45, 59, 0.7);
+}
+
+.pos-status-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pos-qty {
+    font-size: 12px;
+    font-weight: 700;
+    font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+    color: #fff;
+}
+
+.pos-pnl-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.pos-pnl {
+    font-size: 14px;
+    font-weight: 800;
+    font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+    color: var(--text);
+}
+
+.pos-pts {
+    font-size: 11px;
+    font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+    color: var(--muted);
+}
+
+.position-details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.pos-detail-item {
+    background: #121620;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 5px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.pos-detail-lbl {
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pos-detail-val {
+    font-size: 12px;
+    font-weight: 700;
+    font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+    color: var(--text);
+}
+
 /* ---- Bias Card ---- */
 .bias-card {
     border-left: 4px solid var(--muted);

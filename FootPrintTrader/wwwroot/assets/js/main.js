@@ -5,7 +5,9 @@ function callBackground(message) {
 }
 
 const handlers = {
-    FOOTPRINT_SNAPSHOT: footprintSnapshot
+    FOOTPRINT_SNAPSHOT: footprintSnapshot,
+    MARKET_DATA: marketData,
+    POSITION_UPDATE: positionUpdate
 };
 
 let lastSignature = null;
@@ -21,9 +23,79 @@ function receiveFromBackground(message) {
     }
 }
 
+function marketData(data) {
+    if (!data) return;
+    setPrice('price-buy', data.Ask);
+    setPrice('price-sell', data.Bid);
+}
+
+function setPrice(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const text = (value != null && value > 0) ? value.toFixed(2) : '-';
+    if (el.textContent !== text) {
+        el.textContent = text;
+    }
+}
+
+function positionUpdate(data) {
+    if (!data) return;
+
+    const symbolEl = document.getElementById('pos-symbol');
+    const directionEl = document.getElementById('pos-direction');
+    const qtyEl = document.getElementById('pos-qty');
+    const avgPriceEl = document.getElementById('pos-avg-price');
+    const currPriceEl = document.getElementById('pos-curr-price');
+    const pnlEl = document.getElementById('pos-pnl');
+    const ptsEl = document.getElementById('pos-pts');
+    const flattenBtn = document.getElementById('btn-flatten');
+
+    if (symbolEl && data.Symbol) symbolEl.textContent = data.Symbol;
+
+    const isFlat = !data.NetQuantity || data.NetQuantity === 0;
+
+    if (isFlat) {
+        if (directionEl) {
+            directionEl.className = 'status-pill neutral';
+            directionEl.textContent = 'FLAT';
+        }
+        if (qtyEl) qtyEl.textContent = '0';
+        if (avgPriceEl) avgPriceEl.textContent = '-';
+        if (currPriceEl) currPriceEl.textContent = (data.CurrentPrice > 0) ? data.CurrentPrice.toFixed(2) : '-';
+        if (pnlEl) {
+            pnlEl.textContent = '$0.00';
+            pnlEl.className = 'pos-pnl';
+        }
+        if (ptsEl) ptsEl.textContent = '(0.00 pts)';
+        if (flattenBtn) flattenBtn.style.display = 'none';
+    } else {
+        const isLong = String(data.Direction).toUpperCase() === 'BUY';
+        if (directionEl) {
+            directionEl.className = `status-pill ${isLong ? 'bullish' : 'bearish'}`;
+            directionEl.textContent = isLong ? 'LONG' : 'SHORT';
+        }
+        if (qtyEl) qtyEl.textContent = String(Math.abs(data.NetQuantity));
+        if (avgPriceEl) avgPriceEl.textContent = (data.AveragePrice > 0) ? data.AveragePrice.toFixed(2) : '-';
+        if (currPriceEl) currPriceEl.textContent = (data.CurrentPrice > 0) ? data.CurrentPrice.toFixed(2) : '-';
+
+        const pnl = data.UnrealizedPnL || 0;
+        const pts = data.PointsPnL || 0;
+        const pnlSign = pnl >= 0 ? '+' : '−';
+        const ptsSign = pts >= 0 ? '+' : '−';
+
+        if (pnlEl) {
+            pnlEl.textContent = `${pnlSign}$${Math.abs(pnl).toFixed(2)}`;
+            pnlEl.className = `pos-pnl ${pnl >= 0 ? 'val-up' : 'val-down'}`;
+        }
+        if (ptsEl) {
+            ptsEl.textContent = `(${ptsSign}${Math.abs(pts).toFixed(2)} pts)`;
+        }
+        if (flattenBtn) flattenBtn.style.display = 'inline-block';
+    }
+}
+
 function footprintSnapshot(data) {
     if (!window.footprint || !Array.isArray(data.bars) || !data.bars.length) return;
-
 
     // Update the rich Order Flow side panel
     if (data.context) {

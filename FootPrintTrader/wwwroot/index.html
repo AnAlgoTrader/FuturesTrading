@@ -31,6 +31,46 @@
         </div>
 
         <div class="sidebar-body">
+            <!-- Trade Execution Actions -->
+            <div class="actions-card">
+                <button class="action-btn action-buy" id="btn-buy" type="button" onclick="callBackground('buy')">
+                    <span class="action-label">BUY</span>
+                    <span class="action-price" id="price-buy">-</span>
+                </button>
+                <button class="action-btn action-sell" id="btn-sell" type="button" onclick="callBackground('sell')">
+                    <span class="action-label">SELL</span>
+                    <span class="action-price" id="price-sell">-</span>
+                </button>
+            </div>
+
+            <!-- Position Management Card -->
+            <div class="card position-card" id="position-card">
+                <div class="card-title-row">
+                    <span class="card-title">POSITION (<span id="pos-symbol">MES</span>)</span>
+                    <button class="btn-flatten" id="btn-flatten" type="button" onclick="callBackground('closeTrade')" style="display: none;">FLATTEN</button>
+                </div>
+                <div class="position-summary-row">
+                    <div class="pos-status-badge">
+                        <span class="status-pill neutral" id="pos-direction">FLAT</span>
+                        <span class="pos-qty" id="pos-qty">0</span>
+                    </div>
+                    <div class="pos-pnl-wrap">
+                        <span class="pos-pnl" id="pos-pnl">$0.00</span>
+                        <span class="pos-pts" id="pos-pts">(0.00 pts)</span>
+                    </div>
+                </div>
+                <div class="position-details-grid">
+                    <div class="pos-detail-item">
+                        <span class="pos-detail-lbl">Avg Price</span>
+                        <span class="pos-detail-val" id="pos-avg-price">-</span>
+                    </div>
+                    <div class="pos-detail-item">
+                        <span class="pos-detail-lbl">Mark Price</span>
+                        <span class="pos-detail-val" id="pos-curr-price">-</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Market Bias Card -->
             <div class="card bias-card" id="bias-card">
                 <div class="card-title-row">
