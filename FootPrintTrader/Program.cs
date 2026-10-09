@@ -154,6 +154,17 @@ namespace FootPrintTrader
             _client.OnMarketDataTradeTickByTickUpdate += trade =>
             {
                 _footprintClassifier.OnTrade(trade.Time, trade.Price, trade.Size);
+                if (trade.Price > 0)
+                {
+                    _currentPrice = trade.Price;
+                    _orderHelper.CurrentChartPrice = _currentPrice;
+                    if (_bid <= 0 && _ask <= 0)
+                    {
+                        _bid = _currentPrice - TickSize * 0.5;
+                        _ask = _currentPrice + TickSize * 0.5;
+                        SendUpdate(UpdateMessageType.MARKET_DATA, new MarketDataUpdate { Bid = _bid, Ask = _ask });
+                    }
+                }
             };
 
             _client.Start("127.0.0.1", 4001, 0);
@@ -175,6 +186,23 @@ namespace FootPrintTrader
             if (snap.Current != null || snap.Completed.Length > 0)
             {
                 SendUpdate(UpdateMessageType.FOOTPRINT_SNAPSHOT, FootprintRenderBuilder.Build(snap, TickSize));
+
+                if (_bid <= 0 && _ask <= 0)
+                {
+                    var lastBar = snap.Current ?? snap.Completed[^1];
+                    if (lastBar.Close > 0)
+                    {
+                        _currentPrice = lastBar.Close;
+                        _orderHelper.CurrentChartPrice = _currentPrice;
+                        _bid = _currentPrice - TickSize * 0.5;
+                        _ask = _currentPrice + TickSize * 0.5;
+                    }
+                }
+            }
+
+            if (_bid > 0 || _ask > 0)
+            {
+                SendUpdate(UpdateMessageType.MARKET_DATA, new MarketDataUpdate { Bid = _bid, Ask = _ask });
             }
 
             SendPositionUpdate();

@@ -25,14 +25,17 @@ function receiveFromBackground(message) {
 
 function marketData(data) {
     if (!data) return;
-    setPrice('price-buy', data.Ask);
-    setPrice('price-sell', data.Bid);
+    const ask = data.ask ?? data.Ask;
+    const bid = data.bid ?? data.Bid;
+    setPrice('price-buy', ask);
+    setPrice('price-sell', bid);
 }
 
 function setPrice(id, value) {
     const el = document.getElementById(id);
     if (!el) return;
-    const text = (value != null && value > 0) ? value.toFixed(2) : '-';
+    const num = Number(value);
+    const text = (!isNaN(num) && num > 0) ? num.toFixed(2) : '-';
     if (el.textContent !== text) {
         el.textContent = text;
     }
@@ -40,6 +43,14 @@ function setPrice(id, value) {
 
 function positionUpdate(data) {
     if (!data) return;
+
+    const symbol = data.symbol ?? data.Symbol ?? 'MES';
+    const direction = data.direction ?? data.Direction ?? '';
+    const netQuantity = data.netQuantity ?? data.NetQuantity ?? 0;
+    const averagePrice = data.averagePrice ?? data.AveragePrice ?? 0;
+    const currentPrice = data.currentPrice ?? data.CurrentPrice ?? 0;
+    const unrealizedPnL = data.unrealizedPnL ?? data.UnrealizedPnL ?? 0;
+    const pointsPnL = data.pointsPnL ?? data.PointsPnL ?? 0;
 
     const symbolEl = document.getElementById('pos-symbol');
     const directionEl = document.getElementById('pos-direction');
@@ -50,9 +61,9 @@ function positionUpdate(data) {
     const ptsEl = document.getElementById('pos-pts');
     const flattenBtn = document.getElementById('btn-flatten');
 
-    if (symbolEl && data.Symbol) symbolEl.textContent = data.Symbol;
+    if (symbolEl) symbolEl.textContent = symbol;
 
-    const isFlat = !data.NetQuantity || data.NetQuantity === 0;
+    const isFlat = !netQuantity || netQuantity === 0;
 
     if (isFlat) {
         if (directionEl) {
@@ -61,7 +72,7 @@ function positionUpdate(data) {
         }
         if (qtyEl) qtyEl.textContent = '0';
         if (avgPriceEl) avgPriceEl.textContent = '-';
-        if (currPriceEl) currPriceEl.textContent = (data.CurrentPrice > 0) ? data.CurrentPrice.toFixed(2) : '-';
+        if (currPriceEl) currPriceEl.textContent = (currentPrice > 0) ? Number(currentPrice).toFixed(2) : '-';
         if (pnlEl) {
             pnlEl.textContent = '$0.00';
             pnlEl.className = 'pos-pnl';
@@ -69,17 +80,17 @@ function positionUpdate(data) {
         if (ptsEl) ptsEl.textContent = '(0.00 pts)';
         if (flattenBtn) flattenBtn.style.display = 'none';
     } else {
-        const isLong = String(data.Direction).toUpperCase() === 'BUY';
+        const isLong = String(direction).toUpperCase() === 'BUY';
         if (directionEl) {
             directionEl.className = `status-pill ${isLong ? 'bullish' : 'bearish'}`;
             directionEl.textContent = isLong ? 'LONG' : 'SHORT';
         }
-        if (qtyEl) qtyEl.textContent = String(Math.abs(data.NetQuantity));
-        if (avgPriceEl) avgPriceEl.textContent = (data.AveragePrice > 0) ? data.AveragePrice.toFixed(2) : '-';
-        if (currPriceEl) currPriceEl.textContent = (data.CurrentPrice > 0) ? data.CurrentPrice.toFixed(2) : '-';
+        if (qtyEl) qtyEl.textContent = String(Math.abs(netQuantity));
+        if (avgPriceEl) avgPriceEl.textContent = (averagePrice > 0) ? Number(averagePrice).toFixed(2) : '-';
+        if (currPriceEl) currPriceEl.textContent = (currentPrice > 0) ? Number(currentPrice).toFixed(2) : '-';
 
-        const pnl = data.UnrealizedPnL || 0;
-        const pts = data.PointsPnL || 0;
+        const pnl = Number(unrealizedPnL) || 0;
+        const pts = Number(pointsPnL) || 0;
         const pnlSign = pnl >= 0 ? '+' : '−';
         const ptsSign = pts >= 0 ? '+' : '−';
 
