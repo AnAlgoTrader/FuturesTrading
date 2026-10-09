@@ -225,6 +225,10 @@ html, body {
     transform: scale(0.97);
 }
 
+.action-btn * {
+    pointer-events: none;
+}
+
 .action-buy {
     background: #2f9c5c;
     border: 1px solid rgba(47, 156, 92, 0.6);

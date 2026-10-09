@@ -238,7 +238,44 @@ public static class FootprintAnalyzer
             }
         }
 
-        // 5. Delta Divergence
+        // 5. Passive Absorption
+        var barRange = bar.High - bar.Low;
+        var priceChange = bar.Close - bar.Open;
+        var barDelta = bar.Delta;
+        var sellerAbsorption = false;
+        var buyerAbsorption = false;
+
+        if (bar.Volume >= MinSignalVolume)
+        {
+            if (barDelta >= MinAbsorptionDelta && (priceChange < 0 || (barRange > 0 && bar.Close <= bar.High - barRange * 0.40)))
+            {
+                sellerAbsorption = true;
+                signals.Add(new OrderFlowSignal
+                {
+                    Type = "absorption",
+                    Title = "Passive Seller Absorption",
+                    Description = $"Aggressive buyers lifted +Δ {FmtVol(barDelta)} but failed to advance price; sellers absorbing at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                    Tone = "bearish",
+                    Price = bar.High.ToString("F" + dec, CultureInfo.InvariantCulture),
+                    Time = timeLabel
+                });
+            }
+            else if (barDelta <= -MinAbsorptionDelta && (priceChange > 0 || (barRange > 0 && bar.Close >= bar.Low + barRange * 0.40)))
+            {
+                buyerAbsorption = true;
+                signals.Add(new OrderFlowSignal
+                {
+                    Type = "absorption",
+                    Title = "Passive Buyer Absorption",
+                    Description = $"Aggressive sellers hit −Δ {FmtVol(-barDelta)} but failed to breakdown price; buyers absorbing at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                    Tone = "bullish",
+                    Price = bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture),
+                    Time = timeLabel
+                });
+            }
+        }
+
+        // 6. Delta Divergence
         var deltaDivergence = "None";
         if (prevBar != null)
         {
@@ -256,7 +293,21 @@ public static class FootprintAnalyzer
 
         var deltaPct = bar.Volume > 0 ? (double)(bar.Delta / bar.Volume) * 100.0 : 0.0;
 
-        if (hasStackedBuy && hasStackedSell)
+        if (sellerAbsorption)
+        {
+            bias = "Seller Absorption";
+            biasTone = "bearish";
+            auctionStatus = "Passive Liquidity Absorption";
+            narrative = $"Buyers aggressively lifted offers near {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)} (+Δ {FmtVol(bar.Delta)}), but met heavy passive limit resistance. Price rejected downward.";
+        }
+        else if (buyerAbsorption)
+        {
+            bias = "Buyer Absorption";
+            biasTone = "bullish";
+            auctionStatus = "Passive Liquidity Absorption";
+            narrative = $"Sellers hit bids near {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)} (−Δ {FmtVol(-bar.Delta)}), but were absorbed by passive limit bids. Price rotated higher.";
+        }
+        else if (hasStackedBuy && hasStackedSell)
         {
             bias = "Two-Sided Imbalance";
             biasTone = "warning";
@@ -287,7 +338,7 @@ public static class FootprintAnalyzer
 
         var result = new OrderFlowContext
         {
-            HasBias = hasStackedBuy || hasStackedSell,
+            HasBias = hasStackedBuy || hasStackedSell || sellerAbsorption || buyerAbsorption,
             Bias = bias,
             BiasTone = biasTone,
             AuctionStatus = auctionStatus,
