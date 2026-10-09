@@ -99,7 +99,7 @@ namespace FootPrintTrader
 
                 Directory.CreateDirectory(Logger.DATA_DIR);
                 var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-                var payload = FootprintRenderBuilder.Build(snapshot, TickSize);
+                var payload = FootprintRenderBuilder.Build(snapshot, TickSize, _currentPrice);
 
                 var jsonPath = Path.Combine(Logger.DATA_DIR, $"footprint-{stamp}.json");
                 File.WriteAllText(jsonPath, JsonSerializer.Serialize(payload, FootprintRenderBuilder.JsonOptions));
@@ -185,7 +185,7 @@ namespace FootPrintTrader
             var snap = _footprintClassifier.GetSnapshot();
             if (snap.Current != null || snap.Completed.Length > 0)
             {
-                SendUpdate(UpdateMessageType.FOOTPRINT_SNAPSHOT, FootprintRenderBuilder.Build(snap, TickSize));
+                SendUpdate(UpdateMessageType.FOOTPRINT_SNAPSHOT, FootprintRenderBuilder.Build(snap, TickSize, _currentPrice));
 
                 if (_bid <= 0 && _ask <= 0)
                 {

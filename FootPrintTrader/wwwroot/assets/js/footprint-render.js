@@ -107,7 +107,7 @@
           if (r.askBar) ctx.fillRect(mid, y + 1, r.askBar * hw, rowH - 1);
           if (r.bidFill) {ctx.fillStyle = r.bidFill; ctx.fillRect(cl, y + 1, mid - cl, rowH - 1)}
           if (r.askFill) {ctx.fillStyle = r.askFill; ctx.fillRect(mid, y + 1, cr - mid, rowH - 1)}
-          box(r.bidBorder, r.borderWidth, cl, mid, y, rowH); box(r.askBorder, r.borderWidth, mid, cr, y, rowH); box(r.border, r.borderWidth, cl, cr, y, rowH);
+          box(r.bidBorder, r.borderWidth, cl, mid, y, rowH); box(r.askBorder, r.borderWidth, mid, cr, y, rowH); box(r.border, r.borderWidth, cl, cr, y, rowH); box(r.priceBorder, r.borderWidth, cl, cr, y, rowH);
           if (showNum) {ctx.fillStyle = col.text; ctx.textAlign = 'right'; ctx.fillText(fmt(r.bid), mid - 5, y + rowH / 2 + 1); ctx.textAlign = 'left'; ctx.fillText(fmt(r.ask), mid + 5, y + rowH / 2 + 1)}
         }
         if (showNum) {ctx.strokeStyle = col.grid; ctx.beginPath(); ctx.moveTo(Math.round(mid) + .5, yP(b.pmax + R / 2)); ctx.lineTo(Math.round(mid) + .5, yP(b.pmin - R / 2)); ctx.stroke()}

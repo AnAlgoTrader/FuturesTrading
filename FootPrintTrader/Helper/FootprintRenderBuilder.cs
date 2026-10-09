@@ -17,6 +17,7 @@ public class FootprintRenderRow
     public string BidFill { get; set; }
     public string AskFill { get; set; }
     public string Border { get; set; }
+    public string PriceBorder { get; set; }
 }
 
 public class FootprintRenderFooter
@@ -60,6 +61,7 @@ public static class FootprintRenderBuilder
     public const string UpColor = "#2fcf93";
     public const string DownColor = "#f0647b";
     public const string PocBorder = "#f2b705";
+    public const string PriceBorder = "#ff8c1a";
     public const string AskFill = "rgba(47,207,147,0.42)";
     public const string BidFill = "rgba(240,100,123,0.42)";
 
@@ -73,7 +75,7 @@ public static class FootprintRenderBuilder
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public static FootprintRenderSnapshot Build(FootprintSnapshot snapshot, double tickSize)
+    public static FootprintRenderSnapshot Build(FootprintSnapshot snapshot, double tickSize, double currentPrice = 0)
     {
         var result = new FootprintRenderSnapshot
         {
@@ -95,8 +97,24 @@ public static class FootprintRenderBuilder
         if (snapshot.Current != null)
             result.Bars.Add(ConvertBar(snapshot.Current));
 
+        if (currentPrice > 0 && result.Bars.Count > 0)
+            MarkCurrentPrice(result.Bars[^1], currentPrice, tickSize);
+
         result.Context = FootprintAnalyzer.AnalyzeContext(snapshot, tickSize);
         return result;
+    }
+
+    private static void MarkCurrentPrice(FootprintRenderBar bar, double price, double tickSize)
+    {
+        var rowPrice = Math.Round(price / tickSize) * tickSize;
+        var tolerance = tickSize * 0.5 + 1e-9;
+
+        foreach (var row in bar.Rows)
+        {
+            if (Math.Abs(row.Price - rowPrice) > tolerance) continue;
+            row.PriceBorder = PriceBorder;
+            return;
+        }
     }
 
     private static FootprintRenderBar ConvertBar(FootprintBarData bar)
