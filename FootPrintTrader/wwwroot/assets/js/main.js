@@ -24,10 +24,6 @@ function receiveFromBackground(message) {
 function footprintSnapshot(data) {
     if (!window.footprint || !Array.isArray(data.bars) || !data.bars.length) return;
 
-    // Suppress canvas HUD overlay since we now display everything in the dedicated side panel
-    if (window.footprint.setAnalysis) {
-        window.footprint.setAnalysis([]);
-    }
 
     // Update the rich Order Flow side panel
     if (data.context) {
@@ -165,19 +161,3 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
 }
-
-// Side Panel Toggle
-document.addEventListener('DOMContentLoaded', () => {
-    const toggleBtn = document.getElementById('toggle-sidebar-btn');
-    const sidebar = document.getElementById('sidebar');
-
-    if (toggleBtn && sidebar) {
-        toggleBtn.addEventListener('click', () => {
-            const isCollapsed = sidebar.classList.toggle('collapsed');
-            toggleBtn.textContent = isCollapsed ? '◧ Context' : '◨ Context';
-            setTimeout(() => {
-                window.dispatchEvent(new Event('resize'));
-            }, 250);
-        });
-    }
-});

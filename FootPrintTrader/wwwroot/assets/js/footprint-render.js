@@ -1,7 +1,7 @@
     // Pure renderer: every number, colour and highlight comes from the JSON. No footprint maths in here.
     const AXIS = 60;
     const wrap = document.getElementById('wrap'), cv = document.getElementById('cv'), ctx = cv.getContext('2d');
-    let R = .25, dec = 2, FOOT = 50, labels = ['Delta', 'Vol'], custom = {}, W = 0, H = 0, bars = [], minP = 0, maxP = 1, hover = null, hud = [];
+    let R = .25, dec = 2, FOOT = 50, labels = ['Delta', 'Vol'], custom = {}, W = 0, H = 0, bars = [], minP = 0, maxP = 1, hover = null;
     const V = {colW: 92, ppu: 16, x0: 0, top: 0};
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
     const isNum = v => v !== null && v !== '' && v !== undefined && isFinite(+v);
@@ -47,7 +47,6 @@
       R = nR; dec = isNum(meta.priceDecimals) ? +meta.priceDecimals : (String(nR).split('.')[1] || '').length;
       custom = nc; wrap.style.background = nc.panel || '';
       labels = Array.isArray(meta.footerLabels) ? meta.footerLabels.map(String) : [];
-      hud = Array.isArray(meta.analysis) ? meta.analysis.filter(l => l && typeof l.text === 'string') : [];
       const oldFirst = bars.length ? bars[0].id : null, hv = hover;
       bars = nb; refreshMeta();
       if (oldFirst === null) {                                              // first snapshot: frame the chart
@@ -142,16 +141,6 @@
       for (let j = 0; j < n; j++)ctx.fillText(labels[j], cw + 6, ch + 11 + 16 * j);
       ctx.fillText('Time', cw + 6, ch + 11 + 16 * n);
 
-      // analysis HUD: host-supplied lines, drawn as-is (top-right of the chart area)
-      if (hud.length) {
-        ctx.textAlign = 'right';
-        let wm = 0; for (const l of hud) wm = Math.max(wm, ctx.measureText(l.text).width);
-        const bh = hud.length * 16 + 8;
-        ctx.fillStyle = '#000'; ctx.globalAlpha = .9; ctx.fillRect(cw - wm - 20, 6, wm + 14, bh); ctx.globalAlpha = 1;
-        let ly = 14;
-        for (const l of hud) {ctx.fillStyle = l.tone === 'text' ? '#e4e8f0' : (col[l.tone] || '#e4e8f0'); ctx.fillText(l.text, cw - 13, ly); ly += 16}
-        ctx.textAlign = 'left';   // restore: hover readout/axis labels below are left-aligned
-      }
 
       // hover readout (displays the row's own values; no calculation)
       const hr = hover && bars[hover.i] && bars[hover.i].map[hover.k];
@@ -211,11 +200,7 @@
       load: api(d => load(parse(d))),                 // full snapshot: {rowSize, colors, footerLabels, bars:[...]}
       updateLast: api(b => put(parse(b), false)),      // replace the last (live) bar with a rebuilt version
       append: api(b => put(parse(b), true)),           // start a new bar after the last one
-      setAnalysis: api(a => {                          // replace the analysis HUD lines
-        const d = parse(a);
-        hud = Array.isArray(d) ? d.filter(l => l && typeof l.text === 'string') : [];
-        redraw();
-      }),
+      setAnalysis: api(() => {}),                     // deprecated: analysis is displayed in the side panel
       showAll: function () {                           // scroll to the oldest bar and shrink columns so every bar fits
         if (!bars.length) return {ok: false, error: 'no data'};
         size();
