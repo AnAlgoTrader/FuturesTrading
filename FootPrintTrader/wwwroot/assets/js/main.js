@@ -151,6 +151,7 @@ function updateSidePanel(ctx, tickSize) {
 
     const tone = ctx.biasTone || 'neutral';
     if (biasCard) {
+        biasCard.style.display = ctx.hasBias ? '' : 'none';
         biasCard.className = `card bias-card tone-${tone}`;
     }
     if (biasPill) {
