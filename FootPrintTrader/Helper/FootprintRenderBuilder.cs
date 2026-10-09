@@ -52,6 +52,7 @@ public class FootprintRenderSnapshot
     public Dictionary<string, string> Colors { get; set; } = new();
     public List<FootprintRenderBar> Bars { get; set; } = new();
     public List<FootprintRenderLine> Analysis { get; set; }
+    public OrderFlowContext Context { get; set; }
 }
 
 public static class FootprintRenderBuilder
@@ -64,6 +65,8 @@ public static class FootprintRenderBuilder
 
     private const decimal ImbalanceRatio = 0.6m;
     private const decimal MinVolumeRatio = 0.1m;
+
+    private static List<FootprintRenderLine> _lastAnalysis;   // last meaningful signal, held until the next one
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -93,9 +96,12 @@ public static class FootprintRenderBuilder
         if (snapshot.Current != null)
             result.Bars.Add(ConvertBar(snapshot.Current));
 
+        result.Context = FootprintAnalyzer.AnalyzeContext(snapshot, tickSize);
+
         var analysis = FootprintAnalyzer.Analyze(snapshot, tickSize);
         if (analysis.Count > 0)
-            result.Analysis = analysis;
+            _lastAnalysis = analysis;
+        result.Analysis = _lastAnalysis;
         return result;
     }
 

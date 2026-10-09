@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -9,9 +9,98 @@
 </head>
 <body>
 
-<div id="wrap">
-    <canvas id="cv"></canvas>
-    <div id="msg"></div>
+<div id="app-layout">
+    <!-- Main Chart Canvas Area -->
+    <div id="wrap">
+        <canvas id="cv"></canvas>
+        <div id="msg"></div>
+        <button id="toggle-sidebar-btn" title="Toggle Intel Side Panel">◨ Context</button>
+    </div>
+
+    <!-- Order Flow Intel Side Panel -->
+    <aside id="sidebar">
+        <div class="sidebar-header">
+            <div class="header-main">
+                <div class="header-title">ORDER FLOW CONTEXT</div>
+                <div class="live-tag">
+                    <span class="live-dot"></span>LIVE
+                </div>
+            </div>
+            <div class="header-sub">
+                <span id="market-symbol">ES (CME)</span> &bull; 1000-Trade Footprint
+            </div>
+        </div>
+
+        <div class="sidebar-body">
+            <!-- Market Bias Card -->
+            <div class="card bias-card" id="bias-card">
+                <div class="card-title-row">
+                    <span class="card-title">AUCTION BIAS</span>
+                    <span class="status-pill neutral" id="bias-pill">Neutral</span>
+                </div>
+                <div class="bias-headline" id="bias-headline">Waiting for Data...</div>
+                <div class="bias-auction" id="bias-auction">Two-Way Auction Balance</div>
+                <div class="bias-narrative" id="bias-narrative">Connecting to IB market data feed...</div>
+            </div>
+
+            <!-- Key Signals Section -->
+            <div class="card signals-card">
+                <div class="card-title-row">
+                    <span class="card-title">ORDER FLOW SIGNALS</span>
+                    <span class="signal-count-badge" id="signals-count">0</span>
+                </div>
+                <div class="signals-container" id="signals-container">
+                    <div class="empty-state">No active signals on current bar</div>
+                </div>
+            </div>
+
+            <!-- Live Bar Order Flow Metrics -->
+            <div class="card metrics-card">
+                <div class="card-title">LIVE BAR METRICS</div>
+                <div class="metrics-grid">
+                    <div class="metric-box">
+                        <span class="metric-lbl">Bar Delta</span>
+                        <span class="metric-val" id="m-delta">-</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-lbl">Delta %</span>
+                        <span class="metric-val" id="m-delta-pct">-</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-lbl">Bar Volume</span>
+                        <span class="metric-val" id="m-vol">-</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-lbl">POC Price</span>
+                        <span class="metric-val" id="m-poc">-</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-lbl">POC Zone</span>
+                        <span class="metric-val" id="m-poc-zone">-</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-lbl">POC Shift</span>
+                        <span class="metric-val" id="m-poc-shift">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Multi-Bar Auction Structure -->
+            <div class="card structure-card">
+                <div class="card-title">AUCTION STRUCTURE</div>
+                <div class="metrics-grid">
+                    <div class="metric-box">
+                        <span class="metric-lbl">Cum. Delta</span>
+                        <span class="metric-val" id="m-cum-delta">-</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-lbl">Divergence</span>
+                        <span class="metric-val" id="m-divergence">None</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
 </div>
 
 <script src="app://dynamic.js"></script>
