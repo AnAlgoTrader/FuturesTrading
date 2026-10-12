@@ -151,7 +151,7 @@ function updateSidePanel(ctx, tickSize) {
 
     const tone = ctx.biasTone || 'neutral';
     if (biasCard) {
-        biasCard.style.display = ctx.hasBias ? '' : 'none';
+        biasCard.style.display = '';
         biasCard.className = `card bias-card tone-${tone}`;
     }
     if (biasPill) {
@@ -171,7 +171,7 @@ function updateSidePanel(ctx, tickSize) {
 
     if (signalsContainer) {
         if (!signals.length) {
-            signalsContainer.innerHTML = '<div class="empty-state">No active signals on current bar</div>';
+            signalsContainer.innerHTML = '<div class="empty-state">No active order flow signals</div>';
         } else {
             signalsContainer.innerHTML = signals.map(sig => {
                 const sTone = sig.tone || 'neutral';

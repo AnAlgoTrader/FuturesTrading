@@ -15,6 +15,19 @@ public class OrderFlowSignal
     public string Time { get; set; } = "";
 }
 
+public class OrderFlowZone
+{
+    public long BarStartTime { get; set; }
+    public string TimeLabel { get; set; } = "";
+    public bool IsBuy { get; set; }               // true = Buy Imbalance, false = Sell Imbalance
+    public double LowPrice { get; set; }
+    public double HighPrice { get; set; }
+    public int Levels { get; set; }
+    public bool IsExhaustionAtBirth { get; set; } // Formed at bar extreme (top for buy, bottom for sell)
+    public int AgeBars { get; set; }
+    public bool IsTrapped { get; set; }
+}
+
 public class OrderFlowContext
 {
     public bool HasBias { get; set; }
@@ -47,10 +60,15 @@ public static class FootprintAnalyzer
     public const decimal MinImbalanceVol = 10m;
     public const decimal MinDeltaDiff = 5m;
     public const int StackedLevelsRequired = 3;
+    public const int MinLiveTradesForSignal = 250;
+    public const int MaxZoneAgeBars = 8;
 
+    private static readonly object _syncLock = new();
+    private static readonly List<OrderFlowZone> _activeZones = new();
+    private static readonly HashSet<long> _processedBars = new();
     private static OrderFlowContext _lastContext;
 
-    public static OrderFlowContext AnalyzeContext(FootprintSnapshot snapshot, double tickSize)
+    public static OrderFlowContext AnalyzeContext(FootprintSnapshot snapshot, double tickSize, double currentPrice = 0)
     {
         if (snapshot == null)
             return _lastContext ?? new OrderFlowContext();
@@ -58,20 +76,11 @@ public static class FootprintAnalyzer
         var completed = snapshot.Completed ?? Array.Empty<FootprintBarData>();
         var current = snapshot.Current;
 
-        // Choose subject bar: live bar if active enough, otherwise last completed bar
-        FootprintBarData bar = null;
-        FootprintBarData prevBar = null;
-
-        if (current != null && current.Volume >= 20)
-        {
-            bar = current;
-            prevBar = completed.LastOrDefault();
-        }
-        else if (completed.Length > 0)
-        {
-            bar = completed[^1];
-            prevBar = completed.Length > 1 ? completed[^2] : null;
-        }
+        // Use live bar for real-time live metrics (delta, POC, volume), fallback to last completed
+        FootprintBarData bar = current ?? completed.LastOrDefault();
+        FootprintBarData prevBar = current != null
+            ? completed.LastOrDefault()
+            : (completed.Length > 1 ? completed[^2] : null);
 
         if (bar == null)
             return _lastContext ?? new OrderFlowContext();
@@ -79,11 +88,12 @@ public static class FootprintAnalyzer
         var dec = Decimals(tickSize);
         var signals = new List<OrderFlowSignal>();
         var timeLabel = FootprintRenderBuilder.FormatTime(bar.StartTime);
+        var evalPrice = currentPrice > 0 ? currentPrice : bar.Close;
 
         // 1. Cumulative Delta
         var cumDelta = completed.Sum(b => b.Delta) + (current?.Delta ?? 0m);
 
-        // 2. POC Calculation & Zone Placement
+        // 2. POC Calculation & Zone Placement for current bar
         var levels = bar.Levels ?? Array.Empty<FootprintLevel>();
         var pocPrice = bar.Close;
         var pocPosition = "Middle (Value Area)";
@@ -114,131 +124,235 @@ public static class FootprintAnalyzer
             else pocMigration = "Overlapping ◄►";
         }
 
-        // 4. Diagonal Imbalances & Stacked Imbalances
-        var hasStackedBuy = false;
-        var hasStackedSell = false;
-
-        if (levels.Length >= 2)
+        // 4. Update Stateful Order Flow Zones from Completed Bars
+        lock (_syncLock)
         {
-            var buyImb = new bool[levels.Length];
-            var sellImb = new bool[levels.Length];
-
-            for (var i = 0; i < levels.Length - 1; i++)
+            // Register newly completed bars
+            foreach (var compBar in completed)
             {
-                var lLow = levels[i];
-                var lHigh = levels[i + 1];
+                if (_processedBars.Add(compBar.StartTime))
+                {
+                    var barImbalances = DetectStackedImbalances(compBar);
+                    var bRange = compBar.High - compBar.Low;
+                    var bTimeLabel = FootprintRenderBuilder.FormatTime(compBar.StartTime);
 
-                // Buy Imbalance at i+1 (Ask at high vs Bid at low)
-                if (lHigh.AskVolume >= MinImbalanceVol &&
-                    (lLow.BidVolume == 0 ||
-                     (lHigh.AskVolume >= lLow.BidVolume * ImbalanceRatio && lHigh.AskVolume - lLow.BidVolume >= MinDeltaDiff)))
-                {
-                    buyImb[i + 1] = true;
-                }
-
-                // Sell Imbalance at i (Bid at low vs Ask at high)
-                if (lLow.BidVolume >= MinImbalanceVol &&
-                    (lHigh.AskVolume == 0 ||
-                     (lLow.BidVolume >= lHigh.AskVolume * ImbalanceRatio && lLow.BidVolume - lHigh.AskVolume >= MinDeltaDiff)))
-                {
-                    sellImb[i] = true;
-                }
-            }
-
-            // Detect Stacked Buying Imbalances (runs >= StackedLevelsRequired)
-            var run = 0;
-            for (var i = 0; i < levels.Length; i++)
-            {
-                if (buyImb[i])
-                {
-                    run++;
-                }
-                else
-                {
-                    if (run >= StackedLevelsRequired)
+                    foreach (var imb in barImbalances)
                     {
-                        var startP = levels[i - run].Price;
-                        var endP = levels[i - 1].Price;
-                        hasStackedBuy = true;
-
-                        signals.Add(new OrderFlowSignal
+                        bool isExhaustion;
+                        if (imb.IsBuy)
                         {
-                            Type = "stacked_imbalance",
-                            Title = $"Stacked Buy Imbalance ({run} lvls)",
-                            Description = $"Aggressive buyers lifting offers from {startP.ToString("F" + dec, CultureInfo.InvariantCulture)} to {endP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
-                            Tone = "bullish",
-                            Price = $"{startP.ToString("F" + dec, CultureInfo.InvariantCulture)} - {endP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
-                            Time = timeLabel
+                            // Buy imbalance at extreme high of bar or bar closed below it
+                            isExhaustion = bRange > 1e-6 &&
+                                           (imb.EndP >= compBar.High - tickSize * 0.5 ||
+                                            (imb.EndP - compBar.Low) / bRange >= 0.75 ||
+                                            compBar.Close < imb.EndP);
+                        }
+                        else
+                        {
+                            // Sell imbalance at extreme low of bar or bar closed above it
+                            isExhaustion = bRange > 1e-6 &&
+                                           (imb.StartP <= compBar.Low + tickSize * 0.5 ||
+                                            (imb.StartP - compBar.Low) / bRange <= 0.25 ||
+                                            compBar.Close > imb.StartP);
+                        }
+
+                        _activeZones.Add(new OrderFlowZone
+                        {
+                            BarStartTime = compBar.StartTime,
+                            TimeLabel = bTimeLabel,
+                            IsBuy = imb.IsBuy,
+                            LowPrice = imb.StartP,
+                            HighPrice = imb.EndP,
+                            Levels = imb.Run,
+                            IsExhaustionAtBirth = isExhaustion,
+                            AgeBars = 0,
+                            IsTrapped = false
                         });
                     }
-                    run = 0;
                 }
             }
-            if (run >= StackedLevelsRequired)
-            {
-                var startP = levels[levels.Length - run].Price;
-                var endP = levels[^1].Price;
-                hasStackedBuy = true;
 
-                signals.Add(new OrderFlowSignal
-                {
-                    Type = "stacked_imbalance",
-                    Title = $"Stacked Buy Imbalance ({run} lvls)",
-                    Description = $"Aggressive buyers lifting offers from {startP.ToString("F" + dec, CultureInfo.InvariantCulture)} to {endP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
-                    Tone = "bullish",
-                    Price = $"{startP.ToString("F" + dec, CultureInfo.InvariantCulture)} - {endP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
-                    Time = timeLabel
-                });
+            // Update zone age
+            foreach (var zone in _activeZones)
+            {
+                zone.AgeBars = completed.Count(c => c.StartTime > zone.BarStartTime);
             }
 
-            // Detect Stacked Selling Imbalances
-            run = 0;
-            for (var i = 0; i < levels.Length; i++)
+            // Prune expired zones & obsolete bar cache
+            _activeZones.RemoveAll(z => z.AgeBars > MaxZoneAgeBars);
+            if (completed.Length > 0)
             {
-                if (sellImb[i])
+                _processedBars.IntersectWith(completed.Select(c => c.StartTime));
+            }
+
+            // Evaluate current price interaction with active zones
+            foreach (var zone in _activeZones.OrderByDescending(z => z.BarStartTime))
+            {
+                if (zone.IsBuy)
                 {
-                    run++;
-                }
-                else
-                {
-                    if (run >= StackedLevelsRequired)
+                    // Price broke below stacked buy imbalance -> Trapped Buyers (FADE setup)
+                    if (evalPrice < zone.LowPrice - tickSize * 0.5)
                     {
-                        var startP = levels[i - run].Price;
-                        var endP = levels[i - 1].Price;
-                        hasStackedSell = true;
-
+                        zone.IsTrapped = true;
                         signals.Add(new OrderFlowSignal
                         {
-                            Type = "stacked_imbalance",
-                            Title = $"Stacked Sell Imbalance ({run} lvls)",
-                            Description = $"Aggressive sellers hitting bids from {startP.ToString("F" + dec, CultureInfo.InvariantCulture)} to {endP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                            Type = "trapped_traders",
+                            Title = zone.IsExhaustionAtBirth ? "Trapped Longs (Exhaustion Fade)" : "Trapped Buyers (Fade Short)",
+                            Description = $"Price ({evalPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}) broke below stacked buy zone {zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}-{zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}; buyers trapped offside.",
                             Tone = "bearish",
-                            Price = $"{startP.ToString("F" + dec, CultureInfo.InvariantCulture)} - {endP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
-                            Time = timeLabel
+                            Price = $"{zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} - {zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                            Time = zone.TimeLabel
                         });
                     }
-                    run = 0;
+                    // Price testing the zone from above -> Potential support
+                    else if (Math.Abs(evalPrice - zone.LowPrice) <= tickSize * 1.5 ||
+                             (evalPrice >= zone.LowPrice && evalPrice <= zone.HighPrice + tickSize * 0.5))
+                    {
+                        signals.Add(new OrderFlowSignal
+                        {
+                            Type = "stacked_imbalance",
+                            Title = "Retesting Buy Zone (Support)",
+                            Description = $"Pullback testing buyer support at {zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}-{zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}.",
+                            Tone = "bullish",
+                            Price = $"{zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} - {zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                            Time = zone.TimeLabel
+                        });
+                    }
+                    // Fresh initiative buy zone holding
+                    else if (evalPrice > zone.HighPrice && zone.AgeBars <= 2 && !zone.IsExhaustionAtBirth)
+                    {
+                        signals.Add(new OrderFlowSignal
+                        {
+                            Type = "stacked_imbalance",
+                            Title = $"Buyer Support ({zone.Levels} lvls)",
+                            Description = $"Stacked buy imbalance {zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}-{zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} holding as support.",
+                            Tone = "bullish",
+                            Price = $"{zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} - {zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                            Time = zone.TimeLabel
+                        });
+                    }
                 }
-            }
-            if (run >= StackedLevelsRequired)
-            {
-                var startP = levels[levels.Length - run].Price;
-                var endP = levels[^1].Price;
-                hasStackedSell = true;
-
-                signals.Add(new OrderFlowSignal
+                else
                 {
-                    Type = "stacked_imbalance",
-                    Title = $"Stacked Sell Imbalance ({run} lvls)",
-                    Description = $"Aggressive sellers hitting bids from {startP.ToString("F" + dec, CultureInfo.InvariantCulture)} to {endP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
-                    Tone = "bearish",
-                    Price = $"{startP.ToString("F" + dec, CultureInfo.InvariantCulture)} - {endP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
-                    Time = timeLabel
-                });
+                    // Price pushed above stacked sell imbalance -> Trapped Sellers (SQUEEZE setup)
+                    if (evalPrice > zone.HighPrice + tickSize * 0.5)
+                    {
+                        zone.IsTrapped = true;
+                        signals.Add(new OrderFlowSignal
+                        {
+                            Type = "trapped_traders",
+                            Title = zone.IsExhaustionAtBirth ? "Trapped Shorts (Exhaustion Squeeze)" : "Trapped Sellers (Squeeze Long)",
+                            Description = $"Price ({evalPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}) pushed above stacked sell zone {zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}-{zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}; sellers trapped offside.",
+                            Tone = "bullish",
+                            Price = $"{zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} - {zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                            Time = zone.TimeLabel
+                        });
+                    }
+                    // Price testing the zone from below -> Potential resistance
+                    else if (Math.Abs(evalPrice - zone.HighPrice) <= tickSize * 1.5 ||
+                             (evalPrice <= zone.HighPrice && evalPrice >= zone.LowPrice - tickSize * 0.5))
+                    {
+                        signals.Add(new OrderFlowSignal
+                        {
+                            Type = "stacked_imbalance",
+                            Title = "Retesting Sell Zone (Resistance)",
+                            Description = $"Rally testing seller resistance at {zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}-{zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}.",
+                            Tone = "bearish",
+                            Price = $"{zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} - {zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                            Time = zone.TimeLabel
+                        });
+                    }
+                    // Fresh initiative sell zone holding
+                    else if (evalPrice < zone.LowPrice && zone.AgeBars <= 2 && !zone.IsExhaustionAtBirth)
+                    {
+                        signals.Add(new OrderFlowSignal
+                        {
+                            Type = "stacked_imbalance",
+                            Title = $"Seller Resistance ({zone.Levels} lvls)",
+                            Description = $"Stacked sell imbalance {zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}-{zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} holding as resistance.",
+                            Tone = "bearish",
+                            Price = $"{zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} - {zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                            Time = zone.TimeLabel
+                        });
+                    }
+                }
             }
         }
 
-        // 5. Passive Absorption
+        // 5. Developing Live Bar Signals (Debounced: only when live bar has >= MinLiveTradesForSignal)
+        if (current != null && current.TradeCount >= MinLiveTradesForSignal)
+        {
+            var liveImbalances = DetectStackedImbalances(current);
+            var liveRange = current.High - current.Low;
+
+            foreach (var imb in liveImbalances)
+            {
+                if (imb.IsBuy)
+                {
+                    bool isAtHigh = liveRange > 1e-6 &&
+                                    (imb.EndP >= current.High - tickSize * 0.5 ||
+                                     (imb.EndP - current.Low) / liveRange >= 0.75);
+
+                    if (isAtHigh && (evalPrice < imb.EndP || current.Close < imb.EndP))
+                    {
+                        signals.Add(new OrderFlowSignal
+                        {
+                            Type = "exhaustion",
+                            Title = "[Developing] Buying Exhaustion at High",
+                            Description = $"Aggressive buyers ({imb.Run} lvls) at bar high struggling to advance; fade candidate.",
+                            Tone = "bearish",
+                            Price = $"{imb.StartP.ToString("F" + dec, CultureInfo.InvariantCulture)} - {imb.EndP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                            Time = timeLabel
+                        });
+                    }
+                    else if (evalPrice >= imb.EndP)
+                    {
+                        signals.Add(new OrderFlowSignal
+                        {
+                            Type = "stacked_imbalance",
+                            Title = $"[Developing] Stacked Buy Imbalance ({imb.Run} lvls)",
+                            Description = $"Aggressive buyers lifting offers from {imb.StartP.ToString("F" + dec, CultureInfo.InvariantCulture)} to {imb.EndP.ToString("F" + dec, CultureInfo.InvariantCulture)}.",
+                            Tone = "bullish",
+                            Price = $"{imb.StartP.ToString("F" + dec, CultureInfo.InvariantCulture)} - {imb.EndP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                            Time = timeLabel
+                        });
+                    }
+                }
+                else
+                {
+                    bool isAtLow = liveRange > 1e-6 &&
+                                   (imb.StartP <= current.Low + tickSize * 0.5 ||
+                                    (imb.StartP - current.Low) / liveRange <= 0.25);
+
+                    if (isAtLow && (evalPrice > imb.StartP || current.Close > imb.StartP))
+                    {
+                        signals.Add(new OrderFlowSignal
+                        {
+                            Type = "exhaustion",
+                            Title = "[Developing] Selling Exhaustion at Low",
+                            Description = $"Aggressive sellers ({imb.Run} lvls) at bar low struggling to breakdown; squeeze candidate.",
+                            Tone = "bullish",
+                            Price = $"{imb.StartP.ToString("F" + dec, CultureInfo.InvariantCulture)} - {imb.EndP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                            Time = timeLabel
+                        });
+                    }
+                    else if (evalPrice <= imb.StartP)
+                    {
+                        signals.Add(new OrderFlowSignal
+                        {
+                            Type = "stacked_imbalance",
+                            Title = $"[Developing] Stacked Sell Imbalance ({imb.Run} lvls)",
+                            Description = $"Aggressive sellers hitting bids from {imb.StartP.ToString("F" + dec, CultureInfo.InvariantCulture)} to {imb.EndP.ToString("F" + dec, CultureInfo.InvariantCulture)}.",
+                            Tone = "bearish",
+                            Price = $"{imb.StartP.ToString("F" + dec, CultureInfo.InvariantCulture)} - {imb.EndP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                            Time = timeLabel
+                        });
+                    }
+                }
+            }
+        }
+
+        // 6. Passive Absorption Detection (subject bar)
         var barRange = bar.High - bar.Low;
         var priceChange = bar.Close - bar.Open;
         var barDelta = bar.Delta;
@@ -253,8 +367,8 @@ public static class FootprintAnalyzer
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "absorption",
-                    Title = "Passive Seller Absorption",
-                    Description = $"Aggressive buyers lifted +Δ {FmtVol(barDelta)} but failed to advance price; sellers absorbing at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                    Title = "Passive Seller Absorption (Fade)",
+                    Description = $"Aggressive buyers lifted +Δ {FmtVol(barDelta)} into limit sellers at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}; buying absorbed.",
                     Tone = "bearish",
                     Price = bar.High.ToString("F" + dec, CultureInfo.InvariantCulture),
                     Time = timeLabel
@@ -266,8 +380,8 @@ public static class FootprintAnalyzer
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "absorption",
-                    Title = "Passive Buyer Absorption",
-                    Description = $"Aggressive sellers hit −Δ {FmtVol(-barDelta)} but failed to breakdown price; buyers absorbing at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}",
+                    Title = "Passive Buyer Absorption (Squeeze)",
+                    Description = $"Aggressive sellers hit −Δ {FmtVol(-barDelta)} into limit buyers at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}; selling absorbed.",
                     Tone = "bullish",
                     Price = bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture),
                     Time = timeLabel
@@ -275,14 +389,52 @@ public static class FootprintAnalyzer
             }
         }
 
-        // 6. Delta Divergence
+        // 7. Delta Divergence Detection & Signal
         var deltaDivergence = "None";
         if (prevBar != null)
         {
             if (bar.High >= prevBar.High && bar.Delta < 0 && prevBar.Delta > 0)
+            {
                 deltaDivergence = "Bearish Delta Divergence";
+                signals.Add(new OrderFlowSignal
+                {
+                    Type = "divergence",
+                    Title = "Bearish Delta Divergence (Fade)",
+                    Description = $"New high reached at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)} on negative delta ({FmtVol(bar.Delta)}); lack of buyer conviction at highs.",
+                    Tone = "bearish",
+                    Price = bar.High.ToString("F" + dec, CultureInfo.InvariantCulture),
+                    Time = timeLabel
+                });
+            }
             else if (bar.Low <= prevBar.Low && bar.Delta > 0 && prevBar.Delta < 0)
+            {
                 deltaDivergence = "Bullish Delta Divergence";
+                signals.Add(new OrderFlowSignal
+                {
+                    Type = "divergence",
+                    Title = "Bullish Delta Divergence (Squeeze)",
+                    Description = $"New low reached at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)} on positive delta (+{FmtVol(bar.Delta)}); lack of seller conviction at lows.",
+                    Tone = "bullish",
+                    Price = bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture),
+                    Time = timeLabel
+                });
+            }
+        }
+
+        // 8. Deduplicate and Prioritize Signals (Trapped > Absorption > Divergence > Retest > Developing)
+        var distinctSignals = new List<OrderFlowSignal>();
+        var seenKeys = new HashSet<string>();
+        foreach (var sig in signals)
+        {
+            var key = $"{sig.Type}:{sig.Tone}:{sig.Price}";
+            if (seenKeys.Add(key))
+            {
+                distinctSignals.Add(sig);
+            }
+        }
+        if (distinctSignals.Count > 5)
+        {
+            distinctSignals = distinctSignals.Take(5).ToList();
         }
 
         // 9. Synthesize Market Bias, Auction Status, and Context Narrative
@@ -293,52 +445,81 @@ public static class FootprintAnalyzer
 
         var deltaPct = bar.Volume > 0 ? (double)(bar.Delta / bar.Volume) * 100.0 : 0.0;
 
-        if (sellerAbsorption)
+        OrderFlowZone trappedBuy = null;
+        OrderFlowZone trappedSell = null;
+        lock (_syncLock)
         {
-            bias = "Seller Absorption";
+            trappedBuy = _activeZones.FirstOrDefault(z => z.IsBuy && z.IsTrapped);
+            trappedSell = _activeZones.FirstOrDefault(z => !z.IsBuy && z.IsTrapped);
+        }
+
+        if (trappedBuy != null)
+        {
+            bias = "Trapped Buyers / Fade";
+            biasTone = "bearish";
+            auctionStatus = "Liquidity Trap / Order Flow Reversal";
+            narrative = $"Buyers trapped above {trappedBuy.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}; price at {evalPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}. Look to fade.";
+        }
+        else if (trappedSell != null)
+        {
+            bias = "Trapped Sellers / Squeeze";
+            biasTone = "bullish";
+            auctionStatus = "Liquidity Trap / Order Flow Reversal";
+            narrative = $"Sellers trapped below {trappedSell.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}; price at {evalPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}. Look to squeeze.";
+        }
+        else if (sellerAbsorption)
+        {
+            bias = "Seller Absorption (Fade)";
             biasTone = "bearish";
             auctionStatus = "Passive Liquidity Absorption";
-            narrative = $"Seller absorption at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}, +Δ {FmtVol(bar.Delta)}";
+            narrative = $"Seller absorption at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}, +Δ {FmtVol(bar.Delta)}. Buyers rejected.";
         }
         else if (buyerAbsorption)
         {
-            bias = "Buyer Absorption";
+            bias = "Buyer Absorption (Squeeze)";
             biasTone = "bullish";
             auctionStatus = "Passive Liquidity Absorption";
-            narrative = $"Buyer absorption at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}, −Δ {FmtVol(-bar.Delta)}";
+            narrative = $"Buyer absorption at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}, −Δ {FmtVol(-bar.Delta)}. Sellers rejected.";
         }
-        else if (hasStackedBuy && hasStackedSell)
+        else if (deltaDivergence == "Bearish Delta Divergence")
         {
-            bias = "Two-Sided Imbalance";
-            biasTone = "warning";
-            auctionStatus = "Conflicting Order Flow";
-            narrative = $"Two-sided imbalance at POC {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
+            bias = "Bearish Divergence (Fade)";
+            biasTone = "bearish";
+            auctionStatus = "Exhaustion at Highs";
+            narrative = $"New high at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)} on negative delta. Lack of buyer conviction.";
         }
-        else if (hasStackedBuy && bar.Close >= bar.Open && bar.Delta > 0)
+        else if (deltaDivergence == "Bullish Delta Divergence")
+        {
+            bias = "Bullish Divergence (Squeeze)";
+            biasTone = "bullish";
+            auctionStatus = "Exhaustion at Lows";
+            narrative = $"New low at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)} on positive delta. Lack of seller conviction.";
+        }
+        else if (distinctSignals.Any(s => s.Tone == "bullish" && s.Type == "stacked_imbalance"))
         {
             bias = "Bullish Initiative";
             biasTone = "bullish";
             auctionStatus = "Aggressive Initiative Buying";
-            narrative = $"Aggressive buying, +Δ {FmtVol(bar.Delta)} at {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
+            narrative = $"Buyers in control holding above support, +Δ {FmtVol(bar.Delta)} at POC {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
-        else if (hasStackedSell && bar.Close <= bar.Open && bar.Delta < 0)
+        else if (distinctSignals.Any(s => s.Tone == "bearish" && s.Type == "stacked_imbalance"))
         {
             bias = "Bearish Initiative";
             biasTone = "bearish";
             auctionStatus = "Aggressive Initiative Selling";
-            narrative = $"Aggressive selling, −Δ {FmtVol(-bar.Delta)} at {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
+            narrative = $"Sellers in control holding below resistance, −Δ {FmtVol(-bar.Delta)} at POC {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
         else
         {
             bias = "Rotational / Balance";
             biasTone = "neutral";
             auctionStatus = "Two-Way Auction Balance";
-            narrative = $"Balanced market at POC {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
+            narrative = $"Balanced market around POC {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
 
         var result = new OrderFlowContext
         {
-            HasBias = hasStackedBuy || hasStackedSell || sellerAbsorption || buyerAbsorption,
+            HasBias = true, // Keep side card visible with active state
             Bias = bias,
             BiasTone = biasTone,
             AuctionStatus = auctionStatus,
@@ -351,11 +532,81 @@ public static class FootprintAnalyzer
             PocMigration = pocMigration,
             CumulativeDelta = cumDelta,
             DeltaDivergence = deltaDivergence,
-            Signals = signals
+            Signals = distinctSignals
         };
 
         _lastContext = result;
         return result;
+    }
+
+    private static List<(bool IsBuy, double StartP, double EndP, int Run)> DetectStackedImbalances(FootprintBarData bar)
+    {
+        var list = new List<(bool IsBuy, double StartP, double EndP, int Run)>();
+        var levels = bar?.Levels;
+        if (levels == null || levels.Length < 2) return list;
+
+        var buyImb = new bool[levels.Length];
+        var sellImb = new bool[levels.Length];
+
+        for (var i = 0; i < levels.Length - 1; i++)
+        {
+            var lLow = levels[i];
+            var lHigh = levels[i + 1];
+
+            // Buy Imbalance at i+1 (Ask at high vs Bid at low)
+            if (lHigh.AskVolume >= MinImbalanceVol &&
+                (lLow.BidVolume == 0 ||
+                 (lHigh.AskVolume >= lLow.BidVolume * ImbalanceRatio && lHigh.AskVolume - lLow.BidVolume >= MinDeltaDiff)))
+            {
+                buyImb[i + 1] = true;
+            }
+
+            // Sell Imbalance at i (Bid at low vs Ask at high)
+            if (lLow.BidVolume >= MinImbalanceVol &&
+                (lHigh.AskVolume == 0 ||
+                 (lLow.BidVolume >= lHigh.AskVolume * ImbalanceRatio && lLow.BidVolume - lHigh.AskVolume >= MinDeltaDiff)))
+            {
+                sellImb[i] = true;
+            }
+        }
+
+        // Detect Stacked Buy
+        var run = 0;
+        for (var i = 0; i < levels.Length; i++)
+        {
+            if (buyImb[i])
+            {
+                run++;
+            }
+            else
+            {
+                if (run >= StackedLevelsRequired)
+                    list.Add((true, levels[i - run].Price, levels[i - 1].Price, run));
+                run = 0;
+            }
+        }
+        if (run >= StackedLevelsRequired)
+            list.Add((true, levels[levels.Length - run].Price, levels[^1].Price, run));
+
+        // Detect Stacked Sell
+        run = 0;
+        for (var i = 0; i < levels.Length; i++)
+        {
+            if (sellImb[i])
+            {
+                run++;
+            }
+            else
+            {
+                if (run >= StackedLevelsRequired)
+                    list.Add((false, levels[i - run].Price, levels[i - 1].Price, run));
+                run = 0;
+            }
+        }
+        if (run >= StackedLevelsRequired)
+            list.Add((false, levels[levels.Length - run].Price, levels[^1].Price, run));
+
+        return list;
     }
 
     /// <summary>

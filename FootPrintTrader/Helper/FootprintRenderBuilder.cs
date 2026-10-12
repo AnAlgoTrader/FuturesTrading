@@ -100,7 +100,7 @@ public static class FootprintRenderBuilder
         if (currentPrice > 0 && result.Bars.Count > 0)
             MarkCurrentPrice(result.Bars[^1], currentPrice, tickSize);
 
-        result.Context = FootprintAnalyzer.AnalyzeContext(snapshot, tickSize);
+        result.Context = FootprintAnalyzer.AnalyzeContext(snapshot, tickSize, currentPrice);
         return result;
     }
 
