@@ -298,42 +298,42 @@ public static class FootprintAnalyzer
             bias = "Seller Absorption";
             biasTone = "bearish";
             auctionStatus = "Passive Liquidity Absorption";
-            narrative = $"Buyers aggressively lifted offers near {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)} (+Δ {FmtVol(bar.Delta)}), but met heavy passive limit resistance. Price rejected downward.";
+            narrative = $"Seller absorption at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}, +Δ {FmtVol(bar.Delta)}";
         }
         else if (buyerAbsorption)
         {
             bias = "Buyer Absorption";
             biasTone = "bullish";
             auctionStatus = "Passive Liquidity Absorption";
-            narrative = $"Sellers hit bids near {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)} (−Δ {FmtVol(-bar.Delta)}), but were absorbed by passive limit bids. Price rotated higher.";
+            narrative = $"Buyer absorption at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}, −Δ {FmtVol(-bar.Delta)}";
         }
         else if (hasStackedBuy && hasStackedSell)
         {
             bias = "Two-Sided Imbalance";
             biasTone = "warning";
             auctionStatus = "Conflicting Order Flow";
-            narrative = $"Both stacked buying and selling imbalances present around POC {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}. Directional conviction is low.";
+            narrative = $"Two-sided imbalance at POC {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
         else if (hasStackedBuy && bar.Close >= bar.Open && bar.Delta > 0)
         {
             bias = "Bullish Initiative";
             biasTone = "bullish";
             auctionStatus = "Aggressive Initiative Buying";
-            narrative = $"Aggressive buyers driving price higher with stacked buying imbalances and +Δ {FmtVol(bar.Delta)} ({deltaPct:+0.0}%). POC migrating up to {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}.";
+            narrative = $"Aggressive buying, +Δ {FmtVol(bar.Delta)} at {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
         else if (hasStackedSell && bar.Close <= bar.Open && bar.Delta < 0)
         {
             bias = "Bearish Initiative";
             biasTone = "bearish";
             auctionStatus = "Aggressive Initiative Selling";
-            narrative = $"Aggressive sellers in control with stacked selling imbalances and −Δ {FmtVol(-bar.Delta)} ({deltaPct:+0.0}%). POC migrating down to {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}.";
+            narrative = $"Aggressive selling, −Δ {FmtVol(-bar.Delta)} at {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
         else
         {
             bias = "Rotational / Balance";
             biasTone = "neutral";
             auctionStatus = "Two-Way Auction Balance";
-            narrative = $"No stacked imbalance on the current bar. Two-way auction in balance around POC {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}.";
+            narrative = $"Balanced market at POC {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
 
         var result = new OrderFlowContext
