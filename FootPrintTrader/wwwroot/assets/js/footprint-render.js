@@ -1,7 +1,7 @@
     // Pure renderer: every number, colour and highlight comes from the JSON. No footprint maths in here.
     const AXIS = 60;
     const wrap = document.getElementById('wrap'), cv = document.getElementById('cv'), ctx = cv.getContext('2d');
-    let R = .25, dec = 2, FOOT = 50, labels = ['Delta', 'Vol'], custom = {}, W = 0, H = 0, bars = [], minP = 0, maxP = 1, hover = null;
+    let R = .25, dec = 2, FOOT = 56, labels = ['Delta', 'Vol'], custom = {}, W = 0, H = 0, bars = [], minP = 0, maxP = 1, hover = null;
     const V = {colW: 92, ppu: 16, x0: 0, top: 0};
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
     const isNum = v => v !== null && v !== '' && v !== undefined && isFinite(+v);
@@ -37,7 +37,7 @@
       let fn = 0; minP = Infinity; maxP = -Infinity;
       for (const b of bars) {minP = Math.min(minP, b.lo); maxP = Math.max(maxP, b.hi); fn = Math.max(fn, b.footer.length)}
       while (labels.length < fn) labels.push('');
-      FOOT = 16 * (labels.length + 1) + 2;
+      FOOT = 16 * (labels.length + 1) + 8;
     }
     function load(obj) {
       const raw = Array.isArray(obj) ? obj : obj && obj.bars, meta = Array.isArray(obj) ? {} : obj;
