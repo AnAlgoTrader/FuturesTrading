@@ -345,7 +345,7 @@ public static class FootprintAnalyzer
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "absorption",
-                    Title = $"Passive Seller Absorption ({P(bar.High)})",
+                    Title = $"Seller Absorption ({P(bar.High)})",
                     Tone = "bearish",
                     Time = timeLabel
                 });
@@ -356,7 +356,7 @@ public static class FootprintAnalyzer
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "absorption",
-                    Title = $"Passive Buyer Absorption ({P(bar.Low)})",
+                    Title = $"Buyer Absorption ({P(bar.Low)})",
                     Tone = "bullish",
                     Time = timeLabel
                 });
@@ -373,7 +373,7 @@ public static class FootprintAnalyzer
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "divergence",
-                    Title = $"Bearish Delta Divergence ({P(bar.High)})",
+                    Title = $"Bearish Divergence ({P(bar.High)})",
                     Tone = "bearish",
                     Time = timeLabel
                 });
@@ -384,7 +384,7 @@ public static class FootprintAnalyzer
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "divergence",
-                    Title = $"Bullish Delta Divergence ({P(bar.Low)})",
+                    Title = $"Bullish Divergence ({P(bar.Low)})",
                     Tone = "bullish",
                     Time = timeLabel
                 });
