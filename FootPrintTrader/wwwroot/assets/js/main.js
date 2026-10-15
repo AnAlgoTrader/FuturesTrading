@@ -112,6 +112,9 @@ function footprintSnapshot(data) {
     if (data.context) {
         updateSidePanel(data.context, data.rowSize || 0.25);
     }
+    if (data.interpretation) {
+        updateInterpretationPanel(data.interpretation);
+    }
 
     const bars = data.bars;
     const signature = bars.length + ':' + bars[0].id;
@@ -234,4 +237,43 @@ function escapeHtml(str) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+function updateInterpretationPanel(interp) {
+    if (!interp) return;
+
+    const card = document.getElementById('interpretation-card');
+    const headline = document.getElementById('interp-headline');
+    const action = document.getElementById('interp-action');
+    const details = document.getElementById('interp-details');
+    const factorsEl = document.getElementById('interp-factors');
+
+    const tone = interp.tone || 'neutral';
+    if (card) {
+        card.style.display = '';
+        card.className = `card interpretation-card tone-${tone}`;
+    }
+
+    if (headline) {
+        headline.textContent = interp.title || 'Analyzing...';
+    }
+
+    if (action) {
+        action.textContent = interp.action || 'STAND ASIDE';
+    }
+
+    if (details) {
+        details.textContent = interp.details || '';
+    }
+
+    if (factorsEl) {
+        const factors = Array.isArray(interp.factors) ? interp.factors : [];
+        if (factors.length > 0) {
+            factorsEl.innerHTML = factors.map(f => `<div class="interp-factor-item">${escapeHtml(f)}</div>`).join('');
+            factorsEl.style.display = '';
+        } else {
+            factorsEl.innerHTML = '';
+            factorsEl.style.display = 'none';
+        }
+    }
 }

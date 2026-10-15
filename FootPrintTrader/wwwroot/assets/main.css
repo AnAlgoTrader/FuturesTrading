@@ -348,6 +348,89 @@ html, body {
     color: var(--text);
 }
 
+/* ---- Interpretation Card ---- */
+.interpretation-card {
+    border-left: 4px solid var(--muted);
+    transition: border-left-color 0.2s;
+    background: #171c26;
+}
+
+.interpretation-card.tone-bullish { border-left-color: var(--up); }
+.interpretation-card.tone-bearish { border-left-color: var(--down); }
+.interpretation-card.tone-warning { border-left-color: var(--warn); }
+.interpretation-card.tone-neutral { border-left-color: var(--muted); }
+
+.interp-headline {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.interp-action-row {
+    margin: 6px 0;
+}
+
+.interp-action {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    line-height: 1.4;
+    max-width: 100%;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+    background: rgba(138, 147, 166, 0.15);
+    color: var(--muted);
+    border: 1px solid rgba(138, 147, 166, 0.3);
+}
+
+.interpretation-card.tone-bullish .interp-action {
+    background: rgba(47, 207, 147, 0.16);
+    color: var(--up);
+    border-color: rgba(47, 207, 147, 0.4);
+}
+
+.interpretation-card.tone-bearish .interp-action {
+    background: rgba(240, 100, 123, 0.16);
+    color: var(--down);
+    border-color: rgba(240, 100, 123, 0.4);
+}
+
+.interpretation-card.tone-warning .interp-action {
+    background: rgba(242, 183, 5, 0.16);
+    color: var(--warn);
+    border-color: rgba(242, 183, 5, 0.4);
+}
+
+.interp-details {
+    font-size: 11px;
+    line-height: 1.45;
+    color: #cbd5e1;
+    margin-top: 4px;
+}
+
+.interp-factors {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.interp-factor-item {
+    font-size: 10px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.interp-factor-item::before {
+    content: "•";
+    color: var(--warn);
+}
+
 /* ---- Bias Card ---- */
 .bias-card {
     border-left: 4px solid var(--muted);

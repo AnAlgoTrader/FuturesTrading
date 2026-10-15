@@ -54,6 +54,7 @@ public class FootprintRenderSnapshot
     public List<FootprintRenderBar> Bars { get; set; } = new();
     public List<FootprintRenderLine> Analysis { get; set; }
     public OrderFlowContext Context { get; set; }
+    public MarketInterpretation Interpretation { get; set; }
 }
 
 public static class FootprintRenderBuilder
@@ -101,6 +102,7 @@ public static class FootprintRenderBuilder
             MarkCurrentPrice(result.Bars[^1], currentPrice, tickSize);
 
         result.Context = FootprintAnalyzer.AnalyzeContext(snapshot, tickSize, currentPrice);
+        result.Interpretation = FootprintInterpreter.Interpret(result.Context, snapshot, tickSize, currentPrice);
         return result;
     }
 

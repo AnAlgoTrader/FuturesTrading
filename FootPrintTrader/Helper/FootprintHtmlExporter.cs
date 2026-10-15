@@ -23,6 +23,7 @@ if (data.bars && data.bars.length) {{
     footprint.load(data);
     footprint.showAll();
     if (data.context) updateSidePanel(data.context, data.rowSize || 0.25);
+    if (data.interpretation) updateInterpretationPanel(data.interpretation);
 }}
 </script>";
 
