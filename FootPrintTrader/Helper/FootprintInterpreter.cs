@@ -60,25 +60,9 @@ public static class FootprintInterpreter
             interp.Tone = "warning";
             interp.Action = "STAND ASIDE";
 
-            var ceiling = signals.FirstOrDefault(s => s.Tone == "bearish");
-            var floor = signals.FirstOrDefault(s => s.Tone == "bullish");
-
-            var ceilingDesc = ceiling != null ? ceiling.Title : $"Ceiling near {P(bar.High)}";
-            var floorDesc = floor != null ? floor.Title : $"Floor near {P(bar.Low)}";
-
-            if (range < MinViableRangePoints)
-            {
-                interp.IsCompressedRange = true;
-                interp.Details = $"Opposing order flow ({ceilingDesc} vs. {floorDesc}) in a compressed {range.ToString("F" + dec, CultureInfo.InvariantCulture)} pt range. High chop risk — do not fade inside this bracket.";
-            }
-            else
-            {
-                interp.Details = $"Opposing order flow ({ceilingDesc} vs. {floorDesc}). Price is bracketed between {P(bar.Low)} and {P(bar.High)}. Await breakout resolution.";
-            }
-
-            interp.Factors.Add($"Resistance: {ceilingDesc}");
-            interp.Factors.Add($"Support: {floorDesc}");
-            interp.Factors.Add($"Bar Range: {range.ToString("F" + dec, CultureInfo.InvariantCulture)} pts (Too compressed for inside-bar trade)");
+            interp.Details = range < MinViableRangePoints
+                ? $"Opposing flow: resistance at {P(bar.High)}, support at {P(bar.Low)}. Range is compressed ({range.ToString("F" + dec, CultureInfo.InvariantCulture)} pts)."
+                : $"Opposing flow: resistance at {P(bar.High)}, support at {P(bar.Low)}. Wait for breakout.";
             return interp;
         }
 
@@ -89,9 +73,7 @@ public static class FootprintInterpreter
             interp.Title = $"{context.Bias} (Range Compressed)";
             interp.Tone = "warning";
             interp.Action = "STAND ASIDE";
-            interp.Details = $"Bar range is only {range.ToString("F" + dec, CultureInfo.InvariantCulture)} pts. Insufficient profit margin inside the bar after spread and commissions. Wait for range expansion.";
-            interp.Factors.Add($"Current Range: {range.ToString("F" + dec, CultureInfo.InvariantCulture)} pts");
-            interp.Factors.Add($"Min Viable Range: {MinViableRangePoints:F2} pts");
+            interp.Details = $"Bar range is only {range.ToString("F" + dec, CultureInfo.InvariantCulture)} pts. Poor risk/reward inside the bar.";
             return interp;
         }
 
@@ -101,19 +83,18 @@ public static class FootprintInterpreter
         {
             if (trappedSignal.Tone == "bearish")
             {
-                interp.Title = "Trapped Buyers (Liquidation Risk)";
+                interp.Title = "Trapped Buyers";
                 interp.Tone = "bearish";
-                interp.Action = $"FADE RALLIES (< {P(context.PocPrice)})";
-                interp.Details = "Buyers trapped above the current market. Liquidation pressure favors shorts on pullbacks.";
+                interp.Action = $"SHORT (Fade @ {P(context.PocPrice)})";
+                interp.Details = $"Longs trapped above {P(context.PocPrice)}. Look for short continuation.";
             }
             else
             {
-                interp.Title = "Trapped Sellers (Short Squeeze Risk)";
+                interp.Title = "Trapped Sellers";
                 interp.Tone = "bullish";
-                interp.Action = $"BUY PULLBACKS (> {P(context.PocPrice)})";
-                interp.Details = "Sellers trapped below the current market. Short covering pressure favors longs on dips.";
+                interp.Action = $"BUY (Squeeze @ {P(context.PocPrice)})";
+                interp.Details = $"Shorts trapped below {P(context.PocPrice)}. Look for squeeze upward.";
             }
-            interp.Factors.Add(trappedSignal.Title);
             return interp;
         }
 
@@ -122,9 +103,8 @@ public static class FootprintInterpreter
         {
             interp.Title = "Institutional Seller Absorption";
             interp.Tone = "bearish";
-            interp.Action = $"LEAN SHORT ({context.Action})";
-            interp.Details = $"Aggressive market buyers absorbed at {P(bar.High)}. Passive sellers capping price. Fade against high with tight stop.";
-            interp.Factors.Add($"Absorption at high: {P(bar.High)}");
+            interp.Action = $"SHORT (Fade @ {P(bar.High)})";
+            interp.Details = $"Heavy buying absorbed at {P(bar.High)}. Seller defending the high.";
             return interp;
         }
 
@@ -133,9 +113,8 @@ public static class FootprintInterpreter
         {
             interp.Title = "Institutional Buyer Absorption";
             interp.Tone = "bullish";
-            interp.Action = $"LEAN LONG ({context.Action})";
-            interp.Details = $"Aggressive market sellers absorbed at {P(bar.Low)}. Passive buyers defending base. Squeeze off low with tight stop.";
-            interp.Factors.Add($"Absorption at low: {P(bar.Low)}");
+            interp.Action = $"BUY (Squeeze @ {P(bar.Low)})";
+            interp.Details = $"Heavy selling absorbed at {P(bar.Low)}. Buyer defending the low.";
             return interp;
         }
 
@@ -144,9 +123,8 @@ public static class FootprintInterpreter
         {
             interp.Title = "Bearish Delta Divergence";
             interp.Tone = "bearish";
-            interp.Action = $"WATCH FOR REVERSAL ({P(bar.High)})";
-            interp.Details = $"Price tested high on negative delta. Buying momentum exhausted; watch for seller initiative.";
-            interp.Factors.Add("Negative delta at bar / session high");
+            interp.Action = $"SHORT (Divergence @ {P(bar.High)})";
+            interp.Details = $"New high with negative delta. Buyers exhausted at the top.";
             return interp;
         }
 
@@ -154,9 +132,8 @@ public static class FootprintInterpreter
         {
             interp.Title = "Bullish Delta Divergence";
             interp.Tone = "bullish";
-            interp.Action = $"WATCH FOR REVERSAL ({P(bar.Low)})";
-            interp.Details = $"Price tested low on positive delta. Selling momentum exhausted; watch for buyer initiative.";
-            interp.Factors.Add("Positive delta at bar / session low");
+            interp.Action = $"BUY (Divergence @ {P(bar.Low)})";
+            interp.Details = $"New low with positive delta. Sellers exhausted at the bottom.";
             return interp;
         }
 
@@ -166,9 +143,8 @@ public static class FootprintInterpreter
         {
             interp.Title = "Bullish Initiative Drive";
             interp.Tone = "bullish";
-            interp.Action = $"FAVOR LONGS ({context.Action})";
-            interp.Details = "Aggressive initiative buyers in control. Look for retest entries near POC / imbalance zone.";
-            interp.Factors.Add(initiativeBuy.Title);
+            interp.Action = $"BUY (Retest @ {P(context.PocPrice)})";
+            interp.Details = $"Aggressive buyers in control. Buy pullbacks to {P(context.PocPrice)}.";
             return interp;
         }
 
@@ -177,9 +153,8 @@ public static class FootprintInterpreter
         {
             interp.Title = "Bearish Initiative Drive";
             interp.Tone = "bearish";
-            interp.Action = $"FAVOR SHORTS ({context.Action})";
-            interp.Details = "Aggressive initiative sellers in control. Look for bounce short entries near POC / imbalance zone.";
-            interp.Factors.Add(initiativeSell.Title);
+            interp.Action = $"SHORT (Retest @ {P(context.PocPrice)})";
+            interp.Details = $"Aggressive sellers in control. Sell rallies to {P(context.PocPrice)}.";
             return interp;
         }
 
