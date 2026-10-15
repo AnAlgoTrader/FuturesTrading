@@ -7,10 +7,10 @@ namespace FootPrintTrader.Helper;
 
 public class MarketInterpretation
 {
-    public string Title { get; set; } = "Analyzing...";
+    public string Title { get; set; } = "";
     public string Tone { get; set; } = "neutral"; // "bullish", "bearish", "warning", "neutral"
-    public string Action { get; set; } = "STAND ASIDE";
-    public string Details { get; set; } = "Evaluating auction context...";
+    public string Action { get; set; } = "";
+    public string Details { get; set; } = "";
     public List<string> Factors { get; set; } = new();
     public bool IsConflict { get; set; }
     public bool IsCompressedRange { get; set; }
@@ -183,11 +183,11 @@ public static class FootprintInterpreter
             return interp;
         }
 
-        // 7. Default Balanced Rotation
-        interp.Title = "Balanced Auction (Rotational)";
+        // 7. Default Balanced Rotation (No actionable interpretation)
+        interp.Title = "";
         interp.Tone = "neutral";
-        interp.Action = "STAND ASIDE";
-        interp.Details = "Two-sided responsive auction with no clean directional edge. Await clear initiative or absorption.";
+        interp.Action = "";
+        interp.Details = "";
         return interp;
     }
 }

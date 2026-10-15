@@ -245,6 +245,7 @@ function updateInterpretationPanel(interp) {
     const card = document.getElementById('interpretation-card');
     const headline = document.getElementById('interp-headline');
     const action = document.getElementById('interp-action');
+    const actionRow = document.getElementById('interp-action-row') || (action ? action.parentElement : null);
     const details = document.getElementById('interp-details');
     const factorsEl = document.getElementById('interp-factors');
 
@@ -254,16 +255,40 @@ function updateInterpretationPanel(interp) {
         card.className = `card interpretation-card tone-${tone}`;
     }
 
-    if (headline) {
-        headline.textContent = interp.title || 'Analyzing...';
+    const isNeutral = tone === 'neutral' || (!interp.action && !interp.title);
+
+    if (isNeutral) {
+        if (headline) headline.textContent = '-';
+        if (action) action.textContent = '';
+        if (actionRow) actionRow.style.display = 'none';
+        if (details) {
+            details.textContent = '';
+            details.style.display = 'none';
+        }
+        if (factorsEl) {
+            factorsEl.innerHTML = '';
+            factorsEl.style.display = 'none';
+        }
+        return;
     }
 
-    if (action) {
-        action.textContent = interp.action || 'STAND ASIDE';
+    if (headline) {
+        headline.textContent = interp.title || '-';
+    }
+
+    if (action && actionRow) {
+        if (interp.action) {
+            action.textContent = interp.action;
+            actionRow.style.display = '';
+        } else {
+            action.textContent = '';
+            actionRow.style.display = 'none';
+        }
     }
 
     if (details) {
         details.textContent = interp.details || '';
+        details.style.display = interp.details ? '' : 'none';
     }
 
     if (factorsEl) {
