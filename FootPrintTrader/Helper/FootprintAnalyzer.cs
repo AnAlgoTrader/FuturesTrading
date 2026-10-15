@@ -32,8 +32,14 @@ public class OrderFlowContext
 
     // Live Bar Metrics
     public double PocPrice { get; init; }
+    public double CurrentDelta { get; init; }
+    public double DeltaPercent { get; init; }
+    public decimal CurrentVolume { get; init; }
+    public string PocPosition { get; init; } = "-";
+    public string PocMigration { get; init; } = "-";
 
     // Multi-bar / Session Structure
+    public double CumulativeDelta { get; init; }
     public string DeltaDivergence { get; init; } = "None";
 
     // Active Signals
@@ -88,6 +94,35 @@ public static class FootprintAnalyzer
             var pocLevel = levels.OrderByDescending(l => l.Total).First();
             pocPrice = pocLevel.Price;
         }
+
+        // Live Bar Metrics
+        var currentDelta = (double)bar.Delta;
+        var currentVolume = bar.Volume;
+        var deltaPercent = currentVolume > 0 ? currentDelta / (double)currentVolume * 100.0 : 0.0;
+
+        var barRange = bar.High - bar.Low;
+        string pocPosition;
+        if (barRange > 1e-9)
+        {
+            var pos = (pocPrice - bar.Low) / barRange;
+            pocPosition = pos >= 0.66 ? "High" : pos <= 0.33 ? "Low" : "Middle";
+        }
+        else pocPosition = "-";
+
+        var pocMigration = "-";
+        if (prevBar != null)
+        {
+            var prevPoc = prevBar.Close;
+            var prevLevels = prevBar.Levels ?? Array.Empty<FootprintLevel>();
+            if (prevLevels.Length > 0)
+                prevPoc = prevLevels.OrderByDescending(l => l.Total).First().Price;
+            if (pocPrice > prevPoc + tickSize * 0.5) pocMigration = "▲ Up";
+            else if (pocPrice < prevPoc - tickSize * 0.5) pocMigration = "▼ Down";
+            else pocMigration = "→ Flat";
+        }
+
+        // Multi-bar / Session Structure
+        var cumulativeDelta = (double)completed.Sum(c => c.Delta) + currentDelta;
 
         // Update Stateful Order Flow Zones from Completed Bars
         lock (_syncLock)
@@ -285,7 +320,6 @@ public static class FootprintAnalyzer
         }
 
         // Passive Absorption Detection (subject bar)
-        var barRange = bar.High - bar.Low;
         var priceChange = bar.Close - bar.Open;
         var barDelta = bar.Delta;
         var sellerAbsorption = false;
@@ -432,6 +466,12 @@ public static class FootprintAnalyzer
             BiasTone = biasTone,
             Action = action,
             PocPrice = pocPrice,
+            CurrentDelta = currentDelta,
+            DeltaPercent = deltaPercent,
+            CurrentVolume = currentVolume,
+            PocPosition = pocPosition,
+            PocMigration = pocMigration,
+            CumulativeDelta = cumulativeDelta,
             DeltaDivergence = deltaDivergence,
             Signals = distinctSignals
         };
