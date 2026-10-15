@@ -9,9 +9,7 @@ public class OrderFlowSignal
 {
     public string Type { get; set; } = "";        // "stacked_imbalance", "absorption", "trapped_traders", "divergence", "unfinished_auction", "exhaustion"
     public string Title { get; set; } = "";
-    public string Description { get; set; } = "";
     public string Tone { get; set; } = "neutral"; // "bullish", "bearish", "warning", "neutral"
-    public string Price { get; set; } = "";
     public string Time { get; set; } = "";
 }
 
@@ -85,6 +83,7 @@ public static class FootprintAnalyzer
             return _lastContext ?? new OrderFlowContext();
 
         var dec = Decimals(tickSize);
+        string P(double v) => v.ToString("F" + dec, CultureInfo.InvariantCulture);
         var signals = new List<OrderFlowSignal>();
         var timeLabel = FootprintRenderBuilder.FormatTime(bar.StartTime);
         var evalPrice = currentPrice > 0 ? currentPrice : bar.Close;
@@ -196,10 +195,8 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "trapped_traders",
-                            Title = zone.IsExhaustionAtBirth ? "Trapped Longs (Exhaustion Fade)" : "Trapped Buyers (Fade Short)",
-                            Description = $"Price ({evalPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}) broke below stacked buy zone {zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}-{zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}; buyers trapped offside.",
+                            Title = zone.IsExhaustionAtBirth ? $"Trapped Longs ({P(zone.LowPrice)})" : $"Trapped Buyers ({P(zone.LowPrice)})",
                             Tone = "bearish",
-                            Price = $"{zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} - {zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}",
                             Time = zone.TimeLabel
                         });
                     }
@@ -210,10 +207,8 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "stacked_imbalance",
-                            Title = "Retesting Buy Zone (Support)",
-                            Description = $"Pullback testing buyer support at {zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}-{zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}.",
+                            Title = $"Retesting Buy Zone ({P(zone.LowPrice)})",
                             Tone = "bullish",
-                            Price = $"{zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} - {zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}",
                             Time = zone.TimeLabel
                         });
                     }
@@ -223,10 +218,8 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "stacked_imbalance",
-                            Title = $"Buyer Support ({zone.Levels} lvls)",
-                            Description = $"Stacked buy imbalance {zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}-{zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} holding as support.",
+                            Title = $"Buyer Support ({P(zone.LowPrice)})",
                             Tone = "bullish",
-                            Price = $"{zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} - {zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}",
                             Time = zone.TimeLabel
                         });
                     }
@@ -240,10 +233,8 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "trapped_traders",
-                            Title = zone.IsExhaustionAtBirth ? "Trapped Shorts (Exhaustion Squeeze)" : "Trapped Sellers (Squeeze Long)",
-                            Description = $"Price ({evalPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}) pushed above stacked sell zone {zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}-{zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}; sellers trapped offside.",
+                            Title = zone.IsExhaustionAtBirth ? $"Trapped Shorts ({P(zone.HighPrice)})" : $"Trapped Sellers ({P(zone.HighPrice)})",
                             Tone = "bullish",
-                            Price = $"{zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} - {zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}",
                             Time = zone.TimeLabel
                         });
                     }
@@ -254,10 +245,8 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "stacked_imbalance",
-                            Title = "Retesting Sell Zone (Resistance)",
-                            Description = $"Rally testing seller resistance at {zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}-{zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}.",
+                            Title = $"Retesting Sell Zone ({P(zone.HighPrice)})",
                             Tone = "bearish",
-                            Price = $"{zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} - {zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}",
                             Time = zone.TimeLabel
                         });
                     }
@@ -267,10 +256,8 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "stacked_imbalance",
-                            Title = $"Seller Resistance ({zone.Levels} lvls)",
-                            Description = $"Stacked sell imbalance {zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}-{zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} holding as resistance.",
+                            Title = $"Seller Resistance ({P(zone.HighPrice)})",
                             Tone = "bearish",
-                            Price = $"{zone.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)} - {zone.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}",
                             Time = zone.TimeLabel
                         });
                     }
@@ -297,10 +284,8 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "exhaustion",
-                            Title = "[Developing] Buying Exhaustion at High",
-                            Description = $"Aggressive buyers ({imb.Run} lvls) at bar high struggling to advance; fade candidate.",
+                            Title = $"[Developing] Buying Exhaustion at High ({P(imb.EndP)})",
                             Tone = "bearish",
-                            Price = $"{imb.StartP.ToString("F" + dec, CultureInfo.InvariantCulture)} - {imb.EndP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
                             Time = timeLabel
                         });
                     }
@@ -309,10 +294,8 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "stacked_imbalance",
-                            Title = $"[Developing] Stacked Buy Imbalance ({imb.Run} lvls)",
-                            Description = $"Aggressive buyers lifting offers from {imb.StartP.ToString("F" + dec, CultureInfo.InvariantCulture)} to {imb.EndP.ToString("F" + dec, CultureInfo.InvariantCulture)}.",
+                            Title = $"[Developing] Stacked Buy Imbalance ({P(imb.EndP)})",
                             Tone = "bullish",
-                            Price = $"{imb.StartP.ToString("F" + dec, CultureInfo.InvariantCulture)} - {imb.EndP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
                             Time = timeLabel
                         });
                     }
@@ -328,10 +311,8 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "exhaustion",
-                            Title = "[Developing] Selling Exhaustion at Low",
-                            Description = $"Aggressive sellers ({imb.Run} lvls) at bar low struggling to breakdown; squeeze candidate.",
+                            Title = $"[Developing] Selling Exhaustion at Low ({P(imb.StartP)})",
                             Tone = "bullish",
-                            Price = $"{imb.StartP.ToString("F" + dec, CultureInfo.InvariantCulture)} - {imb.EndP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
                             Time = timeLabel
                         });
                     }
@@ -340,10 +321,8 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "stacked_imbalance",
-                            Title = $"[Developing] Stacked Sell Imbalance ({imb.Run} lvls)",
-                            Description = $"Aggressive sellers hitting bids from {imb.StartP.ToString("F" + dec, CultureInfo.InvariantCulture)} to {imb.EndP.ToString("F" + dec, CultureInfo.InvariantCulture)}.",
+                            Title = $"[Developing] Stacked Sell Imbalance ({P(imb.StartP)})",
                             Tone = "bearish",
-                            Price = $"{imb.StartP.ToString("F" + dec, CultureInfo.InvariantCulture)} - {imb.EndP.ToString("F" + dec, CultureInfo.InvariantCulture)}",
                             Time = timeLabel
                         });
                     }
@@ -366,10 +345,8 @@ public static class FootprintAnalyzer
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "absorption",
-                    Title = "Passive Seller Absorption (Fade)",
-                    Description = $"Aggressive buyers lifted +Δ {FmtVol(barDelta)} into limit sellers at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}; buying absorbed.",
+                    Title = $"Passive Seller Absorption ({P(bar.High)})",
                     Tone = "bearish",
-                    Price = bar.High.ToString("F" + dec, CultureInfo.InvariantCulture),
                     Time = timeLabel
                 });
             }
@@ -379,10 +356,8 @@ public static class FootprintAnalyzer
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "absorption",
-                    Title = "Passive Buyer Absorption (Squeeze)",
-                    Description = $"Aggressive sellers hit −Δ {FmtVol(-barDelta)} into limit buyers at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}; selling absorbed.",
+                    Title = $"Passive Buyer Absorption ({P(bar.Low)})",
                     Tone = "bullish",
-                    Price = bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture),
                     Time = timeLabel
                 });
             }
@@ -398,10 +373,8 @@ public static class FootprintAnalyzer
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "divergence",
-                    Title = "Bearish Delta Divergence (Fade)",
-                    Description = $"New high reached at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)} on negative delta ({FmtVol(bar.Delta)}); lack of buyer conviction at highs.",
+                    Title = $"Bearish Delta Divergence ({P(bar.High)})",
                     Tone = "bearish",
-                    Price = bar.High.ToString("F" + dec, CultureInfo.InvariantCulture),
                     Time = timeLabel
                 });
             }
@@ -411,10 +384,8 @@ public static class FootprintAnalyzer
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "divergence",
-                    Title = "Bullish Delta Divergence (Squeeze)",
-                    Description = $"New low reached at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)} on positive delta (+{FmtVol(bar.Delta)}); lack of seller conviction at lows.",
+                    Title = $"Bullish Delta Divergence ({P(bar.Low)})",
                     Tone = "bullish",
-                    Price = bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture),
                     Time = timeLabel
                 });
             }
@@ -425,7 +396,7 @@ public static class FootprintAnalyzer
         var seenKeys = new HashSet<string>();
         foreach (var sig in signals)
         {
-            var key = $"{sig.Type}:{sig.Tone}:{sig.Price}";
+            var key = $"{sig.Type}:{sig.Tone}:{sig.Title}";
             if (seenKeys.Add(key))
             {
                 distinctSignals.Add(sig);
@@ -618,7 +589,7 @@ public static class FootprintAnalyzer
         {
             lines.Add(new FootprintRenderLine
             {
-                Text = $"{sig.Title}: {sig.Description}",
+                Text = sig.Title,
                 Tone = sig.Tone == "bullish" ? "up" : sig.Tone == "bearish" ? "down" : "text"
             });
         }

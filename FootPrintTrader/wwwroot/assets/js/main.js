@@ -168,14 +168,11 @@ function updateSidePanel(ctx, tickSize) {
         } else {
             signalsContainer.innerHTML = signals.map(sig => {
                 const sTone = sig.tone || 'neutral';
-                const priceBadge = sig.price ? `<span class="signal-price">${sig.price}</span>` : '';
                 return `
                     <div class="signal-item tone-${sTone}">
                         <div class="signal-header">
                             <span class="signal-title">${escapeHtml(sig.title)}</span>
-                            ${priceBadge}
                         </div>
-                        <div class="signal-desc">${escapeHtml(sig.description)}</div>
                     </div>
                 `;
             }).join('');
