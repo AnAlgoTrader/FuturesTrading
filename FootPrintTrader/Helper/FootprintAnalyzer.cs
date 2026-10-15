@@ -284,7 +284,7 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "exhaustion",
-                            Title = $"[Developing] Buying Exhaustion at High ({P(imb.EndP)})",
+                            Title = $"Buying Exhaustion at High ({P(imb.EndP)})",
                             Tone = "bearish",
                             Time = timeLabel
                         });
@@ -294,7 +294,7 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "stacked_imbalance",
-                            Title = $"[Developing] Stacked Buy Imbalance ({P(imb.EndP)})",
+                            Title = $"Stacked Buy Imbalance ({P(imb.EndP)})",
                             Tone = "bullish",
                             Time = timeLabel
                         });
@@ -311,7 +311,7 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "exhaustion",
-                            Title = $"[Developing] Selling Exhaustion at Low ({P(imb.StartP)})",
+                            Title = $"Selling Exhaustion at Low ({P(imb.StartP)})",
                             Tone = "bullish",
                             Time = timeLabel
                         });
@@ -321,7 +321,7 @@ public static class FootprintAnalyzer
                         signals.Add(new OrderFlowSignal
                         {
                             Type = "stacked_imbalance",
-                            Title = $"[Developing] Stacked Sell Imbalance ({P(imb.StartP)})",
+                            Title = $"Stacked Sell Imbalance ({P(imb.StartP)})",
                             Tone = "bearish",
                             Time = timeLabel
                         });
