@@ -402,21 +402,17 @@ html, body {
     margin-bottom: 2px;
 }
 
-.bias-auction {
-    font-size: 11px;
-    color: var(--muted);
-    margin-bottom: 10px;
+.bias-action {
+    font-size: 16px;
+    font-weight: 700;
+    font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+    color: var(--text);
+    margin-top: 4px;
 }
 
-.bias-narrative {
-    font-size: 12px;
-    line-height: 1.45;
-    color: #cbd5e1;
-    background: rgba(15, 19, 26, 0.7);
-    padding: 8px 10px;
-    border-radius: 6px;
-    border: 1px solid rgba(38, 45, 59, 0.6);
-}
+.bias-card.tone-bullish .bias-action { color: var(--up); }
+.bias-card.tone-bearish .bias-action { color: var(--down); }
+.bias-card.tone-warning .bias-action { color: var(--warn); }
 
 /* ---- Signals List ---- */
 .signal-count-badge {

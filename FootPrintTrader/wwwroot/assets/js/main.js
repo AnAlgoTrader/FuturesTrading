@@ -144,23 +144,16 @@ function updateSidePanel(ctx, tickSize) {
 
     // 1. Bias Card & Headline
     const biasCard = document.getElementById('bias-card');
-    const biasPill = document.getElementById('bias-pill');
     const biasHeadline = document.getElementById('bias-headline');
-    const biasAuction = document.getElementById('bias-auction');
-    const biasNarrative = document.getElementById('bias-narrative');
+    const biasAction = document.getElementById('bias-action');
 
     const tone = ctx.biasTone || 'neutral';
     if (biasCard) {
         biasCard.style.display = '';
         biasCard.className = `card bias-card tone-${tone}`;
     }
-    if (biasPill) {
-        biasPill.className = `status-pill ${tone}`;
-        biasPill.textContent = (ctx.biasTone || 'Neutral').toUpperCase();
-    }
     if (biasHeadline) biasHeadline.textContent = ctx.bias || 'Balanced';
-    if (biasAuction) biasAuction.textContent = ctx.auctionStatus || 'Two-Way Auction Balance';
-    if (biasNarrative) biasNarrative.textContent = ctx.narrative || 'Analyzing order flow...';
+    if (biasAction) biasAction.textContent = ctx.action || '-';
 
     // 2. Signals Container
     const signalsCount = document.getElementById('signals-count');

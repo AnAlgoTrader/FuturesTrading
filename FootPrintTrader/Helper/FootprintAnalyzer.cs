@@ -33,7 +33,7 @@ public class OrderFlowContext
     public bool HasBias { get; set; }
     public string Bias { get; set; } = "Neutral";
     public string BiasTone { get; set; } = "neutral"; // "bullish", "bearish", "warning", "neutral"
-    public string Narrative { get; set; } = "";
+    public string Action { get; set; } = "";
 
     // Live Bar Metrics
     public decimal CurrentDelta { get; set; }
@@ -46,7 +46,6 @@ public class OrderFlowContext
     // Multi-bar / Session Structure
     public decimal CumulativeDelta { get; set; }
     public string DeltaDivergence { get; set; } = "None";
-    public string AuctionStatus { get; set; } = "Balanced";
 
     // Active Signals
     public List<OrderFlowSignal> Signals { get; set; } = new();
@@ -437,11 +436,10 @@ public static class FootprintAnalyzer
             distinctSignals = distinctSignals.Take(5).ToList();
         }
 
-        // 9. Synthesize Market Bias, Auction Status, and Context Narrative
+        // 9. Synthesize Market Bias and the Action (what to do, at what level)
         string bias;
         string biasTone;
-        string auctionStatus;
-        string narrative;
+        string action;
 
         var deltaPct = bar.Volume > 0 ? (double)(bar.Delta / bar.Volume) * 100.0 : 0.0;
 
@@ -455,66 +453,57 @@ public static class FootprintAnalyzer
 
         if (trappedBuy != null)
         {
-            bias = "Trapped Buyers / Fade";
+            bias = "Trapped Buyers";
             biasTone = "bearish";
-            auctionStatus = "Liquidity Trap / Order Flow Reversal";
-            narrative = $"Buyers trapped above {trappedBuy.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}; price at {evalPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}. Look to fade.";
+            action = $"Fade at {trappedBuy.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
         else if (trappedSell != null)
         {
-            bias = "Trapped Sellers / Squeeze";
+            bias = "Trapped Sellers";
             biasTone = "bullish";
-            auctionStatus = "Liquidity Trap / Order Flow Reversal";
-            narrative = $"Sellers trapped below {trappedSell.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}; price at {evalPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}. Look to squeeze.";
+            action = $"Squeeze at {trappedSell.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
         else if (sellerAbsorption)
         {
-            bias = "Seller Absorption (Fade)";
+            bias = "Seller Absorption";
             biasTone = "bearish";
-            auctionStatus = "Passive Liquidity Absorption";
-            narrative = $"Seller absorption at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}, +Δ {FmtVol(bar.Delta)}. Buyers rejected.";
+            action = $"Fade at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
         else if (buyerAbsorption)
         {
-            bias = "Buyer Absorption (Squeeze)";
+            bias = "Buyer Absorption";
             biasTone = "bullish";
-            auctionStatus = "Passive Liquidity Absorption";
-            narrative = $"Buyer absorption at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}, −Δ {FmtVol(-bar.Delta)}. Sellers rejected.";
+            action = $"Squeeze at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
         else if (deltaDivergence == "Bearish Divergence")
         {
-            bias = "Bearish Divergence (Fade)";
+            bias = "Bearish Divergence";
             biasTone = "bearish";
-            auctionStatus = "Exhaustion at Highs";
-            narrative = $"New high at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)} on negative delta. Lack of buyer conviction.";
+            action = $"Fade at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
         else if (deltaDivergence == "Bullish Divergence")
         {
-            bias = "Bullish Divergence (Squeeze)";
+            bias = "Bullish Divergence";
             biasTone = "bullish";
-            auctionStatus = "Exhaustion at Lows";
-            narrative = $"New low at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)} on positive delta. Lack of seller conviction.";
+            action = $"Squeeze at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
         else if (distinctSignals.Any(s => s.Tone == "bullish" && s.Type == "stacked_imbalance"))
         {
             bias = "Bullish Initiative";
             biasTone = "bullish";
-            auctionStatus = "Aggressive Initiative Buying";
-            narrative = $"Buyers in control holding above support, +Δ {FmtVol(bar.Delta)} at POC {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
+            action = $"Buy at {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
         else if (distinctSignals.Any(s => s.Tone == "bearish" && s.Type == "stacked_imbalance"))
         {
             bias = "Bearish Initiative";
             biasTone = "bearish";
-            auctionStatus = "Aggressive Initiative Selling";
-            narrative = $"Sellers in control holding below resistance, −Δ {FmtVol(-bar.Delta)} at POC {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
+            action = $"Sell at {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
         else
         {
             bias = "Rotational / Balance";
             biasTone = "neutral";
-            auctionStatus = "Two-Way Auction Balance";
-            narrative = $"Balanced market around POC {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
+            action = "Stand Aside";
         }
 
         var result = new OrderFlowContext
@@ -522,8 +511,7 @@ public static class FootprintAnalyzer
             HasBias = true, // Keep side card visible with active state
             Bias = bias,
             BiasTone = biasTone,
-            AuctionStatus = auctionStatus,
-            Narrative = narrative,
+            Action = action,
             CurrentDelta = bar.Delta,
             CurrentVolume = bar.Volume,
             DeltaPercent = deltaPct,
@@ -617,11 +605,11 @@ public static class FootprintAnalyzer
         var ctx = AnalyzeContext(snapshot, tickSize);
         var lines = new List<FootprintRenderLine>();
 
-        if (!string.IsNullOrEmpty(ctx.Narrative))
+        if (!string.IsNullOrEmpty(ctx.Action))
         {
             lines.Add(new FootprintRenderLine
             {
-                Text = ctx.Narrative,
+                Text = $"{ctx.Bias}: {ctx.Action}",
                 Tone = ctx.BiasTone == "bullish" ? "up" : ctx.BiasTone == "bearish" ? "down" : "text"
             });
         }
