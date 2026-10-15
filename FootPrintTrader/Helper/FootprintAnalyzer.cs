@@ -2,65 +2,56 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 
 namespace FootPrintTrader.Helper;
 
 public class OrderFlowSignal
 {
-    public string Type { get; set; } = "";        // "stacked_imbalance", "absorption", "trapped_traders", "divergence", "unfinished_auction", "exhaustion"
-    public string Title { get; set; } = "";
-    public string Tone { get; set; } = "neutral"; // "bullish", "bearish", "warning", "neutral"
-    public string Time { get; set; } = "";
+    public string Type { get; init; } = "";        // "stacked_imbalance", "absorption", "trapped_traders", "divergence", "unfinished_auction", "exhaustion"
+    public string Title { get; init; } = "";
+    public string Tone { get; init; } = "neutral"; // "bullish", "bearish", "warning", "neutral"
 }
 
 public class OrderFlowZone
 {
-    public long BarStartTime { get; set; }
-    public string TimeLabel { get; set; } = "";
-    public bool IsBuy { get; set; }               // true = Buy Imbalance, false = Sell Imbalance
-    public double LowPrice { get; set; }
-    public double HighPrice { get; set; }
-    public int Levels { get; set; }
-    public bool IsExhaustionAtBirth { get; set; } // Formed at bar extreme (top for buy, bottom for sell)
+    public long BarStartTime { get; init; }
+    public bool IsBuy { get; init; }               // true = Buy Imbalance, false = Sell Imbalance
+    public double LowPrice { get; init; }
+    public double HighPrice { get; init; }
+    public bool IsExhaustionAtBirth { get; init; } // Formed at bar extreme (top for buy, bottom for sell)
     public int AgeBars { get; set; }
     public bool IsTrapped { get; set; }
 }
 
 public class OrderFlowContext
 {
-    public bool HasBias { get; set; }
-    public string Bias { get; set; } = "Neutral";
-    public string BiasTone { get; set; } = "neutral"; // "bullish", "bearish", "warning", "neutral"
-    public string Action { get; set; } = "";
+    public string Bias { get; init; } = "Neutral";
+    public string BiasTone { get; init; } = "neutral"; // "bullish", "bearish", "warning", "neutral"
+    public string Action { get; init; } = "";
 
     // Live Bar Metrics
-    public decimal CurrentDelta { get; set; }
-    public decimal CurrentVolume { get; set; }
-    public double DeltaPercent { get; set; }
-    public double PocPrice { get; set; }
-    public string PocPosition { get; set; } = "Middle";
-    public string PocMigration { get; set; } = "Leveled";
+    public double PocPrice { get; init; }
 
     // Multi-bar / Session Structure
-    public decimal CumulativeDelta { get; set; }
-    public string DeltaDivergence { get; set; } = "None";
+    public string DeltaDivergence { get; init; } = "None";
 
     // Active Signals
-    public List<OrderFlowSignal> Signals { get; set; } = new();
+    public List<OrderFlowSignal> Signals { get; init; } = new();
 }
 
 public static class FootprintAnalyzer
 {
-    public const decimal MinSignalVolume = 100m;
-    public const decimal MinAbsorptionDelta = 40m;
-    public const decimal ImbalanceRatio = 3.0m;
-    public const decimal MinImbalanceVol = 10m;
-    public const decimal MinDeltaDiff = 5m;
-    public const int StackedLevelsRequired = 3;
-    public const int MinLiveTradesForSignal = 250;
-    public const int MaxZoneAgeBars = 8;
+    private const decimal MinSignalVolume = 100m;
+    private const decimal MinAbsorptionDelta = 40m;
+    private const decimal ImbalanceRatio = 3.0m;
+    private const decimal MinImbalanceVol = 10m;
+    private const decimal MinDeltaDiff = 5m;
+    private const int StackedLevelsRequired = 3;
+    private const int MinLiveTradesForSignal = 250;
+    private const int MaxZoneAgeBars = 2;
 
-    private static readonly object _syncLock = new();
+    private static readonly Lock _syncLock = new();
     private static readonly List<OrderFlowZone> _activeZones = new();
     private static readonly HashSet<long> _processedBars = new();
     private static OrderFlowContext _lastContext;
@@ -74,7 +65,7 @@ public static class FootprintAnalyzer
         var current = snapshot.Current;
 
         // Use live bar for real-time live metrics (delta, POC, volume), fallback to last completed
-        FootprintBarData bar = current ?? completed.LastOrDefault();
+        var bar = current ?? completed.LastOrDefault();
         FootprintBarData prevBar = current != null
             ? completed.LastOrDefault()
             : (completed.Length > 1 ? completed[^2] : null);
@@ -85,44 +76,20 @@ public static class FootprintAnalyzer
         var dec = Decimals(tickSize);
         string P(double v) => v.ToString("F" + dec, CultureInfo.InvariantCulture);
         var signals = new List<OrderFlowSignal>();
-        var timeLabel = FootprintRenderBuilder.FormatTime(bar.StartTime);
+        FootprintRenderBuilder.FormatTime(bar.StartTime);
         var evalPrice = currentPrice > 0 ? currentPrice : bar.Close;
 
-        // 1. Cumulative Delta
-        var cumDelta = completed.Sum(b => b.Delta) + (current?.Delta ?? 0m);
-
-        // 2. POC Calculation & Zone Placement for current bar
+        // POC Calculation & Zone Placement for current bar
         var levels = bar.Levels ?? Array.Empty<FootprintLevel>();
         var pocPrice = bar.Close;
-        var pocPosition = "Middle (Value Area)";
 
         if (levels.Length > 0)
         {
             var pocLevel = levels.OrderByDescending(l => l.Total).First();
             pocPrice = pocLevel.Price;
-
-            var range = bar.High - bar.Low;
-            if (range > 1e-6)
-            {
-                var ratio = (pocPrice - bar.Low) / range;
-                if (ratio >= 0.70) pocPosition = "Top";
-                else if (ratio <= 0.30) pocPosition = "Bottom";
-                else pocPosition = "Middle";
-            }
         }
 
-        // 3. POC Migration
-        var pocMigration = "Leveled ◄►";
-        if (prevBar != null && prevBar.Levels != null && prevBar.Levels.Length > 0)
-        {
-            var prevPoc = prevBar.Levels.OrderByDescending(l => l.Total).First().Price;
-            var diff = pocPrice - prevPoc;
-            if (diff >= tickSize * 0.75) pocMigration = "Rising ▲";
-            else if (diff <= -tickSize * 0.75) pocMigration = "Falling ▼";
-            else pocMigration = "Leveled ◄►";
-        }
-
-        // 4. Update Stateful Order Flow Zones from Completed Bars
+        // Update Stateful Order Flow Zones from Completed Bars
         lock (_syncLock)
         {
             // Register newly completed bars
@@ -132,7 +99,6 @@ public static class FootprintAnalyzer
                 {
                     var barImbalances = DetectStackedImbalances(compBar);
                     var bRange = compBar.High - compBar.Low;
-                    var bTimeLabel = FootprintRenderBuilder.FormatTime(compBar.StartTime);
 
                     foreach (var imb in barImbalances)
                     {
@@ -157,11 +123,9 @@ public static class FootprintAnalyzer
                         _activeZones.Add(new OrderFlowZone
                         {
                             BarStartTime = compBar.StartTime,
-                            TimeLabel = bTimeLabel,
                             IsBuy = imb.IsBuy,
                             LowPrice = imb.StartP,
                             HighPrice = imb.EndP,
-                            Levels = imb.Run,
                             IsExhaustionAtBirth = isExhaustion,
                             AgeBars = 0,
                             IsTrapped = false
@@ -196,8 +160,7 @@ public static class FootprintAnalyzer
                         {
                             Type = "trapped_traders",
                             Title = zone.IsExhaustionAtBirth ? $"Trapped Longs ({P(zone.LowPrice)})" : $"Trapped Buyers ({P(zone.LowPrice)})",
-                            Tone = "bearish",
-                            Time = zone.TimeLabel
+                            Tone = "bearish"
                         });
                     }
                     // Price testing the zone from above -> Potential support
@@ -208,8 +171,7 @@ public static class FootprintAnalyzer
                         {
                             Type = "stacked_imbalance",
                             Title = $"Retesting Buy Zone ({P(zone.LowPrice)})",
-                            Tone = "bullish",
-                            Time = zone.TimeLabel
+                            Tone = "bullish"
                         });
                     }
                     // Fresh initiative buy zone holding
@@ -219,8 +181,7 @@ public static class FootprintAnalyzer
                         {
                             Type = "stacked_imbalance",
                             Title = $"Buyer Support ({P(zone.LowPrice)})",
-                            Tone = "bullish",
-                            Time = zone.TimeLabel
+                            Tone = "bullish"
                         });
                     }
                 }
@@ -234,8 +195,7 @@ public static class FootprintAnalyzer
                         {
                             Type = "trapped_traders",
                             Title = zone.IsExhaustionAtBirth ? $"Trapped Shorts ({P(zone.HighPrice)})" : $"Trapped Sellers ({P(zone.HighPrice)})",
-                            Tone = "bullish",
-                            Time = zone.TimeLabel
+                            Tone = "bullish"
                         });
                     }
                     // Price testing the zone from below -> Potential resistance
@@ -246,8 +206,7 @@ public static class FootprintAnalyzer
                         {
                             Type = "stacked_imbalance",
                             Title = $"Retesting Sell Zone ({P(zone.HighPrice)})",
-                            Tone = "bearish",
-                            Time = zone.TimeLabel
+                            Tone = "bearish"
                         });
                     }
                     // Fresh initiative sell zone holding
@@ -257,16 +216,15 @@ public static class FootprintAnalyzer
                         {
                             Type = "stacked_imbalance",
                             Title = $"Seller Resistance ({P(zone.HighPrice)})",
-                            Tone = "bearish",
-                            Time = zone.TimeLabel
+                            Tone = "bearish"
                         });
                     }
                 }
             }
         }
 
-        // 5. Developing Live Bar Signals (Debounced: only when live bar has >= MinLiveTradesForSignal)
-        if (current != null && current.TradeCount >= MinLiveTradesForSignal)
+        // Developing Live Bar Signals (Debounced: only when live bar has >= MinLiveTradesForSignal)
+        if (current is { TradeCount: >= MinLiveTradesForSignal })
         {
             var liveImbalances = DetectStackedImbalances(current);
             var liveRange = current.High - current.Low;
@@ -285,8 +243,7 @@ public static class FootprintAnalyzer
                         {
                             Type = "exhaustion",
                             Title = $"Buying Exhaustion at High ({P(imb.EndP)})",
-                            Tone = "bearish",
-                            Time = timeLabel
+                            Tone = "bearish"
                         });
                     }
                     else if (evalPrice >= imb.EndP)
@@ -295,8 +252,7 @@ public static class FootprintAnalyzer
                         {
                             Type = "stacked_imbalance",
                             Title = $"Stacked Buy Imbalance ({P(imb.EndP)})",
-                            Tone = "bullish",
-                            Time = timeLabel
+                            Tone = "bullish"
                         });
                     }
                 }
@@ -312,8 +268,7 @@ public static class FootprintAnalyzer
                         {
                             Type = "exhaustion",
                             Title = $"Selling Exhaustion at Low ({P(imb.StartP)})",
-                            Tone = "bullish",
-                            Time = timeLabel
+                            Tone = "bullish"
                         });
                     }
                     else if (evalPrice <= imb.StartP)
@@ -322,15 +277,14 @@ public static class FootprintAnalyzer
                         {
                             Type = "stacked_imbalance",
                             Title = $"Stacked Sell Imbalance ({P(imb.StartP)})",
-                            Tone = "bearish",
-                            Time = timeLabel
+                            Tone = "bearish"
                         });
                     }
                 }
             }
         }
 
-        // 6. Passive Absorption Detection (subject bar)
+        // Passive Absorption Detection (subject bar)
         var barRange = bar.High - bar.Low;
         var priceChange = bar.Close - bar.Open;
         var barDelta = bar.Delta;
@@ -346,8 +300,7 @@ public static class FootprintAnalyzer
                 {
                     Type = "absorption",
                     Title = $"Seller Absorption ({P(bar.High)})",
-                    Tone = "bearish",
-                    Time = timeLabel
+                    Tone = "bearish"
                 });
             }
             else if (barDelta <= -MinAbsorptionDelta && (priceChange > 0 || (barRange > 0 && bar.Close >= bar.Low + barRange * 0.40)))
@@ -357,13 +310,12 @@ public static class FootprintAnalyzer
                 {
                     Type = "absorption",
                     Title = $"Buyer Absorption ({P(bar.Low)})",
-                    Tone = "bullish",
-                    Time = timeLabel
+                    Tone = "bullish"
                 });
             }
         }
 
-        // 7. Delta Divergence Detection & Signal
+        // Delta Divergence Detection & Signal
         var deltaDivergence = "None";
         if (prevBar != null)
         {
@@ -374,8 +326,7 @@ public static class FootprintAnalyzer
                 {
                     Type = "divergence",
                     Title = $"Bearish Divergence ({P(bar.High)})",
-                    Tone = "bearish",
-                    Time = timeLabel
+                    Tone = "bearish"
                 });
             }
             else if (bar.Low <= prevBar.Low && bar.Delta > 0 && prevBar.Delta < 0)
@@ -385,13 +336,12 @@ public static class FootprintAnalyzer
                 {
                     Type = "divergence",
                     Title = $"Bullish Divergence ({P(bar.Low)})",
-                    Tone = "bullish",
-                    Time = timeLabel
+                    Tone = "bullish"
                 });
             }
         }
 
-        // 8. Deduplicate and Prioritize Signals (Trapped > Absorption > Divergence > Retest > Developing)
+        // Deduplicate and Prioritize Signals (Trapped > Absorption > Divergence > Retest > Developing)
         var distinctSignals = new List<OrderFlowSignal>();
         var seenKeys = new HashSet<string>();
         foreach (var sig in signals)
@@ -407,15 +357,13 @@ public static class FootprintAnalyzer
             distinctSignals = distinctSignals.Take(5).ToList();
         }
 
-        // 9. Synthesize Market Bias and the Action (what to do, at what level)
+        // Synthesize Market Bias and the Action (what to do, at what level)
         string bias;
         string biasTone;
         string action;
 
-        var deltaPct = bar.Volume > 0 ? (double)(bar.Delta / bar.Volume) * 100.0 : 0.0;
-
-        OrderFlowZone trappedBuy = null;
-        OrderFlowZone trappedSell = null;
+        OrderFlowZone trappedBuy;
+        OrderFlowZone trappedSell;
         lock (_syncLock)
         {
             trappedBuy = _activeZones.FirstOrDefault(z => z.IsBuy && z.IsTrapped);
@@ -479,17 +427,11 @@ public static class FootprintAnalyzer
 
         var result = new OrderFlowContext
         {
-            HasBias = true, // Keep side card visible with active state
+            // Keep side card visible with active state
             Bias = bias,
             BiasTone = biasTone,
             Action = action,
-            CurrentDelta = bar.Delta,
-            CurrentVolume = bar.Volume,
-            DeltaPercent = deltaPct,
             PocPrice = pocPrice,
-            PocPosition = pocPosition,
-            PocMigration = pocMigration,
-            CumulativeDelta = cumDelta,
             DeltaDivergence = deltaDivergence,
             Signals = distinctSignals
         };
