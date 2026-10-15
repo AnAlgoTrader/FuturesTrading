@@ -41,7 +41,7 @@ public class OrderFlowContext
     public double DeltaPercent { get; set; }
     public double PocPrice { get; set; }
     public string PocPosition { get; set; } = "Middle";
-    public string PocMigration { get; set; } = "Overlapping";
+    public string PocMigration { get; set; } = "Leveled";
 
     // Multi-bar / Session Structure
     public decimal CumulativeDelta { get; set; }
@@ -107,21 +107,21 @@ public static class FootprintAnalyzer
             if (range > 1e-6)
             {
                 var ratio = (pocPrice - bar.Low) / range;
-                if (ratio >= 0.70) pocPosition = "Top (Upper Range)";
-                else if (ratio <= 0.30) pocPosition = "Bottom (Lower Range)";
-                else pocPosition = "Middle (Value Area)";
+                if (ratio >= 0.70) pocPosition = "Top";
+                else if (ratio <= 0.30) pocPosition = "Bottom";
+                else pocPosition = "Middle";
             }
         }
 
         // 3. POC Migration
-        var pocMigration = "Overlapping ◄►";
+        var pocMigration = "Leveled ◄►";
         if (prevBar != null && prevBar.Levels != null && prevBar.Levels.Length > 0)
         {
             var prevPoc = prevBar.Levels.OrderByDescending(l => l.Total).First().Price;
             var diff = pocPrice - prevPoc;
             if (diff >= tickSize * 0.75) pocMigration = "Rising ▲";
             else if (diff <= -tickSize * 0.75) pocMigration = "Falling ▼";
-            else pocMigration = "Overlapping ◄►";
+            else pocMigration = "Leveled ◄►";
         }
 
         // 4. Update Stateful Order Flow Zones from Completed Bars
@@ -395,7 +395,7 @@ public static class FootprintAnalyzer
         {
             if (bar.High >= prevBar.High && bar.Delta < 0 && prevBar.Delta > 0)
             {
-                deltaDivergence = "Bearish Delta Divergence";
+                deltaDivergence = "Bearish Divergence";
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "divergence",
@@ -408,7 +408,7 @@ public static class FootprintAnalyzer
             }
             else if (bar.Low <= prevBar.Low && bar.Delta > 0 && prevBar.Delta < 0)
             {
-                deltaDivergence = "Bullish Delta Divergence";
+                deltaDivergence = "Bullish Divergence";
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "divergence",
@@ -481,14 +481,14 @@ public static class FootprintAnalyzer
             auctionStatus = "Passive Liquidity Absorption";
             narrative = $"Buyer absorption at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}, −Δ {FmtVol(-bar.Delta)}. Sellers rejected.";
         }
-        else if (deltaDivergence == "Bearish Delta Divergence")
+        else if (deltaDivergence == "Bearish Divergence")
         {
             bias = "Bearish Divergence (Fade)";
             biasTone = "bearish";
             auctionStatus = "Exhaustion at Highs";
             narrative = $"New high at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)} on negative delta. Lack of buyer conviction.";
         }
-        else if (deltaDivergence == "Bullish Delta Divergence")
+        else if (deltaDivergence == "Bullish Divergence")
         {
             bias = "Bullish Divergence (Squeeze)";
             biasTone = "bullish";
