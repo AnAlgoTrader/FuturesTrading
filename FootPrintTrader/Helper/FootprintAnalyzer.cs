@@ -369,7 +369,7 @@ public static class FootprintAnalyzer
         {
             if (bar.High >= prevBar.High && bar.Delta < 0 && prevBar.Delta > 0)
             {
-                deltaDivergence = "Bearish Divergence";
+                deltaDivergence = "Bearish";
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "divergence",
@@ -380,7 +380,7 @@ public static class FootprintAnalyzer
             }
             else if (bar.Low <= prevBar.Low && bar.Delta > 0 && prevBar.Delta < 0)
             {
-                deltaDivergence = "Bullish Divergence";
+                deltaDivergence = "Bullish";
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "divergence",
@@ -446,13 +446,13 @@ public static class FootprintAnalyzer
             biasTone = "bullish";
             action = $"Squeeze at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
-        else if (deltaDivergence == "Bearish Divergence")
+        else if (deltaDivergence == "Bearish")
         {
             bias = "Bearish Divergence";
             biasTone = "bearish";
             action = $"Fade at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}";
         }
-        else if (deltaDivergence == "Bullish Divergence")
+        else if (deltaDivergence == "Bullish")
         {
             bias = "Bullish Divergence";
             biasTone = "bullish";
