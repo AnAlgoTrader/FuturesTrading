@@ -3,9 +3,9 @@
 **Scope:** functionality of the market-data → analysis → render pipeline. Trade execution mechanics are out of scope.
 **Date:** 2026-10-16
 **Method:** full code trace + external verification of IB/CME behavior (sources noted per issue). Line numbers are approximate and will drift as files change.
-**Verdict:** ❌ **Not ready for live trading.** Analysis reliability (FT-006/007/008) is now fixed; the remaining blocker is the data-quality question (FT-009/FT-010). (Connection, startup, contract-roll, session-reset, and warm-up concerns were reviewed and deliberately deferred — see below.)
+**Verdict:** ❌ **Not ready for live trading.** Analysis reliability (FT-006/007/008) is now fixed; the remaining blocker is the data-quality question (FT-010). (Connection, startup, contract-roll, session-reset, and warm-up concerns were reviewed and deliberately deferred — see below.)
 
-> **Note (removed issues):** FT-001 (reconnect), FT-002 (startup error handling), FT-003 (contract roll), FT-004 (warm-up), and FT-005 (session reset) were intentionally dropped and will **not** be fixed. IDs are stable and are not renumbered, so the remaining set has gaps (FT-006…).
+> **Note (removed issues):** FT-001 (reconnect), FT-002 (startup error handling), FT-003 (contract roll), FT-004 (warm-up), FT-005 (session reset), and FT-009 (`"Last"` vs `"AllLast"`) were intentionally dropped and will **not** be fixed. On FT-009 specifically: `Last` is correct for an outright ES contract (IB's `AllLast` adds combos/derivatives/average-price spread-leg prints that would *overstate* footprint volume and don't reconcile with the tape or TWS Time & Sales), so no change is needed. IDs are stable and are not renumbered, so the remaining set has gaps (FT-006…).
 
 ---
 
@@ -25,10 +25,9 @@
 | [FT-006](#ft-006) | High | Analysis | Absorption & divergence computed on in-progress bar | 🟢 Fixed |
 | [FT-007](#ft-007) | Medium | Analysis | Signal prioritization not implemented; truncation drops key signals | 🟢 Fixed |
 | [FT-008](#ft-008) | Medium | Analysis/UI | Two conflicting recommendation surfaces | 🟢 Fixed |
-| [FT-009](#ft-009) | Medium | Data | Trade ticks use `"Last"` instead of `"AllLast"` | 🔴 Open |
 | [FT-010](#ft-010) | Medium | Data | IB data fitness for footprint/delta (known quality limits) | 🔴 Open |
-| [FT-011](#ft-011) | Low | UI/Config | UI label says 1000-trade; actually 2000; unused config | 🔴 Open |
-| [FT-012](#ft-012) | Low | Perf | Full 200-bar payload rebuilt & pushed every second | 🔴 Open |
+| [FT-011](#ft-011) | Low | UI/Config | UI label says 1000-trade; actually 2000; unused config | 🟢 Fixed |
+| [FT-012](#ft-012) | Low | Perf | Full 200-bar payload rebuilt & pushed every second | ⚪ Won't fix |
 | [FT-013](#ft-013) | Low | Concurrency | Static state read outside lock; overlapping timer callbacks | 🔴 Open |
 | [FT-014](#ft-014) | Low | Logging | Hardcoded log path, truncate on start | 🔴 Open |
 | [FT-015](#ft-015) | Low | Analysis | `"unfinished_auction"` type documented but never emitted | 🔴 Open |
@@ -97,14 +96,6 @@ The removal of `ResetSession()`, `Analyze()`, `FootprintRenderLine`/`Analysis`, 
 - **Fix direction:** single source of truth for the actionable level; make conflict detection require *opposing high-priority* signals; base range checks on completed bars (or clearly label live-bar variants).
 - **🟢 Implemented:** the analyzer now derives bias/action/level from the single highest-priority signal and exposes `OrderFlowContext.ActionPrice`; the bias card (`Action`) and interpreter both use it, so the two surfaces can no longer disagree on direction or level. The interpreter's conflict test now requires opposing *structural* signals only (`Priority <= PriorityDivergence`), and its range filter uses the last **completed** bar (`FootprintInterpreter.cs`).
 
-### FT-009
-**Trade ticks use `"Last"` instead of `"AllLast"`**
-- **Area:** data
-- **Evidence:** `SubscribeToTradesTickByTick` requests `"Last"` (`IbMarketData.cs:365`).
-- **External fact:** IB docs — `AllLast` includes additional trade types (combos, derivatives, average-price trades) not present in `Last`.
-- **Impact:** Understated volume/delta vs a full Time & Sales feed; footprint may not reconcile with exchange volume.
-- **Fix direction:** switch to `"AllLast"` (and reconcile against cumulative volume).
-
 ### FT-010
 **IB data fitness for footprint/delta**
 - **Area:** data
@@ -114,6 +105,11 @@ The removal of `ResetSession()`, `Analyze()`, `FootprintRenderLine`/`Analysis`, 
   - Sierra Chart / ATAS: documented missing/duplicate IB ticks; IB streaming is ~0.2–0.3s snapshots except true tick-by-tick.
 - **Impact:** Even with `reqTickByTickData` (the best IB offers), footprint/delta accuracy may not match a professional feed. This is a fitness-for-purpose decision, not a bug.
 - **Fix direction:** decide explicitly; if footprint accuracy matters, source data from a dedicated feed (e.g., dxFeed/Rithmic) and keep IB for execution only.
+- **Research — "would the NinjaTrader API be a better source?" (not a clean win):**
+  - *NinjaTrader Desktop API (`NinjaTrader.Client.dll`)*: an external bridge to a running NT desktop, but NT's own docs state it does **not** support sending/receiving **historical data**, has **no events** (data must be polled on a timer), is **100% unsupported** by NT Support, requires the NT desktop running, and external projects must target **.NET 4.8** (our app is .NET 9). It also just consumes whatever feed NT is connected to, so it doesn't improve data quality — it adds a hop.
+  - *NinjaTrader Partner / Market Data API (Tradovate REST + WebSocket)*: does expose real-time **and historical** quotes/DOM/charts over WebSocket, but requires Organization Admin credentials + API key + CID (partner onboarding), and quality still depends on the connection/provider behind it (Tradovate/Continuum). It is essentially the Tradovate API.
+  - *The feed is what matters, not the vendor.* NinjaTrader is not a data provider — it resells/connects to Kinetick, Rithmic, CQG/Continuum, IQFeed, etc. Per NT's own **Data by Provider** table, **IB is the only provider with no historical tick data, no historical bid/ask tick data, and no Tick Replay**; Rithmic, CQG/Continuum, Kinetick (real-time), NinjaTrader Brokerage/Tradovate and IQFeed all support historical bid/ask ticks + Tick Replay. That is precisely why NT footprint bars backfill blank on IB.
+  - *Conclusion:* the improvement is moving off IB's data to a **footprint-capable feed** (Rithmic, CQG, Kinetick, IQFeed, dxFeed, Databento) — directly or via a platform — not adopting "the NinjaTrader API". If/when this is actioned, prefer a direct futures-feed API for data and keep IB for execution. NT's value is the platform (replay/ordering), not a superior data API.
 
 ---
 
@@ -123,11 +119,13 @@ The removal of `ResetSession()`, `Analyze()`, `FootprintRenderLine`/`Analysis`, 
 **UI label vs actual bar size; unused config**
 - **Evidence:** `index.html:29` says "1000-Trade Footprint", but the classifier uses the default `tradesPerBar = 2000` (`FootprintClassifier.cs:68`; `Program.cs:48` passes only `tickSize`). `TradingConfig.TicksPerBucket = 1000` is unused.
 - **Fix:** correct the label, drive both from one config value.
+- **🟢 Implemented:** `TradingConfig.TicksPerBucket` (1000) is now the single source of truth. `Program.cs` passes it to `FootprintClassifier` (the constructor's hidden `= 2000` default was removed, making `tradesPerBar` required). The label is no longer hardcoded: the bucket size is sent as `tradesPerBar` in the render snapshot (`FootprintRenderBuilder`) and written into the `#bucket-size` span by `main.js`.
 
 ### FT-012
 **Full payload rebuilt & pushed every second**
 - **Evidence:** `TimerCallback` calls `FootprintRenderBuilder.Build` each second (`Program.cs:188`), which re-converts all bars plus `Current` (`FootprintRenderBuilder.cs:79-107`); the frontend only patches the last bar unless the signature changes (`main.js:119-127`).
 - **Fix:** send deltas (last bar / new bar) instead of the full history each tick.
+- **⚪ Won't fix (accepted):** the renderer is already efficient — it only re-renders the last bar (`main.js` signature check → `updateLast`; the delta primitives `updateLast`/`append` already exist in `footprint-render.js`). The remaining cost is the server re-sending/serializing the full ~200-bar array each second. Accepted as-is; a delta protocol would add edge cases (finalizing the completed bar before append, sliding-window detection, unbounded client growth) that aren't worth it now. Revisit if payload size becomes a problem.
 
 ### FT-013
 **Static state read outside lock; overlapping timer callbacks**
@@ -163,10 +161,10 @@ The removal of `ResetSession()`, `Analyze()`, `FootprintRenderLine`/`Analysis`, 
 ## Suggested remediation order
 
 1. ~~FT-006 + FT-007 + FT-008 — make the analysis and its two panels consistent and reliable.~~ 🟢 Done.
-2. FT-009 + FT-010 — settle the data-quality question (feed choice).
+2. FT-010 — settle the data-quality question (feed choice).
 3. Low-severity items as cleanup.
 
 ## Open decisions
 
-- **Feed:** is IB tick-by-tick acceptable for this footprint, or is a dedicated feed required (FT-010)?
+- **Feed:** is IB tick-by-tick acceptable for this footprint, or is a dedicated feed required (FT-010)? See FT-010 research — NT's API is not the answer; a footprint-capable feed (Rithmic/CQG/Kinetick/IQFeed/dxFeed/Databento) is.
 - **Bar model:** keep trade-count bars (2000) or move to time-based/session-aligned bars?

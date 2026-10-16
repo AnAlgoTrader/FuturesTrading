@@ -108,6 +108,9 @@ function positionUpdate(data) {
 function footprintSnapshot(data) {
     if (!window.footprint || !Array.isArray(data.bars) || !data.bars.length) return;
 
+    const bucketEl = document.getElementById('bucket-size');
+    if (bucketEl && data.tradesPerBar) bucketEl.textContent = data.tradesPerBar;
+
     // Update the rich Order Flow side panel
     if (data.context) {
         updateSidePanel(data.context, data.rowSize || 0.25);

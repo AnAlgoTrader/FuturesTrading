@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Common.Model;
 
 namespace FootPrintTrader.Helper;
 
@@ -43,6 +44,7 @@ public class FootprintRenderBar
 public class FootprintRenderSnapshot
 {
     public double RowSize { get; set; }
+    public int TradesPerBar { get; set; }
     public string[] FooterLabels { get; set; } = { "Delta", "Vol" };
     public Dictionary<string, string> Colors { get; set; } = new();
     public List<FootprintRenderBar> Bars { get; set; } = new();
@@ -74,6 +76,7 @@ public static class FootprintRenderBuilder
         var result = new FootprintRenderSnapshot
         {
             RowSize = tickSize,
+            TradesPerBar = TradingConfig.TicksPerBucket,
             Colors = new Dictionary<string, string>
             {
                 ["background"] = "#0f131a",

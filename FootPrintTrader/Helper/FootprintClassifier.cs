@@ -65,7 +65,7 @@ public sealed class FootprintClassifier
     /// </summary>
     public event Action<FootprintBarData> BarCompleted;
 
-    public FootprintClassifier(double tickSize, int tradesPerBar = 2000, int maxHistory = 200,
+    public FootprintClassifier(double tickSize, int tradesPerBar, int maxHistory = 200,
                                TimeSpan? maxHold = null, bool quotesFirstOnTie = true)
     {
         _tickSize = tickSize;
