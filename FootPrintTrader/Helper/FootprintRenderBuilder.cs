@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Common.Model;
+using FootPrintTrader.Model;
 
 namespace FootPrintTrader.Helper;
 

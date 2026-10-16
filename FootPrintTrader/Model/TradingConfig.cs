@@ -1,4 +1,4 @@
-namespace Common.Model;
+namespace FootPrintTrader.Model;
 
 public static class TradingConfig
 {

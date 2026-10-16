@@ -4,8 +4,6 @@ using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Common.Helper;
-using Common.Model;
 using FootPrintTrader.Helper;
 using FootPrintTrader.Model;
 using Ib.Csharp.Api.Client.Implementation;

@@ -18,7 +18,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Common\Common.csproj" />
+        <ProjectReference Include="..\..\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client.csproj" />
     </ItemGroup>
 
 </Project>

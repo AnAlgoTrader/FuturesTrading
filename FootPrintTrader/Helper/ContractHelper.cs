@@ -2,11 +2,11 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using Common.Model;
+using FootPrintTrader.Model;
 using Ib.Csharp.Api.Client.Implementation;
 using IBApi;
 
-namespace Common.Helper;
+namespace FootPrintTrader.Helper;
 
 public class ContractHelper
 {
