@@ -84,16 +84,16 @@ public static class FootprintAnalyzer
     private const double DivergenceMinCvdGapRatio = 0.10; // CVD gap must be >= 10% of the prior extreme's |CVD|
 
     // --- Unfinished auction (per-bar extreme; both sides printed == unfinished) ---
-    // Majority footprint convention (DeepCharts / LuxAlgo / OrderVane / Quantower): a
-    // completed bar's high is "finished" when only aggressive buyers printed there (bid
-    // volume == 0); if sellers also hit bids at the high the auction is unfinished — an
+    // Majority footprint convention (Imprint/NT8, ATAS, FTMO, Trader Dale): a completed
+    // bar's high is "finished" when only aggressive buyers printed there (bid volume
+    // == 0); if sellers also hit bids at the high the auction is unfinished — an
     // unfinished-business reference price the market tends to revisit. Mirror for the low
-    // (ask volume > 0). Evaluated on closed bars only. (An inverted convention exists that
-    // calls the one-sided cell unfinished; we follow the majority.) The min-side filter
-    // ignores one-lot dust; candidates persist until a later bar trades back through them.
+    // (ask volume > 0). Evaluated on closed bars only. (An inverted zero-side convention
+    // exists — DeepCharts / Senzoukria — calling the one-sided cell unfinished; we follow
+    // the majority, whose test is any non-zero print at the extreme.) Candidates persist
+    // until a later bar trades back through them.
     // Ledger keeps up to 4 unrepaired references, but only the one nearest the current
     // price is emitted, at PriorityUnfinished — it is a reference/magnet, never a bias.
-    private const double UnfinishedAuctionMinSideRatio = 0.05; // opposite side >= 5% of avg level vol
     private const int MaxUnfinishedAuctions = 4;
 
     // --- Rolling baselines ---
@@ -266,17 +266,19 @@ public static class FootprintAnalyzer
                         bool isExhaustion;
                         if (imb.IsBuy)
                         {
+                            // At the bar extreme AND the close failed to hold the stack top
+                            // (industry: aggression at the extreme + close off the extreme).
                             isExhaustion = bRange > 1e-6 &&
                                            (imb.EndP >= compBar.High - tickSize * 0.5 ||
-                                            (imb.EndP - compBar.Low) / bRange >= 0.75 ||
-                                            compBar.Close < imb.EndP);
+                                            (imb.EndP - compBar.Low) / bRange >= 0.75) &&
+                                           compBar.Close < imb.EndP;
                         }
                         else
                         {
                             isExhaustion = bRange > 1e-6 &&
                                            (imb.StartP <= compBar.Low + tickSize * 0.5 ||
-                                            (imb.StartP - compBar.Low) / bRange <= 0.25 ||
-                                            compBar.Close > imb.StartP);
+                                            (imb.StartP - compBar.Low) / bRange <= 0.25) &&
+                                           compBar.Close > imb.StartP;
                         }
 
                         _activeZones.Add(new OrderFlowZone
@@ -721,8 +723,8 @@ public static class FootprintAnalyzer
     // ============================================================
     // UNFINISHED AUCTION (per-bar extreme where both sides printed)
     // A completed bar's high is finished when only buyers printed there; if sellers also
-    // traded the high (bid volume above the dust filter) the auction is unfinished. Mirror
-    // for the low (ask volume). The price is a reference the market tends to revisit.
+    // traded the high (any non-zero bid print) the auction is unfinished. Mirror for the
+    // low (ask volume). The price is a reference the market tends to revisit.
     // ============================================================
     private static void DetectUnfinishedAuctions(FootprintBarData bar, double tickSize)
     {
@@ -730,19 +732,17 @@ public static class FootprintAnalyzer
         if (levels == null || levels.Length == 0)
             return;
 
-        var minSide = (bar.Volume / levels.Length) * (decimal)UnfinishedAuctionMinSideRatio;
-
         foreach (var lvl in levels)
         {
             if (Math.Abs(lvl.Price - bar.High) <= tickSize * 0.5 &&
-                lvl.BidVolume >= minSide &&
+                lvl.BidVolume > 0 &&
                 !_unfinishedAuctions.Any(u => u.IsHigh && Math.Abs(u.Price - lvl.Price) < tickSize * 0.5))
             {
                 _unfinishedAuctions.Add(new UnfinishedAuction { IsHigh = true, Price = lvl.Price, BarStart = bar.StartTime });
             }
 
             if (Math.Abs(lvl.Price - bar.Low) <= tickSize * 0.5 &&
-                lvl.AskVolume >= minSide &&
+                lvl.AskVolume > 0 &&
                 !_unfinishedAuctions.Any(u => !u.IsHigh && Math.Abs(u.Price - lvl.Price) < tickSize * 0.5))
             {
                 _unfinishedAuctions.Add(new UnfinishedAuction { IsHigh = false, Price = lvl.Price, BarStart = bar.StartTime });
