@@ -31,7 +31,7 @@
 | [FT-013](#ft-013) | Low | Concurrency | Static state read outside lock; overlapping timer callbacks | 🔴 Open |
 | [FT-014](#ft-014) | Low | Logging | Hardcoded log path, truncate on start | 🔴 Open |
 | [FT-015](#ft-015) | Low | Analysis | `"unfinished_auction"` type documented but never emitted | 🟢 Fixed |
-| [FT-016](#ft-016) | Low | Frontend | Dead `interp-factors` UI + deprecated `setAnalysis` no-op | 🔴 Open |
+| [FT-016](#ft-016) | Low | Frontend | Dead `interp-factors` UI + deprecated `setAnalysis` no-op | 🟢 Fixed |
 
 ---
 
@@ -41,8 +41,8 @@ The removal of `ResetSession()`, `Analyze()`, `FootprintRenderLine`/`Analysis`, 
 
 - Every removed member had zero call sites; build passes with 0 warnings.
 - `Factors` was the only removed field the frontend referenced (`main.js:295`), but the interpreter never populated it → the factor list was already inert.
-- `Analyze()`/`Analysis` map to the already-deprecated `setAnalysis` no-op (`footprint-render.js:203`).
-- Remaining cruft from the removal is tracked in [FT-016](#ft-016).
+- `Analyze()`/`Analysis` mapped to the (now-removed, see [FT-016](#ft-016)) `setAnalysis` no-op (`footprint-render.js`).
+- The residual cruft from the removal was tracked in [FT-016](#ft-016) and has since been removed.
 
 ---
 
@@ -149,6 +149,7 @@ The removal of `ResetSession()`, `Analyze()`, `FootprintRenderLine`/`Analysis`, 
 **Dead frontend factor UI + deprecated API**
 - **Evidence:** `#interp-factors` element (`index.html:84`), rendering logic (`main.js:294-303`), CSS `.interp-factors`; `window.footprint.setAnalysis` is a documented no-op (`footprint-render.js:203`).
 - **Fix:** remove, or repopulate `Factors` in the interpreter and re-add the field.
+- **🟢 Removed (option A):** the interpreter never populates factors (`MarketInterpretation` has only `Title`/`Tone`/`Action`/`Details`), so the UI was unreachable. Removed the `#interp-factors` element (`index.html`), its `factorsEl` wiring + neutral/active branches (`main.js`), the `.interp-factors`/`.interp-factor-item`/`::before` CSS (`main.css`), and the `setAnalysis` no-op from the public API (`footprint-render.js`). `setAnalysis` had no callers; `escapeHtml` is still used by the signals list. Build clean.
 
 ---
 
