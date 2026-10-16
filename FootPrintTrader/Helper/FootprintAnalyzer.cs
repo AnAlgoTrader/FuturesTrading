@@ -61,6 +61,7 @@ public static class FootprintAnalyzer
     private static readonly List<OrderFlowZone> _activeZones = new();
     private static readonly HashSet<long> _processedBars = new();
     private static OrderFlowContext _lastContext;
+    private static decimal _sessionCumulativeDelta;
 
     public static OrderFlowContext AnalyzeContext(FootprintSnapshot snapshot, double tickSize, double currentPrice = 0)
     {
@@ -82,7 +83,6 @@ public static class FootprintAnalyzer
         var dec = Decimals(tickSize);
         string P(double v) => v.ToString("F" + dec, CultureInfo.InvariantCulture);
         var signals = new List<OrderFlowSignal>();
-        FootprintRenderBuilder.FormatTime(bar.StartTime);
         var evalPrice = currentPrice > 0 ? currentPrice : bar.Close;
 
         // POC Calculation & Zone Placement for current bar
@@ -122,7 +122,8 @@ public static class FootprintAnalyzer
         }
 
         // Multi-bar / Session Structure
-        var cumulativeDelta = (double)completed.Sum(c => c.Delta) + currentDelta;
+        var liveDelta = current?.Delta ?? 0m;
+        var cumulativeDelta = (double)(_sessionCumulativeDelta + liveDelta);
 
         // Update Stateful Order Flow Zones from Completed Bars
         lock (_syncLock)
@@ -132,6 +133,8 @@ public static class FootprintAnalyzer
             {
                 if (_processedBars.Add(compBar.StartTime))
                 {
+                    _sessionCumulativeDelta += compBar.Delta;
+
                     var barImbalances = DetectStackedImbalances(compBar);
                     var bRange = compBar.High - compBar.Low;
 
