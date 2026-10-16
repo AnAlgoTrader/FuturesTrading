@@ -45,6 +45,7 @@ public sealed class FootprintClassifier
     private readonly Queue<Q> _quotes = new();
     private readonly Queue<T> _trades = new();
     private readonly List<FootprintBarData> _completed = new();
+    private readonly Queue<FootprintBarData> _completedQueue = new();   // NEW: bars awaiting BarCompleted
 
     private Q? _quote;                       // quote currently in force
     private long _lastQuoteTime = long.MinValue;
@@ -57,7 +58,11 @@ public sealed class FootprintClassifier
     private long _start, _end;
     private double _open, _high, _low, _close;
 
-    /// <summary>Raised when a bar reaches tradesPerBar. Runs inside the lock: keep handlers trivial.</summary>
+    /// <summary>
+    /// Raised when a bar reaches tradesPerBar. Invoked OUTSIDE the internal lock,
+    /// on the thread that called OnQuote / OnTrade / GetSnapshot. Handlers may safely
+    /// call back into this class. Exceptions propagate to the caller.
+    /// </summary>
     public event Action<FootprintBarData> BarCompleted;
 
     public FootprintClassifier(double tickSize, int tradesPerBar = 1000, int maxHistory = 200,
@@ -80,6 +85,7 @@ public sealed class FootprintClassifier
             if (time > _lastQuoteTime) _lastQuoteTime = time;
             Process();
         }
+        DrainCompleted();
     }
 
     public void OnTrade(long time, double price, decimal size)
@@ -89,21 +95,39 @@ public sealed class FootprintClassifier
             _trades.Enqueue(new T(time, price, size, Stopwatch.GetTimestamp()));
             Process();
         }
+        DrainCompleted();
     }
 
     // ---- Call from your UI timer (every 1 s) ----
 
     public FootprintSnapshot GetSnapshot()
     {
+        FootprintSnapshot snap;
         lock (_lock)
         {
             Process();   // flush trades that were waiting on a quiet quote stream
-            return new FootprintSnapshot(_completed.ToArray(),
+            snap = new FootprintSnapshot(_completed.ToArray(),
                                          _count > 0 ? BuildBar() : null);
         }
+        DrainCompleted();
+        return snap;
     }
 
     // ---- Internals (all under lock) ----
+
+    private void DrainCompleted()
+    {
+        while (true)
+        {
+            FootprintBarData bar;
+            lock (_lock)
+            {
+                if (_completedQueue.Count == 0) break;
+                bar = _completedQueue.Dequeue();
+            }
+            BarCompleted?.Invoke(bar);   // outside the lock
+        }
+    }
 
     private void Process()
     {
@@ -186,7 +210,7 @@ public sealed class FootprintClassifier
 
             _levels = new Dictionary<long, Level>();
             _count = 0;
-            BarCompleted?.Invoke(bar);
+            _completedQueue.Enqueue(bar);
         }
     }
 
