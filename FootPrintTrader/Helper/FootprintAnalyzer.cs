@@ -13,6 +13,8 @@ public class OrderFlowSignal
     public string Tone { get; init; } = "neutral"; // "bullish", "bearish", "warning", "neutral"
     public double Price { get; init; }         // actionable level the signal refers to
     public int Priority { get; init; } = 5;    // lower = more important (see FootprintAnalyzer.Priority*)
+    public string Description { get; init; } = ""; // one-line "why" shown under the title
+    public string Time { get; init; } = "";    // HH:mm of the bar the signal came from
 }
 
 public class OrderFlowZone
@@ -66,6 +68,12 @@ public static class FootprintAnalyzer
     private const double MinImbalanceVolRatio = 0.05; // level must carry >= 5% of bar's avg level vol
     // (noise filter only — NOT a signal threshold)
 
+    // --- Absolute volume floors (quiet-market gate; from the v1/v2 analyzer) ---
+    // Ratios alone normalize thin data into looking meaningful. A bar/level must clear
+    // an absolute contract minimum before any signal is emitted from it.
+    private const decimal MinSignalVolume = 100m; // bar volume >= 100 contracts
+    private const decimal MinImbalanceVol = 10m;  // a level must carry >= 10 contracts
+
     // --- Absorption (real-time, per price level; Bookmap / MZpack style) ---
     // A level is absorbing when one side's aggressor volume is an outlier versus the
     // recent per-level volume distribution, price stalls at the extreme, and price
@@ -84,6 +92,8 @@ public static class FootprintAnalyzer
     // (ask volume > 0). Evaluated on closed bars only. (An inverted convention exists that
     // calls the one-sided cell unfinished; we follow the majority.) The min-side filter
     // ignores one-lot dust; candidates persist until a later bar trades back through them.
+    // Ledger keeps up to 4 unrepaired references, but only the one nearest the current
+    // price is emitted, at PriorityUnfinished — it is a reference/magnet, never a bias.
     private const double UnfinishedAuctionMinSideRatio = 0.05; // opposite side >= 5% of avg level vol
     private const int MaxUnfinishedAuctions = 4;
 
@@ -97,10 +107,11 @@ public static class FootprintAnalyzer
     public const int PriorityDivergence = 3;
     public const int PriorityRetest = 4;
     public const int PriorityDeveloping = 5;
+    public const int PriorityUnfinished = 6;          // reference only — never drives bias
 
     // --- Debounce / structural (kept fixed — not magnitude thresholds) ---
     private const int MinLiveTradesForSignal = 250;
-    private const int MaxZoneAgeBars = 2;
+    private const int MaxZoneAgeBars = 8;
 
     // ============================================================
     // STATE
@@ -126,6 +137,7 @@ public static class FootprintAnalyzer
     private static readonly List<DivergencePoint> _divergenceWindow = new();
     private static string _divergence = "None";
     private static double _divergencePrice;
+    private static long _divergenceBarStart;
 
     private sealed class AbsorptionCandidate
     {
@@ -141,7 +153,7 @@ public static class FootprintAnalyzer
         public long BarStart;
     }
 
-    private readonly record struct DivergencePoint(double High, double Low, decimal Cvd, decimal Delta);
+    private readonly record struct DivergencePoint(double High, double Low, decimal Cvd, decimal Delta, long Start);
 
     public static OrderFlowContext AnalyzeContext(FootprintSnapshot snapshot, double tickSize, double currentPrice = 0)
     {
@@ -162,6 +174,7 @@ public static class FootprintAnalyzer
 
         var dec = Decimals(tickSize);
         string P(double v) => v.ToString("F" + dec, CultureInfo.InvariantCulture);
+        string T(long unixSeconds) => FootprintRenderBuilder.FormatTime(unixSeconds);
         var signals = new List<OrderFlowSignal>();
         var evalPrice = currentPrice > 0 ? currentPrice : bar.Close;
 
@@ -231,7 +244,7 @@ public static class FootprintAnalyzer
                     UpdateLevelVolumeStats();
 
                     // Maintain the divergence window (price extremes + CVD at bar close).
-                    _divergenceWindow.Add(new DivergencePoint(compBar.High, compBar.Low, _sessionCumulativeDelta, compBar.Delta));
+                    _divergenceWindow.Add(new DivergencePoint(compBar.High, compBar.Low, _sessionCumulativeDelta, compBar.Delta, compBar.StartTime));
                     while (_divergenceWindow.Count > DivergenceWindowBars)
                         _divergenceWindow.RemoveAt(0);
 
@@ -243,7 +256,9 @@ public static class FootprintAnalyzer
                         u.Price <= compBar.High + tickSize * 0.5);
                     DetectUnfinishedAuctions(compBar, tickSize);
 
-                    var barImbalances = DetectStackedImbalances(compBar, _baselineBarVolume);
+                    var barImbalances = compBar.Volume >= MinSignalVolume
+                        ? DetectStackedImbalances(compBar, _baselineBarVolume)
+                        : new List<(bool IsBuy, double StartP, double EndP, int Run)>();
                     var bRange = compBar.High - compBar.Low;
 
                     foreach (var imb in barImbalances)
@@ -314,7 +329,9 @@ public static class FootprintAnalyzer
                             Title = zone.IsExhaustionAtBirth ? $"Trapped Longs ({P(zone.LowPrice)})" : $"Trapped Buyers ({P(zone.LowPrice)})",
                             Tone = "bearish",
                             Price = zone.LowPrice,
-                            Priority = PriorityTrapped
+                            Priority = PriorityTrapped,
+                            Description = $"Price traded below the buy imbalance at {P(zone.LowPrice)}; buyers are stuck offside.",
+                            Time = T(zone.BarStartTime)
                         });
                     }
                     else if (Math.Abs(evalPrice - zone.LowPrice) <= tickSize * 1.5 ||
@@ -326,7 +343,9 @@ public static class FootprintAnalyzer
                             Title = $"Retesting Buy Zone ({P(zone.LowPrice)})",
                             Tone = "bullish",
                             Price = zone.LowPrice,
-                            Priority = PriorityRetest
+                            Priority = PriorityRetest,
+                            Description = $"Pullback testing the buy imbalance zone {P(zone.LowPrice)}–{P(zone.HighPrice)} from above.",
+                            Time = T(zone.BarStartTime)
                         });
                     }
                     else if (evalPrice > zone.HighPrice && zone.AgeBars <= 2 && !zone.IsExhaustionAtBirth)
@@ -337,7 +356,9 @@ public static class FootprintAnalyzer
                             Title = $"Buyer Support ({P(zone.LowPrice)})",
                             Tone = "bullish",
                             Price = zone.LowPrice,
-                            Priority = PriorityRetest
+                            Priority = PriorityRetest,
+                            Description = $"Fresh buy imbalance {P(zone.LowPrice)}–{P(zone.HighPrice)} holding as support.",
+                            Time = T(zone.BarStartTime)
                         });
                     }
                 }
@@ -352,7 +373,9 @@ public static class FootprintAnalyzer
                             Title = zone.IsExhaustionAtBirth ? $"Trapped Shorts ({P(zone.HighPrice)})" : $"Trapped Sellers ({P(zone.HighPrice)})",
                             Tone = "bullish",
                             Price = zone.HighPrice,
-                            Priority = PriorityTrapped
+                            Priority = PriorityTrapped,
+                            Description = $"Price traded above the sell imbalance at {P(zone.HighPrice)}; sellers are stuck offside.",
+                            Time = T(zone.BarStartTime)
                         });
                     }
                     else if (Math.Abs(evalPrice - zone.HighPrice) <= tickSize * 1.5 ||
@@ -364,7 +387,9 @@ public static class FootprintAnalyzer
                             Title = $"Retesting Sell Zone ({P(zone.HighPrice)})",
                             Tone = "bearish",
                             Price = zone.HighPrice,
-                            Priority = PriorityRetest
+                            Priority = PriorityRetest,
+                            Description = $"Rally testing the sell imbalance zone {P(zone.LowPrice)}–{P(zone.HighPrice)} from below.",
+                            Time = T(zone.BarStartTime)
                         });
                     }
                     else if (evalPrice < zone.LowPrice && zone.AgeBars <= 2 && !zone.IsExhaustionAtBirth)
@@ -375,7 +400,9 @@ public static class FootprintAnalyzer
                             Title = $"Seller Resistance ({P(zone.HighPrice)})",
                             Tone = "bearish",
                             Price = zone.HighPrice,
-                            Priority = PriorityRetest
+                            Priority = PriorityRetest,
+                            Description = $"Fresh sell imbalance {P(zone.LowPrice)}–{P(zone.HighPrice)} holding as resistance.",
+                            Time = T(zone.BarStartTime)
                         });
                     }
                 }
@@ -383,7 +410,7 @@ public static class FootprintAnalyzer
         }
 
         // Developing Live Bar Signals (Debounced: only when live bar has >= MinLiveTradesForSignal)
-        if (current is { TradeCount: >= MinLiveTradesForSignal })
+        if (current is { TradeCount: >= MinLiveTradesForSignal, Volume: >= MinSignalVolume })
         {
             var liveImbalances = DetectStackedImbalances(current, _baselineBarVolume);
             var liveRange = current.High - current.Low;
@@ -404,7 +431,9 @@ public static class FootprintAnalyzer
                             Title = $"Buying Exhaustion at High ({P(imb.EndP)})",
                             Tone = "bearish",
                             Price = imb.EndP,
-                            Priority = PriorityRetest
+                            Priority = PriorityRetest,
+                            Description = $"Stacked buying into the bar high at {P(imb.EndP)} with price failing to advance; fade candidate.",
+                            Time = T(current.StartTime)
                         });
                     }
                     else if (evalPrice >= imb.EndP)
@@ -415,7 +444,9 @@ public static class FootprintAnalyzer
                             Title = $"Stacked Buy Imbalance ({P(imb.EndP)})",
                             Tone = "bullish",
                             Price = imb.EndP,
-                            Priority = PriorityDeveloping
+                            Priority = PriorityDeveloping,
+                            Description = $"3+ consecutive diagonal buy imbalances topping out at {P(imb.EndP)}; buyers lifting offers.",
+                            Time = T(current.StartTime)
                         });
                     }
                 }
@@ -433,7 +464,9 @@ public static class FootprintAnalyzer
                             Title = $"Selling Exhaustion at Low ({P(imb.StartP)})",
                             Tone = "bullish",
                             Price = imb.StartP,
-                            Priority = PriorityRetest
+                            Priority = PriorityRetest,
+                            Description = $"Stacked selling into the bar low at {P(imb.StartP)} with price failing to break down; squeeze candidate.",
+                            Time = T(current.StartTime)
                         });
                     }
                     else if (evalPrice <= imb.StartP)
@@ -444,7 +477,9 @@ public static class FootprintAnalyzer
                             Title = $"Stacked Sell Imbalance ({P(imb.StartP)})",
                             Tone = "bearish",
                             Price = imb.StartP,
-                            Priority = PriorityDeveloping
+                            Priority = PriorityDeveloping,
+                            Description = $"3+ consecutive diagonal sell imbalances bottoming at {P(imb.StartP)}; sellers hitting bids.",
+                            Time = T(current.StartTime)
                         });
                     }
                 }
@@ -459,7 +494,8 @@ public static class FootprintAnalyzer
         // ============================================================
         var absorptionThreshold = _levelVolMean + AbsorptionLevelSigma * _levelVolStd;
 
-        if (absorptionThreshold > 0 && levels.Length > 0 && bar.TradeCount >= MinLiveTradesForSignal)
+        if (absorptionThreshold > 0 && levels.Length > 0 &&
+            bar.TradeCount >= MinLiveTradesForSignal && bar.Volume >= MinSignalVolume)
         {
             var depth = tickSize * AbsorptionDepthTicks;
 
@@ -505,7 +541,11 @@ public static class FootprintAnalyzer
                         Title = $"{(c.SellerAbsorption ? "Seller" : "Buyer")} Absorption ({P(c.Price)})",
                         Tone = c.SellerAbsorption ? "bearish" : "bullish",
                         Price = c.Price,
-                        Priority = PriorityAbsorption
+                        Priority = PriorityAbsorption,
+                        Description = c.SellerAbsorption
+                            ? $"Heavy aggressive buying at {P(c.Price)} absorbed; price rejected {AbsorptionDepthTicks} ticks lower."
+                            : $"Heavy aggressive selling at {P(c.Price)} absorbed; price rejected {AbsorptionDepthTicks} ticks higher.",
+                        Time = T(c.BarStart)
                     });
                 }
             }
@@ -524,31 +564,42 @@ public static class FootprintAnalyzer
                 Title = $"{deltaDivergence} Divergence ({P(_divergencePrice)})",
                 Tone = deltaDivergence == "Bearish" ? "bearish" : "bullish",
                 Price = _divergencePrice,
-                Priority = PriorityDivergence
+                Priority = PriorityDivergence,
+                Description = deltaDivergence == "Bearish"
+                    ? $"New high at {P(_divergencePrice)} on weaker cumulative delta; buyers losing conviction."
+                    : $"New low at {P(_divergencePrice)} on stronger cumulative delta; sellers losing conviction.",
+                Time = T(_divergenceBarStart)
             });
         }
 
         // ============================================================
         // Unfinished auctions (unrepaired extremes where both sides traded).
-        // A reference/magnet price, not a directional entry — emitted at retest priority.
+        // A reference/magnet price, not a directional entry: only the entry nearest the
+        // current price is surfaced, at PriorityUnfinished so it can never win the bias.
         // ============================================================
         lock (_syncLock)
         {
-            foreach (var ua in _unfinishedAuctions)
+            if (_unfinishedAuctions.Count > 0)
             {
+                var ua = _unfinishedAuctions.OrderBy(u => Math.Abs(u.Price - evalPrice)).First();
                 signals.Add(new OrderFlowSignal
                 {
                     Type = "unfinished_auction",
                     Title = $"{(ua.IsHigh ? "Unfinished High" : "Unfinished Low")} ({P(ua.Price)})",
                     Tone = ua.IsHigh ? "bullish" : "bearish",
                     Price = ua.Price,
-                    Priority = PriorityRetest
+                    Priority = PriorityUnfinished,
+                    Description = ua.IsHigh
+                        ? $"Sellers also traded the bar high at {P(ua.Price)}; the high is unfinished and may be revisited."
+                        : $"Buyers also traded the bar low at {P(ua.Price)}; the low is unfinished and may be revisited.",
+                    Time = T(ua.BarStart)
                 });
             }
         }
 
-        // Deduplicate and prioritize: Trapped > Absorption > Divergence > Retest > Developing.
-        // OrderBy is stable, so equal-priority signals keep their emission order.
+        // Deduplicate and prioritize: Trapped > Absorption > Divergence > Retest >
+        // Developing > Unfinished (reference). OrderBy is stable, so equal-priority
+        // signals keep their emission order.
         var distinctSignals = signals
             .GroupBy(s => $"{s.Type}:{s.Tone}:{s.Title}")
             .Select(g => g.First())
@@ -558,8 +609,9 @@ public static class FootprintAnalyzer
 
         // Single source of truth: the highest-priority signal drives bias, action and level.
         // Both the bias card and the interpretation panel read these fields, so the two
-        // surfaces can no longer disagree on direction or level.
-        var top = distinctSignals.FirstOrDefault();
+        // surfaces can no longer disagree on direction or level. Unfinished auctions are
+        // excluded — they are reference prices, never an actionable bias on their own.
+        var top = distinctSignals.FirstOrDefault(s => s.Priority < PriorityUnfinished);
 
         string bias;
         string biasTone;
@@ -704,6 +756,7 @@ public static class FootprintAnalyzer
     {
         _divergence = "None";
         _divergencePrice = 0;
+        _divergenceBarStart = 0;
 
         var n = _divergenceWindow.Count;
         if (n < 3)
@@ -729,6 +782,7 @@ public static class FootprintAnalyzer
         {
             _divergence = "Bearish";
             _divergencePrice = latest.High;
+            _divergenceBarStart = latest.Start;
         }
         else if (latest.Low < priorLow - tickSize * 0.5 &&
                  latest.Cvd > priorLowCvd &&
@@ -736,6 +790,7 @@ public static class FootprintAnalyzer
         {
             _divergence = "Bullish";
             _divergencePrice = latest.Low;
+            _divergenceBarStart = latest.Start;
         }
     }
 
@@ -759,10 +814,11 @@ public static class FootprintAnalyzer
         if (!IsSortedAscending(levels))
             levels = levels.OrderBy(l => l.Price).ToArray();
 
-        // Minimum level volume = X% of the bar's average level volume.
-        // This only filters out near-empty rows; the 3:1 ratio does the real work.
+        // Minimum level volume = X% of the bar's average level volume, never below the
+        // absolute MinImbalanceVol floor (quiet-market gate). Ratios alone would let a
+        // near-empty bar produce "meaningful" imbalances; the 3:1 ratio does the real work.
         var avgLevelVol = bar.Volume / levels.Length;
-        var minLevelVol = avgLevelVol * (decimal)MinImbalanceVolRatio;
+        var minLevelVol = Math.Max(avgLevelVol * (decimal)MinImbalanceVolRatio, MinImbalanceVol);
 
         var buyImb = new bool[levels.Length];
         var sellImb = new bool[levels.Length];
