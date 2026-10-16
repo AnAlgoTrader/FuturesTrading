@@ -45,9 +45,9 @@ public sealed class FootprintClassifier
     private readonly Queue<Q> _quotes = new();
     private readonly Queue<T> _trades = new();
     private readonly List<FootprintBarData> _completed = new();
-    private readonly Queue<FootprintBarData> _completedQueue = new();   // NEW: bars awaiting BarCompleted
+    private readonly Queue<FootprintBarData> _completedQueue = new();
 
-    private Q? _quote;                       // quote currently in force
+    private Q? _quote;
     private long _lastQuoteTime = long.MinValue;
     private double _lastPrice = double.NaN;
     private Side _lastSide = Side.Buy;
@@ -66,7 +66,7 @@ public sealed class FootprintClassifier
     public event Action<FootprintBarData> BarCompleted;
 
     public FootprintClassifier(double tickSize, int tradesPerBar = 1000, int maxHistory = 200,
-                               TimeSpan? maxHold = null, bool quotesFirstOnTie = false)
+                               TimeSpan? maxHold = null, bool quotesFirstOnTie = true)
     {
         _tickSize = tickSize;
         _tradesPerBar = tradesPerBar;
@@ -105,7 +105,7 @@ public sealed class FootprintClassifier
         FootprintSnapshot snap;
         lock (_lock)
         {
-            Process();   // flush trades that were waiting on a quiet quote stream
+            Process();
             snap = new FootprintSnapshot(_completed.ToArray(),
                                          _count > 0 ? BuildBar() : null);
         }
@@ -125,7 +125,7 @@ public sealed class FootprintClassifier
                 if (_completedQueue.Count == 0) break;
                 bar = _completedQueue.Dequeue();
             }
-            BarCompleted?.Invoke(bar);   // outside the lock
+            BarCompleted?.Invoke(bar);
         }
     }
 
@@ -137,13 +137,11 @@ public sealed class FootprintClassifier
         {
             var t = _trades.Peek();
 
-            // Apply every quote that was in force before this trade
             while (_quotes.Count > 0 &&
                    (_quotes.Peek().Time < t.Time ||
                     (_quotesFirstOnTie && _quotes.Peek().Time == t.Time)))
                 _quote = _quotes.Dequeue();
 
-            // Wait until the quote stream has reached the trade's time, or give up after maxHold
             bool quotesCaughtUp = _lastQuoteTime >= t.Time;
             bool timedOut = now - t.Arrival >= _maxHoldTs;
             if (!quotesCaughtUp && !timedOut) break;
@@ -152,8 +150,6 @@ public sealed class FootprintClassifier
             AddTrade(t, Classify(t));
         }
 
-        // No trades pending: don't let quotes pile up. Apply those that are old enough
-        // that no late trade can still refer to them.
         if (_trades.Count == 0)
             while (_quotes.Count > 0 && now - _quotes.Peek().Arrival >= _maxHoldTs)
                 _quote = _quotes.Dequeue();
@@ -168,12 +164,11 @@ public sealed class FootprintClassifier
             if (t.Price >= q.Ask - eps) return Remember(t, Side.Buy);
             if (t.Price <= q.Bid + eps) return Remember(t, Side.Sell);
 
-            double mid = (q.Bid + q.Ask) / 2.0;          // inside the spread
+            double mid = (q.Bid + q.Ask) / 2.0;
             if (t.Price > mid + eps) return Remember(t, Side.Buy);
             if (t.Price < mid - eps) return Remember(t, Side.Sell);
         }
 
-        // Tick rule fallback
         if (!double.IsNaN(_lastPrice))
         {
             if (t.Price > _lastPrice) return Remember(t, Side.Buy);
