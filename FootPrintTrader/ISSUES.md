@@ -30,7 +30,7 @@
 | [FT-012](#ft-012) | Low | Perf | Full 200-bar payload rebuilt & pushed every second | ⚪ Won't fix |
 | [FT-013](#ft-013) | Low | Concurrency | Static state read outside lock; overlapping timer callbacks | 🔴 Open |
 | [FT-014](#ft-014) | Low | Logging | Hardcoded log path, truncate on start | 🔴 Open |
-| [FT-015](#ft-015) | Low | Analysis | `"unfinished_auction"` type documented but never emitted | 🔴 Open |
+| [FT-015](#ft-015) | Low | Analysis | `"unfinished_auction"` type documented but never emitted | 🟢 Fixed |
 | [FT-016](#ft-016) | Low | Frontend | Dead `interp-factors` UI + deprecated `setAnalysis` no-op | 🔴 Open |
 
 ---
@@ -142,6 +142,8 @@ The removal of `ResetSession()`, `Analyze()`, `FootprintRenderLine`/`Analysis`, 
 **`"unfinished_auction"` documented but never emitted**
 - **Evidence:** listed in the `OrderFlowSignal.Type` comment (`FootprintAnalyzer.cs:11`); no code path emits it.
 - **Fix:** implement or remove from the documented type set.
+- **Researched approach (majority footprint convention):** an unfinished auction is a bar extreme where **both sides traded** — bid volume at the high, or ask volume at the low — i.e. the auction did not terminate cleanly (DeepCharts, LuxAlgo, OrderVane, Quantower, Sidi). "Finished" = one side is zero at the extreme (only aggressive buyers at the high). It is computed on **closed bars only**, needs a **min-volume-per-side** filter to ignore dust, and behaves as an **unfinished-business reference / magnet**: the level is marked until a later bar trades back through it (repair). The session-scale TPO cousin is "poor high / poor low" (2+ TPOs flat at an extreme, no tail); an inverted one-sided convention also circulates, but the both-sided reading is the majority and is what platforms document.
+- **🟢 Implemented:** `FootprintAnalyzer` now maintains a persistent `_unfinishedAuctions` ledger. On each newly completed bar it retires any active extreme the bar traded back through (`Low-tick .. High+tick`), then flags a new unfinished high when the high row's `BidVolume >= UnfinishedAuctionMinSideRatio(0.05) × avg level vol`, and an unfinished low when the low row's `AskVolume` does. Candidates persist (re-emitted each tick) until repaired, the creating bar scrolls out of the window, or the newest 4 cap (`MaxUnfinishedAuctions`) evicts them. Emitted as `Type="unfinished_auction"` at retest priority (so it never fakes a structural conflict or overrides trapped/absorption/divergence). Bias synthesis maps it to "Unfinished High/Low" with a `Target up/down <price>` action; the interpreter surfaces it as a target (tone from direction) **without** forcing a LONG/SHORT entry (`FootprintInterpreter.Interpret`). Deterministic signal title/price feed the existing generic signals UI — no frontend change needed.
 
 ### FT-016
 **Dead frontend factor UI + deprecated API**

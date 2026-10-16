@@ -73,6 +73,17 @@ public static class FootprintInterpreter
         // Single source of truth: reuse the analyzer's bias/level so both panels agree.
         var level = context.ActionPrice > 0 ? context.ActionPrice : context.PocPrice;
 
+        // Unfinished auction is a reference price (unfinished business / magnet), not a
+        // directional entry — surface the target without forcing a LONG/SHORT trigger.
+        if (context.Bias == "Unfinished High" || context.Bias == "Unfinished Low")
+        {
+            interp.Title = context.Bias;
+            interp.Tone = context.BiasTone;
+            interp.Action = context.Action;
+            interp.Details = Describe(context, level, P);
+            return interp;
+        }
+
         interp.Title = context.Bias;
         interp.Tone = context.BiasTone;
         interp.Action = context.BiasTone == "bearish" ? $"SHORT @ {P(level)}" : $"LONG @ {P(level)}";
@@ -101,6 +112,9 @@ public static class FootprintInterpreter
             "exhaustion" => top.Tone == "bearish"
                 ? $"Buying exhaustion at {P(level)}."
                 : $"Selling exhaustion at {P(level)}.",
+            "unfinished_auction" => top.Tone == "bearish"
+                ? $"Unfinished low at {P(level)}: buyers and sellers both traded the extreme; the auction is unfinished and may be revisited."
+                : $"Unfinished high at {P(level)}: buyers and sellers both traded the extreme; the auction is unfinished and may be revisited.",
             _ => top.Tone == "bearish"
                 ? $"Aggressive sellers in control. Sell rallies to {P(level)}."
                 : $"Aggressive buyers in control. Buy pullbacks to {P(level)}."

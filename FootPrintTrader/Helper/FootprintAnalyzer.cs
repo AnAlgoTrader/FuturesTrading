@@ -76,6 +76,17 @@ public static class FootprintAnalyzer
     // --- Divergence (windowed CVD vs price; confirmed at bar close) ---
     private const int DivergenceWindowBars = 20;
 
+    // --- Unfinished auction (per-bar extreme; both sides printed == unfinished) ---
+    // Majority footprint convention (DeepCharts / LuxAlgo / OrderVane / Quantower): a
+    // completed bar's high is "finished" when only aggressive buyers printed there (bid
+    // volume == 0); if sellers also hit bids at the high the auction is unfinished — an
+    // unfinished-business reference price the market tends to revisit. Mirror for the low
+    // (ask volume > 0). Evaluated on closed bars only. (An inverted convention exists that
+    // calls the one-sided cell unfinished; we follow the majority.) The min-side filter
+    // ignores one-lot dust; candidates persist until a later bar trades back through them.
+    private const double UnfinishedAuctionMinSideRatio = 0.05; // opposite side >= 5% of avg level vol
+    private const int MaxUnfinishedAuctions = 4;
+
     // --- Rolling baselines ---
     private const int BaselineWindowBars = 20;
     private const int LevelVolumeWindow = 2000;       // rolling per-level volume samples for mean/σ
@@ -108,6 +119,9 @@ public static class FootprintAnalyzer
     // Absorption candidates detected on a developing/recent bar; confirmed when price rejects.
     private static readonly List<AbsorptionCandidate> _absorptionCandidates = new();
 
+    // Persistent unfinished-auction references (unrepaired bar extremes where both sides traded).
+    private static readonly List<UnfinishedAuction> _unfinishedAuctions = new();
+
     // Rolling window of completed bars (price extremes + cumulative delta at close) for divergence.
     private static readonly List<DivergencePoint> _divergenceWindow = new();
     private static string _divergence = "None";
@@ -116,6 +130,13 @@ public static class FootprintAnalyzer
     private sealed class AbsorptionCandidate
     {
         public bool SellerAbsorption; // true = aggressive buying absorbed at a high (bearish)
+        public double Price;
+        public long BarStart;
+    }
+
+    private sealed class UnfinishedAuction
+    {
+        public bool IsHigh;   // true = unfinished high (both sides at the high), false = unfinished low
         public double Price;
         public long BarStart;
     }
@@ -214,6 +235,14 @@ public static class FootprintAnalyzer
                     while (_divergenceWindow.Count > DivergenceWindowBars)
                         _divergenceWindow.RemoveAt(0);
 
+                    // Unfinished auctions: retire any active extreme this completed bar has
+                    // traded back through (repair), then test this bar's own extremes.
+                    _unfinishedAuctions.RemoveAll(u =>
+                        u.BarStart < compBar.StartTime &&
+                        u.Price >= compBar.Low - tickSize * 0.5 &&
+                        u.Price <= compBar.High + tickSize * 0.5);
+                    DetectUnfinishedAuctions(compBar, tickSize);
+
                     var barImbalances = DetectStackedImbalances(compBar, _baselineBarVolume);
                     var bRange = compBar.High - compBar.Low;
 
@@ -268,6 +297,7 @@ public static class FootprintAnalyzer
             {
                 var oldestInWindow = completed.Min(c => c.StartTime);
                 _processedBars.RemoveWhere(t => t < oldestInWindow);
+                _unfinishedAuctions.RemoveAll(u => u.BarStart < oldestInWindow);
             }
 
             // Evaluate current price interaction with active zones
@@ -498,6 +528,25 @@ public static class FootprintAnalyzer
             });
         }
 
+        // ============================================================
+        // Unfinished auctions (unrepaired extremes where both sides traded).
+        // A reference/magnet price, not a directional entry — emitted at retest priority.
+        // ============================================================
+        lock (_syncLock)
+        {
+            foreach (var ua in _unfinishedAuctions)
+            {
+                signals.Add(new OrderFlowSignal
+                {
+                    Type = "unfinished_auction",
+                    Title = $"{(ua.IsHigh ? "Unfinished High" : "Unfinished Low")} ({P(ua.Price)})",
+                    Tone = ua.IsHigh ? "bullish" : "bearish",
+                    Price = ua.Price,
+                    Priority = PriorityRetest
+                });
+            }
+        }
+
         // Deduplicate and prioritize: Trapped > Absorption > Divergence > Retest > Developing.
         // OrderBy is stable, so equal-priority signals keep their emission order.
         var distinctSignals = signals
@@ -543,6 +592,10 @@ public static class FootprintAnalyzer
                 case "divergence":
                     bias = top.Tone == "bearish" ? "Bearish Divergence" : "Bullish Divergence";
                     action = (top.Tone == "bearish" ? "Fade at " : "Squeeze at ") + level;
+                    break;
+                case "unfinished_auction":
+                    bias = top.Tone == "bearish" ? "Unfinished Low" : "Unfinished High";
+                    action = (top.Tone == "bearish" ? "Target down " : "Target up ") + level;
                     break;
                 case "exhaustion":
                     bias = top.Tone == "bearish" ? "Buying Exhaustion" : "Selling Exhaustion";
@@ -605,6 +658,41 @@ public static class FootprintAnalyzer
 
         _levelVolMean = mean;
         _levelVolStd = Math.Sqrt(sq / n);
+    }
+
+    // ============================================================
+    // UNFINISHED AUCTION (per-bar extreme where both sides printed)
+    // A completed bar's high is finished when only buyers printed there; if sellers also
+    // traded the high (bid volume above the dust filter) the auction is unfinished. Mirror
+    // for the low (ask volume). The price is a reference the market tends to revisit.
+    // ============================================================
+    private static void DetectUnfinishedAuctions(FootprintBarData bar, double tickSize)
+    {
+        var levels = bar.Levels;
+        if (levels == null || levels.Length == 0)
+            return;
+
+        var minSide = (bar.Volume / levels.Length) * (decimal)UnfinishedAuctionMinSideRatio;
+
+        foreach (var lvl in levels)
+        {
+            if (Math.Abs(lvl.Price - bar.High) <= tickSize * 0.5 &&
+                lvl.BidVolume >= minSide &&
+                !_unfinishedAuctions.Any(u => u.IsHigh && Math.Abs(u.Price - lvl.Price) < tickSize * 0.5))
+            {
+                _unfinishedAuctions.Add(new UnfinishedAuction { IsHigh = true, Price = lvl.Price, BarStart = bar.StartTime });
+            }
+
+            if (Math.Abs(lvl.Price - bar.Low) <= tickSize * 0.5 &&
+                lvl.AskVolume >= minSide &&
+                !_unfinishedAuctions.Any(u => !u.IsHigh && Math.Abs(u.Price - lvl.Price) < tickSize * 0.5))
+            {
+                _unfinishedAuctions.Add(new UnfinishedAuction { IsHigh = false, Price = lvl.Price, BarStart = bar.StartTime });
+            }
+        }
+
+        while (_unfinishedAuctions.Count > MaxUnfinishedAuctions)
+            _unfinishedAuctions.RemoveAt(0);
     }
 
     // ============================================================
