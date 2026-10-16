@@ -198,7 +198,7 @@ public sealed class FootprintClassifier
         if (t.Price < _low) _low = t.Price;
         _count++;
 
-        long ticks = (long)Math.Round(t.Price / _tickSize);
+        long ticks = (long)Math.Round(t.Price / _tickSize, MidpointRounding.AwayFromZero);
         if (!_levels.TryGetValue(ticks, out var lvl)) _levels[ticks] = lvl = new Level();
         if (side == Side.Buy) lvl.Ask += t.Size; else lvl.Bid += t.Size;
 
