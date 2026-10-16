@@ -48,20 +48,59 @@ public class OrderFlowContext
 
 public static class FootprintAnalyzer
 {
-    private const decimal MinSignalVolume = 100m;
-    private const decimal MinAbsorptionDelta = 40m;
-    private const decimal ImbalanceRatio = 3.0m;
-    private const decimal MinImbalanceVol = 10m;
-    private const decimal MinDeltaDiff = 5m;
-    private const int StackedLevelsRequired = 3;
+    // ============================================================
+    // TUNABLE SETTINGS
+    // ------------------------------------------------------------
+    // Ratio-based detection (industry standard, kept fixed).
+    // Magnitude-based filters (relative, adaptive to market activity).
+    // ============================================================
+
+    // --- Diagonal imbalance (relative by nature — adjacent levels) ---
+    private const decimal ImbalanceRatio = 3.0m;   // 300% — Bookmap / GoCharting / FC Footprint default
+    private const int StackedLevelsRequired = 3;   // 3+ consecutive diagonal imbalances
+
+    // --- Volume floors (relative to bar activity) ---
+    private const double MinImbalanceVolRatio = 0.05; // level must carry >= 5% of bar's avg level vol
+                                                      // (noise filter only — NOT a signal threshold)
+
+    // --- Absorption (relative to bar's own volume + baseline) ---
+    private const double MinAbsorptionDeltaRatio  = 0.25; // |delta| >= 25% of bar volume
+    private const double MinAbsorptionVolumeRatio = 1.00; // bar vol >= 100% of 20-bar baseline
+
+    // --- Rolling baseline ---
+    private const int BaselineWindowBars = 20;
+
+    // --- Debounce / structural (kept fixed — not magnitude thresholds) ---
     private const int MinLiveTradesForSignal = 250;
     private const int MaxZoneAgeBars = 2;
 
+    // ============================================================
+    // STATE
+    // ============================================================
     private static readonly Lock _syncLock = new();
     private static readonly List<OrderFlowZone> _activeZones = new();
     private static readonly HashSet<long> _processedBars = new();
+    private static readonly Queue<decimal> _recentBarVolumes = new();
     private static OrderFlowContext _lastContext;
     private static decimal _sessionCumulativeDelta;
+    private static decimal _baselineBarVolume;
+
+    /// <summary>
+    /// Clears all session-scoped state. Call once at app startup.
+    /// (Single-session app: process restart is sufficient, but explicit is safer.)
+    /// </summary>
+    public static void ResetSession()
+    {
+        lock (_syncLock)
+        {
+            _activeZones.Clear();
+            _processedBars.Clear();
+            _recentBarVolumes.Clear();
+            _sessionCumulativeDelta = 0m;
+            _baselineBarVolume = 0m;
+            _lastContext = null;
+        }
+    }
 
     public static OrderFlowContext AnalyzeContext(FootprintSnapshot snapshot, double tickSize, double currentPrice = 0)
     {
@@ -135,7 +174,15 @@ public static class FootprintAnalyzer
                 {
                     _sessionCumulativeDelta += compBar.Delta;
 
-                    var barImbalances = DetectStackedImbalances(compBar);
+                    // Maintain rolling baseline bar volume (20-bar average)
+                    _recentBarVolumes.Enqueue(compBar.Volume);
+                    while (_recentBarVolumes.Count > BaselineWindowBars)
+                        _recentBarVolumes.Dequeue();
+                    _baselineBarVolume = _recentBarVolumes.Count > 0
+                        ? _recentBarVolumes.Average()
+                        : compBar.Volume;
+
+                    var barImbalances = DetectStackedImbalances(compBar, _baselineBarVolume);
                     var bRange = compBar.High - compBar.Low;
 
                     foreach (var imb in barImbalances)
@@ -143,7 +190,6 @@ public static class FootprintAnalyzer
                         bool isExhaustion;
                         if (imb.IsBuy)
                         {
-                            // Buy imbalance at extreme high of bar or bar closed below it
                             isExhaustion = bRange > 1e-6 &&
                                            (imb.EndP >= compBar.High - tickSize * 0.5 ||
                                             (imb.EndP - compBar.Low) / bRange >= 0.75 ||
@@ -151,7 +197,6 @@ public static class FootprintAnalyzer
                         }
                         else
                         {
-                            // Sell imbalance at extreme low of bar or bar closed above it
                             isExhaustion = bRange > 1e-6 &&
                                            (imb.StartP <= compBar.Low + tickSize * 0.5 ||
                                             (imb.StartP - compBar.Low) / bRange <= 0.25 ||
@@ -180,9 +225,14 @@ public static class FootprintAnalyzer
 
             // Prune expired zones & obsolete bar cache
             _activeZones.RemoveAll(z => z.AgeBars > MaxZoneAgeBars);
+
+            // NOTE on _processedBars: IntersectWith(completed) can cause double-counting
+            // if the window slides and a bar re-enters. Safer to only prune bars older
+            // than the newest completed bar minus a generous lookback.
             if (completed.Length > 0)
             {
-                _processedBars.IntersectWith(completed.Select(c => c.StartTime));
+                var oldestInWindow = completed.Min(c => c.StartTime);
+                _processedBars.RemoveWhere(t => t < oldestInWindow);
             }
 
             // Evaluate current price interaction with active zones
@@ -190,7 +240,6 @@ public static class FootprintAnalyzer
             {
                 if (zone.IsBuy)
                 {
-                    // Price broke below stacked buy imbalance -> Trapped Buyers (FADE setup)
                     if (evalPrice < zone.LowPrice - tickSize * 0.5)
                     {
                         zone.IsTrapped = true;
@@ -201,7 +250,6 @@ public static class FootprintAnalyzer
                             Tone = "bearish"
                         });
                     }
-                    // Price testing the zone from above -> Potential support
                     else if (Math.Abs(evalPrice - zone.LowPrice) <= tickSize * 1.5 ||
                              (evalPrice >= zone.LowPrice && evalPrice <= zone.HighPrice + tickSize * 0.5))
                     {
@@ -212,7 +260,6 @@ public static class FootprintAnalyzer
                             Tone = "bullish"
                         });
                     }
-                    // Fresh initiative buy zone holding
                     else if (evalPrice > zone.HighPrice && zone.AgeBars <= 2 && !zone.IsExhaustionAtBirth)
                     {
                         signals.Add(new OrderFlowSignal
@@ -225,7 +272,6 @@ public static class FootprintAnalyzer
                 }
                 else
                 {
-                    // Price pushed above stacked sell imbalance -> Trapped Sellers (SQUEEZE setup)
                     if (evalPrice > zone.HighPrice + tickSize * 0.5)
                     {
                         zone.IsTrapped = true;
@@ -236,7 +282,6 @@ public static class FootprintAnalyzer
                             Tone = "bullish"
                         });
                     }
-                    // Price testing the zone from below -> Potential resistance
                     else if (Math.Abs(evalPrice - zone.HighPrice) <= tickSize * 1.5 ||
                              (evalPrice <= zone.HighPrice && evalPrice >= zone.LowPrice - tickSize * 0.5))
                     {
@@ -247,7 +292,6 @@ public static class FootprintAnalyzer
                             Tone = "bearish"
                         });
                     }
-                    // Fresh initiative sell zone holding
                     else if (evalPrice < zone.LowPrice && zone.AgeBars <= 2 && !zone.IsExhaustionAtBirth)
                     {
                         signals.Add(new OrderFlowSignal
@@ -264,7 +308,7 @@ public static class FootprintAnalyzer
         // Developing Live Bar Signals (Debounced: only when live bar has >= MinLiveTradesForSignal)
         if (current is { TradeCount: >= MinLiveTradesForSignal })
         {
-            var liveImbalances = DetectStackedImbalances(current);
+            var liveImbalances = DetectStackedImbalances(current, _baselineBarVolume);
             var liveRange = current.High - current.Low;
 
             foreach (var imb in liveImbalances)
@@ -322,15 +366,31 @@ public static class FootprintAnalyzer
             }
         }
 
-        // Passive Absorption Detection (subject bar)
+        // ============================================================
+        // Passive Absorption Detection (relative to bar's own volume + baseline)
+        // ============================================================
         var priceChange = bar.Close - bar.Open;
         var barDelta = bar.Delta;
         var sellerAbsorption = false;
         var buyerAbsorption = false;
 
-        if (bar.Volume >= MinSignalVolume)
+        var deltaRatio = bar.Volume > 0
+            ? (double)Math.Abs(barDelta) / (double)bar.Volume
+            : 0.0;
+
+        var barVolumeRatio = _baselineBarVolume > 0
+            ? (double)bar.Volume / (double)_baselineBarVolume
+            : 1.0;
+
+        var absorptionCandidate =
+            barVolumeRatio >= MinAbsorptionVolumeRatio &&
+            deltaRatio     >= MinAbsorptionDeltaRatio;
+
+        if (absorptionCandidate)
         {
-            if (barDelta >= MinAbsorptionDelta && (priceChange < 0 || (barRange > 0 && bar.Close <= bar.High - barRange * 0.40)))
+            // Seller absorption: strong positive delta, price fails to rise / closes weak
+            if (barDelta > 0 && (priceChange < 0 ||
+                                 (barRange > 0 && bar.Close <= bar.High - barRange * 0.40)))
             {
                 sellerAbsorption = true;
                 signals.Add(new OrderFlowSignal
@@ -340,7 +400,9 @@ public static class FootprintAnalyzer
                     Tone = "bearish"
                 });
             }
-            else if (barDelta <= -MinAbsorptionDelta && (priceChange > 0 || (barRange > 0 && bar.Close >= bar.Low + barRange * 0.40)))
+            // Buyer absorption: strong negative delta, price fails to fall / closes strong
+            else if (barDelta < 0 && (priceChange > 0 ||
+                                      (barRange > 0 && bar.Close >= bar.Low + barRange * 0.40)))
             {
                 buyerAbsorption = true;
                 signals.Add(new OrderFlowSignal
@@ -403,7 +465,7 @@ public static class FootprintAnalyzer
         OrderFlowZone trappedSell;
         lock (_syncLock)
         {
-            trappedBuy = _activeZones.FirstOrDefault(z => z.IsBuy && z.IsTrapped);
+            trappedBuy  = _activeZones.FirstOrDefault(z =>  z.IsBuy && z.IsTrapped);
             trappedSell = _activeZones.FirstOrDefault(z => !z.IsBuy && z.IsTrapped);
         }
 
@@ -464,7 +526,6 @@ public static class FootprintAnalyzer
 
         var result = new OrderFlowContext
         {
-            // Keep side card visible with active state
             Bias = bias,
             BiasTone = biasTone,
             Action = action,
@@ -483,32 +544,51 @@ public static class FootprintAnalyzer
         return result;
     }
 
-    private static List<(bool IsBuy, double StartP, double EndP, int Run)> DetectStackedImbalances(FootprintBarData bar)
+    // ============================================================
+    // IMBALANCE DETECTION
+    // ------------------------------------------------------------
+    // Diagonal imbalance: Ask@N+1 vs Bid@N (buy) or Bid@N vs Ask@N+1 (sell).
+    // Ratio gate is fixed at 3:1 (industry standard).
+    // Volume floor scales with the bar's average level volume — a noise filter,
+    // not a signal threshold.
+    // ============================================================
+    private static List<(bool IsBuy, double StartP, double EndP, int Run)>
+        DetectStackedImbalances(FootprintBarData bar, decimal baselineBarVolume)
     {
         var list = new List<(bool IsBuy, double StartP, double EndP, int Run)>();
         var levels = bar?.Levels;
         if (levels == null || levels.Length < 2) return list;
 
-        var buyImb = new bool[levels.Length];
+        // Defensive: footprint feeds occasionally deliver unsorted levels.
+        // Sort ascending by price so the diagonal comparison is valid.
+        if (!IsSortedAscending(levels))
+            levels = levels.OrderBy(l => l.Price).ToArray();
+
+        // Minimum level volume = X% of the bar's average level volume.
+        // This only filters out near-empty rows; the 3:1 ratio does the real work.
+        var avgLevelVol = bar.Volume / levels.Length;
+        var minLevelVol = avgLevelVol * (decimal)MinImbalanceVolRatio;
+
+        var buyImb  = new bool[levels.Length];
         var sellImb = new bool[levels.Length];
 
         for (var i = 0; i < levels.Length - 1; i++)
         {
-            var lLow = levels[i];
+            var lLow  = levels[i];
             var lHigh = levels[i + 1];
 
-            // Buy Imbalance at i+1 (Ask at high vs Bid at low)
-            if (lHigh.AskVolume >= MinImbalanceVol &&
+            // Buy imbalance at i+1 (Ask at high vs Bid at low)
+            if (lHigh.AskVolume >= minLevelVol &&
                 (lLow.BidVolume == 0 ||
-                 (lHigh.AskVolume >= lLow.BidVolume * ImbalanceRatio && lHigh.AskVolume - lLow.BidVolume >= MinDeltaDiff)))
+                 lHigh.AskVolume >= lLow.BidVolume * ImbalanceRatio))
             {
                 buyImb[i + 1] = true;
             }
 
-            // Sell Imbalance at i (Bid at low vs Ask at high)
-            if (lLow.BidVolume >= MinImbalanceVol &&
+            // Sell imbalance at i (Bid at low vs Ask at high)
+            if (lLow.BidVolume >= minLevelVol &&
                 (lHigh.AskVolume == 0 ||
-                 (lLow.BidVolume >= lHigh.AskVolume * ImbalanceRatio && lLow.BidVolume - lHigh.AskVolume >= MinDeltaDiff)))
+                 lLow.BidVolume >= lHigh.AskVolume * ImbalanceRatio))
             {
                 sellImb[i] = true;
             }
@@ -518,10 +598,7 @@ public static class FootprintAnalyzer
         var run = 0;
         for (var i = 0; i < levels.Length; i++)
         {
-            if (buyImb[i])
-            {
-                run++;
-            }
+            if (buyImb[i]) run++;
             else
             {
                 if (run >= StackedLevelsRequired)
@@ -536,10 +613,7 @@ public static class FootprintAnalyzer
         run = 0;
         for (var i = 0; i < levels.Length; i++)
         {
-            if (sellImb[i])
-            {
-                run++;
-            }
+            if (sellImb[i]) run++;
             else
             {
                 if (run >= StackedLevelsRequired)
@@ -551,6 +625,13 @@ public static class FootprintAnalyzer
             list.Add((false, levels[levels.Length - run].Price, levels[^1].Price, run));
 
         return list;
+    }
+
+    private static bool IsSortedAscending(FootprintLevel[] levels)
+    {
+        for (var i = 1; i < levels.Length; i++)
+            if (levels[i].Price < levels[i - 1].Price) return false;
+        return true;
     }
 
     /// <summary>
