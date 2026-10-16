@@ -45,7 +45,7 @@ namespace FootPrintTrader
         [STAThread]
         private static void Main()
         {
-            _footprintClassifier = new FootprintClassifier(tickSize: TickSize, tradesPerBar: 1000);
+            _footprintClassifier = new FootprintClassifier(tickSize: TickSize);
             _logger = new Logger();
             _orderHelper = new OrderHelper(_logger);
             _orderHelper.OnOrdersChanged += _ => SendPositionUpdate();
