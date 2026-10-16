@@ -200,7 +200,6 @@
       load: api(d => load(parse(d))),                 // full snapshot: {rowSize, colors, footerLabels, bars:[...]}
       updateLast: api(b => put(parse(b), false)),      // replace the last (live) bar with a rebuilt version
       append: api(b => put(parse(b), true)),           // start a new bar after the last one
-      setAnalysis: api(() => {}),                     // deprecated: analysis is displayed in the side panel
       showAll: function () {                           // scroll to the oldest bar and shrink columns so every bar fits
         if (!bars.length) return {ok: false, error: 'no data'};
         size();

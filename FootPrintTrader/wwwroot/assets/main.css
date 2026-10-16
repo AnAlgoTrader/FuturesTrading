@@ -411,26 +411,6 @@ html, body {
     margin-top: 4px;
 }
 
-.interp-factors {
-    margin-top: 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.interp-factor-item {
-    font-size: 10px;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.interp-factor-item::before {
-    content: "•";
-    color: var(--warn);
-}
-
 /* ---- Bias Card ---- */
 .bias-card {
     border-left: 4px solid var(--muted);

@@ -250,7 +250,6 @@ function updateInterpretationPanel(interp) {
     const action = document.getElementById('interp-action');
     const actionRow = document.getElementById('interp-action-row') || (action ? action.parentElement : null);
     const details = document.getElementById('interp-details');
-    const factorsEl = document.getElementById('interp-factors');
 
     const tone = interp.tone || 'neutral';
     if (card) {
@@ -267,10 +266,6 @@ function updateInterpretationPanel(interp) {
         if (details) {
             details.textContent = '';
             details.style.display = 'none';
-        }
-        if (factorsEl) {
-            factorsEl.innerHTML = '';
-            factorsEl.style.display = 'none';
         }
         return;
     }
@@ -292,16 +287,5 @@ function updateInterpretationPanel(interp) {
     if (details) {
         details.textContent = interp.details || '';
         details.style.display = interp.details ? '' : 'none';
-    }
-
-    if (factorsEl) {
-        const factors = Array.isArray(interp.factors) ? interp.factors : [];
-        if (factors.length > 0) {
-            factorsEl.innerHTML = factors.map(f => `<div class="interp-factor-item">${escapeHtml(f)}</div>`).join('');
-            factorsEl.style.display = '';
-        } else {
-            factorsEl.innerHTML = '';
-            factorsEl.style.display = 'none';
-        }
     }
 }
