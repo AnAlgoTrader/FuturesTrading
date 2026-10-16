@@ -48,7 +48,7 @@ public sealed class FootprintClassifier
     private readonly Queue<FootprintBarData> _completedQueue = new();
 
     private Q? _quote;
-    private long _lastQuoteTime = long.MinValue;
+    private long _quoteTime = long.MinValue;
     private double _lastPrice = double.NaN;
     private Side _lastSide = Side.Buy;
 
@@ -82,7 +82,6 @@ public sealed class FootprintClassifier
         lock (_lock)
         {
             _quotes.Enqueue(new Q(time, bid, ask, Stopwatch.GetTimestamp()));
-            if (time > _lastQuoteTime) _lastQuoteTime = time;
             Process();
         }
         DrainCompleted();
@@ -140,9 +139,12 @@ public sealed class FootprintClassifier
             while (_quotes.Count > 0 &&
                    (_quotes.Peek().Time < t.Time ||
                     (_quotesFirstOnTie && _quotes.Peek().Time == t.Time)))
+            {
                 _quote = _quotes.Dequeue();
+                _quoteTime = _quote.Value.Time;
+            }
 
-            bool quotesCaughtUp = _lastQuoteTime >= t.Time;
+            bool quotesCaughtUp = _quoteTime >= t.Time;
             bool timedOut = now - t.Arrival >= _maxHoldTs;
             if (!quotesCaughtUp && !timedOut) break;
 
@@ -152,7 +154,10 @@ public sealed class FootprintClassifier
 
         if (_trades.Count == 0)
             while (_quotes.Count > 0 && now - _quotes.Peek().Arrival >= _maxHoldTs)
+            {
                 _quote = _quotes.Dequeue();
+                _quoteTime = _quote.Value.Time;
+            }
     }
 
     private Side Classify(T t)
