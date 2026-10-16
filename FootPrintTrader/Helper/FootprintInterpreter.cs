@@ -15,8 +15,7 @@ public class MarketInterpretation
 
 public static class FootprintInterpreter
 {
-    public const double MinViableRangePoints = 2.5; // Under 2.5 pts on ES/MES is a tight bracket/noise
-    public const int MinTicksForTrade = 10;
+    public const int MinTicksForTrade = 10; // prior-bar range < 10 ticks = compressed (ES: 2.5 pts)
 
     public static MarketInterpretation Interpret(
         OrderFlowContext context,
@@ -52,7 +51,7 @@ public static class FootprintInterpreter
             interp.Title = "Conflicting Auction (Bracket)";
             interp.Tone = "warning";
             interp.Action = "STAND ASIDE";
-            interp.Details = range < MinViableRangePoints
+            interp.Details = range < tickSize * MinTicksForTrade
                 ? $"Opposing structural flow inside a compressed {range.ToString("F" + dec, CultureInfo.InvariantCulture)}-pt range."
                 : "Opposing structural flow. Wait for one side to take control.";
             return interp;
