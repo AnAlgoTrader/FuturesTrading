@@ -11,6 +11,8 @@ public class OrderFlowSignal
     public string Type { get; init; } = ""; // "stacked_imbalance", "absorption", "trapped_traders", "divergence", "unfinished_auction", "exhaustion"
     public string Title { get; init; } = "";
     public string Tone { get; init; } = "neutral"; // "bullish", "bearish", "warning", "neutral"
+    public double Price { get; init; }         // actionable level the signal refers to
+    public int Priority { get; init; } = 5;    // lower = more important (see FootprintAnalyzer.Priority*)
 }
 
 public class OrderFlowZone
@@ -29,6 +31,7 @@ public class OrderFlowContext
     public string Bias { get; init; } = "Neutral";
     public string BiasTone { get; init; } = "neutral"; // "bullish", "bearish", "warning", "neutral"
     public string Action { get; init; } = "";
+    public double ActionPrice { get; init; } // single source of truth for the actionable level
 
     // Live Bar Metrics
     public double PocPrice { get; init; }
@@ -63,12 +66,26 @@ public static class FootprintAnalyzer
     private const double MinImbalanceVolRatio = 0.05; // level must carry >= 5% of bar's avg level vol
     // (noise filter only — NOT a signal threshold)
 
-    // --- Absorption (relative to bar's own volume + baseline) ---
-    private const double MinAbsorptionDeltaRatio = 0.25; // |delta| >= 25% of bar volume
-    private const double MinAbsorptionVolumeRatio = 1.00; // bar vol >= 100% of 20-bar baseline
+    // --- Absorption (real-time, per price level; Bookmap / MZpack style) ---
+    // A level is absorbing when one side's aggressor volume is an outlier versus the
+    // recent per-level volume distribution, price stalls at the extreme, and price
+    // then rejects by AbsorptionDepthTicks. Evaluated on the developing bar.
+    private const double AbsorptionLevelSigma = 3.0;  // level vol >= mean + 3σ of recent level volumes
+    private const int AbsorptionDepthTicks = 2;       // price must reject >= 2 ticks from the level
 
-    // --- Rolling baseline ---
+    // --- Divergence (windowed CVD vs price; confirmed at bar close) ---
+    private const int DivergenceWindowBars = 20;
+
+    // --- Rolling baselines ---
     private const int BaselineWindowBars = 20;
+    private const int LevelVolumeWindow = 2000;       // rolling per-level volume samples for mean/σ
+
+    // --- Signal priority (lower = more important) ---
+    public const int PriorityTrapped = 1;
+    public const int PriorityAbsorption = 2;
+    public const int PriorityDivergence = 3;
+    public const int PriorityRetest = 4;
+    public const int PriorityDeveloping = 5;
 
     // --- Debounce / structural (kept fixed — not magnitude thresholds) ---
     private const int MinLiveTradesForSignal = 250;
@@ -81,26 +98,29 @@ public static class FootprintAnalyzer
     private static readonly List<OrderFlowZone> _activeZones = new();
     private static readonly HashSet<long> _processedBars = new();
     private static readonly Queue<decimal> _recentBarVolumes = new();
+    private static readonly Queue<decimal> _recentLevelVolumes = new();
     private static OrderFlowContext _lastContext;
     private static decimal _sessionCumulativeDelta;
     private static decimal _baselineBarVolume;
+    private static double _levelVolMean;
+    private static double _levelVolStd;
 
-    /// <summary>
-    /// Clears all session-scoped state. Call once at app startup.
-    /// (Single-session app: process restart is sufficient, but explicit is safer.)
-    /// </summary>
-    public static void ResetSession()
+    // Absorption candidates detected on a developing/recent bar; confirmed when price rejects.
+    private static readonly List<AbsorptionCandidate> _absorptionCandidates = new();
+
+    // Rolling window of completed bars (price extremes + cumulative delta at close) for divergence.
+    private static readonly List<DivergencePoint> _divergenceWindow = new();
+    private static string _divergence = "None";
+    private static double _divergencePrice;
+
+    private sealed class AbsorptionCandidate
     {
-        lock (_syncLock)
-        {
-            _activeZones.Clear();
-            _processedBars.Clear();
-            _recentBarVolumes.Clear();
-            _sessionCumulativeDelta = 0m;
-            _baselineBarVolume = 0m;
-            _lastContext = null;
-        }
+        public bool SellerAbsorption; // true = aggressive buying absorbed at a high (bearish)
+        public double Price;
+        public long BarStart;
     }
+
+    private readonly record struct DivergencePoint(double High, double Low, decimal Cvd, decimal Delta);
 
     public static OrderFlowContext AnalyzeContext(FootprintSnapshot snapshot, double tickSize, double currentPrice = 0)
     {
@@ -182,6 +202,18 @@ public static class FootprintAnalyzer
                         ? _recentBarVolumes.Average()
                         : compBar.Volume;
 
+                    // Maintain rolling per-level volume distribution (mean/σ) for absorption.
+                    foreach (var lvl in compBar.Levels)
+                        _recentLevelVolumes.Enqueue(lvl.Total);
+                    while (_recentLevelVolumes.Count > LevelVolumeWindow)
+                        _recentLevelVolumes.Dequeue();
+                    UpdateLevelVolumeStats();
+
+                    // Maintain the divergence window (price extremes + CVD at bar close).
+                    _divergenceWindow.Add(new DivergencePoint(compBar.High, compBar.Low, _sessionCumulativeDelta, compBar.Delta));
+                    while (_divergenceWindow.Count > DivergenceWindowBars)
+                        _divergenceWindow.RemoveAt(0);
+
                     var barImbalances = DetectStackedImbalances(compBar, _baselineBarVolume);
                     var bRange = compBar.High - compBar.Low;
 
@@ -217,6 +249,9 @@ public static class FootprintAnalyzer
                 }
             }
 
+            // Recompute CVD-vs-price divergence from the confirmed completed-bar window.
+            ComputeDivergence(tickSize);
+
             // Update zone age
             foreach (var zone in _activeZones)
             {
@@ -247,7 +282,9 @@ public static class FootprintAnalyzer
                         {
                             Type = "trapped_traders",
                             Title = zone.IsExhaustionAtBirth ? $"Trapped Longs ({P(zone.LowPrice)})" : $"Trapped Buyers ({P(zone.LowPrice)})",
-                            Tone = "bearish"
+                            Tone = "bearish",
+                            Price = zone.LowPrice,
+                            Priority = PriorityTrapped
                         });
                     }
                     else if (Math.Abs(evalPrice - zone.LowPrice) <= tickSize * 1.5 ||
@@ -257,7 +294,9 @@ public static class FootprintAnalyzer
                         {
                             Type = "stacked_imbalance",
                             Title = $"Retesting Buy Zone ({P(zone.LowPrice)})",
-                            Tone = "bullish"
+                            Tone = "bullish",
+                            Price = zone.LowPrice,
+                            Priority = PriorityRetest
                         });
                     }
                     else if (evalPrice > zone.HighPrice && zone.AgeBars <= 2 && !zone.IsExhaustionAtBirth)
@@ -266,7 +305,9 @@ public static class FootprintAnalyzer
                         {
                             Type = "stacked_imbalance",
                             Title = $"Buyer Support ({P(zone.LowPrice)})",
-                            Tone = "bullish"
+                            Tone = "bullish",
+                            Price = zone.LowPrice,
+                            Priority = PriorityRetest
                         });
                     }
                 }
@@ -279,7 +320,9 @@ public static class FootprintAnalyzer
                         {
                             Type = "trapped_traders",
                             Title = zone.IsExhaustionAtBirth ? $"Trapped Shorts ({P(zone.HighPrice)})" : $"Trapped Sellers ({P(zone.HighPrice)})",
-                            Tone = "bullish"
+                            Tone = "bullish",
+                            Price = zone.HighPrice,
+                            Priority = PriorityTrapped
                         });
                     }
                     else if (Math.Abs(evalPrice - zone.HighPrice) <= tickSize * 1.5 ||
@@ -289,7 +332,9 @@ public static class FootprintAnalyzer
                         {
                             Type = "stacked_imbalance",
                             Title = $"Retesting Sell Zone ({P(zone.HighPrice)})",
-                            Tone = "bearish"
+                            Tone = "bearish",
+                            Price = zone.HighPrice,
+                            Priority = PriorityRetest
                         });
                     }
                     else if (evalPrice < zone.LowPrice && zone.AgeBars <= 2 && !zone.IsExhaustionAtBirth)
@@ -298,7 +343,9 @@ public static class FootprintAnalyzer
                         {
                             Type = "stacked_imbalance",
                             Title = $"Seller Resistance ({P(zone.HighPrice)})",
-                            Tone = "bearish"
+                            Tone = "bearish",
+                            Price = zone.HighPrice,
+                            Priority = PriorityRetest
                         });
                     }
                 }
@@ -325,7 +372,9 @@ public static class FootprintAnalyzer
                         {
                             Type = "exhaustion",
                             Title = $"Buying Exhaustion at High ({P(imb.EndP)})",
-                            Tone = "bearish"
+                            Tone = "bearish",
+                            Price = imb.EndP,
+                            Priority = PriorityRetest
                         });
                     }
                     else if (evalPrice >= imb.EndP)
@@ -334,7 +383,9 @@ public static class FootprintAnalyzer
                         {
                             Type = "stacked_imbalance",
                             Title = $"Stacked Buy Imbalance ({P(imb.EndP)})",
-                            Tone = "bullish"
+                            Tone = "bullish",
+                            Price = imb.EndP,
+                            Priority = PriorityDeveloping
                         });
                     }
                 }
@@ -350,7 +401,9 @@ public static class FootprintAnalyzer
                         {
                             Type = "exhaustion",
                             Title = $"Selling Exhaustion at Low ({P(imb.StartP)})",
-                            Tone = "bullish"
+                            Tone = "bullish",
+                            Price = imb.StartP,
+                            Priority = PriorityRetest
                         });
                     }
                     else if (evalPrice <= imb.StartP)
@@ -359,7 +412,9 @@ public static class FootprintAnalyzer
                         {
                             Type = "stacked_imbalance",
                             Title = $"Stacked Sell Imbalance ({P(imb.StartP)})",
-                            Tone = "bearish"
+                            Tone = "bearish",
+                            Price = imb.StartP,
+                            Priority = PriorityDeveloping
                         });
                     }
                 }
@@ -367,178 +422,137 @@ public static class FootprintAnalyzer
         }
 
         // ============================================================
-        // Passive Absorption Detection (relative to bar's own volume + baseline)
+        // Absorption (real-time, per price level; Bookmap / MZpack style)
+        // A level absorbs when one side's aggressor volume is an outlier versus the
+        // recent per-level volume distribution AND price then rejects by AbsorptionDepthTicks.
+        // Runs on the developing bar, so it does NOT wait for the bar to close.
         // ============================================================
-        var priceChange = bar.Close - bar.Open;
-        var barDelta = bar.Delta;
-        var sellerAbsorption = false;
-        var buyerAbsorption = false;
+        var absorptionThreshold = _levelVolMean + AbsorptionLevelSigma * _levelVolStd;
 
-        var deltaRatio = bar.Volume > 0
-            ? (double)Math.Abs(barDelta) / (double)bar.Volume
-            : 0.0;
-
-        var barVolumeRatio = _baselineBarVolume > 0
-            ? (double)bar.Volume / (double)_baselineBarVolume
-            : 1.0;
-
-        var absorptionCandidate =
-            barVolumeRatio >= MinAbsorptionVolumeRatio &&
-            deltaRatio >= MinAbsorptionDeltaRatio;
-
-        if (absorptionCandidate)
+        if (absorptionThreshold > 0 && levels.Length > 0 && bar.TradeCount >= MinLiveTradesForSignal)
         {
-            // Seller absorption: strong positive delta, price fails to rise / closes weak
-            if (barDelta > 0 && (priceChange < 0 ||
-                                 (barRange > 0 && bar.Close <= bar.High - barRange * 0.40)))
+            var depth = tickSize * AbsorptionDepthTicks;
+
+            lock (_syncLock)
             {
-                sellerAbsorption = true;
-                signals.Add(new OrderFlowSignal
+                // Register candidate levels on the developing bar.
+                foreach (var lvl in levels)
                 {
-                    Type = "absorption",
-                    Title = $"Seller Absorption ({P(bar.High)})",
-                    Tone = "bearish"
-                });
-            }
-            // Buyer absorption: strong negative delta, price fails to fall / closes strong
-            else if (barDelta < 0 && (priceChange > 0 ||
-                                      (barRange > 0 && bar.Close >= bar.Low + barRange * 0.40)))
-            {
-                buyerAbsorption = true;
-                signals.Add(new OrderFlowSignal
+                    // Seller absorption: heavy aggressive buying at/near the high, price stalls.
+                    if ((double)lvl.AskVolume >= absorptionThreshold &&
+                        lvl.Price >= bar.High - depth + 1e-9 &&
+                        !_absorptionCandidates.Any(c => c.SellerAbsorption && c.BarStart == bar.StartTime && Math.Abs(c.Price - lvl.Price) < tickSize * 0.5))
+                    {
+                        _absorptionCandidates.Add(new AbsorptionCandidate { SellerAbsorption = true, Price = lvl.Price, BarStart = bar.StartTime });
+                    }
+
+                    // Buyer absorption: heavy aggressive selling at/near the low, price stalls.
+                    if ((double)lvl.BidVolume >= absorptionThreshold &&
+                        lvl.Price <= bar.Low + depth + 1e-9 &&
+                        !_absorptionCandidates.Any(c => !c.SellerAbsorption && c.BarStart == bar.StartTime && Math.Abs(c.Price - lvl.Price) < tickSize * 0.5))
+                    {
+                        _absorptionCandidates.Add(new AbsorptionCandidate { SellerAbsorption = false, Price = lvl.Price, BarStart = bar.StartTime });
+                    }
+                }
+
+                // Keep candidates only for the current bar and the most recent completed bar.
+                var prevStart = completed.Length > 0 ? completed[^1].StartTime : bar.StartTime;
+                _absorptionCandidates.RemoveAll(c => c.BarStart != bar.StartTime && c.BarStart != prevStart);
+
+                // Confirm by rejection: price moved >= depth away from the absorbed level.
+                // Confirmed candidates are kept (and re-emitted each tick) until their bar
+                // ages out, so the signal persists rather than flickering for one second.
+                foreach (var c in _absorptionCandidates)
                 {
-                    Type = "absorption",
-                    Title = $"Buyer Absorption ({P(bar.Low)})",
-                    Tone = "bullish"
-                });
+                    var rejected = c.SellerAbsorption
+                        ? evalPrice <= c.Price - depth
+                        : evalPrice >= c.Price + depth;
+                    if (!rejected) continue;
+
+                    signals.Add(new OrderFlowSignal
+                    {
+                        Type = "absorption",
+                        Title = $"{(c.SellerAbsorption ? "Seller" : "Buyer")} Absorption ({P(c.Price)})",
+                        Tone = c.SellerAbsorption ? "bearish" : "bullish",
+                        Price = c.Price,
+                        Priority = PriorityAbsorption
+                    });
+                }
             }
         }
 
-        // Delta Divergence Detection & Signal
-        var deltaDivergence = "None";
-        if (prevBar != null)
+        // ============================================================
+        // Delta Divergence (windowed CVD vs price; confirmed at bar close).
+        // New price extreme on a weaker cumulative-delta extreme.
+        // ============================================================
+        var deltaDivergence = _divergence;
+        if (deltaDivergence != "None")
         {
-            if (bar.High >= prevBar.High && bar.Delta < 0 && prevBar.Delta > 0)
+            signals.Add(new OrderFlowSignal
             {
-                deltaDivergence = "Bearish";
-                signals.Add(new OrderFlowSignal
-                {
-                    Type = "divergence",
-                    Title = $"Bearish Divergence ({P(bar.High)})",
-                    Tone = "bearish"
-                });
-            }
-            else if (bar.Low <= prevBar.Low && bar.Delta > 0 && prevBar.Delta < 0)
-            {
-                deltaDivergence = "Bullish";
-                signals.Add(new OrderFlowSignal
-                {
-                    Type = "divergence",
-                    Title = $"Bullish Divergence ({P(bar.Low)})",
-                    Tone = "bullish"
-                });
-            }
+                Type = "divergence",
+                Title = $"{deltaDivergence} Divergence ({P(_divergencePrice)})",
+                Tone = deltaDivergence == "Bearish" ? "bearish" : "bullish",
+                Price = _divergencePrice,
+                Priority = PriorityDivergence
+            });
         }
 
-        // Deduplicate and Prioritize Signals (Trapped > Absorption > Divergence > Retest > Developing)
-        var distinctSignals = new List<OrderFlowSignal>();
-        var seenKeys = new HashSet<string>();
-        foreach (var sig in signals)
-        {
-            var key = $"{sig.Type}:{sig.Tone}:{sig.Title}";
-            if (seenKeys.Add(key))
-            {
-                distinctSignals.Add(sig);
-            }
-        }
+        // Deduplicate and prioritize: Trapped > Absorption > Divergence > Retest > Developing.
+        // OrderBy is stable, so equal-priority signals keep their emission order.
+        var distinctSignals = signals
+            .GroupBy(s => $"{s.Type}:{s.Tone}:{s.Title}")
+            .Select(g => g.First())
+            .OrderBy(s => s.Priority)
+            .Take(5)
+            .ToList();
 
-        if (distinctSignals.Count > 5)
-        {
-            distinctSignals = distinctSignals.Take(5).ToList();
-        }
+        // Single source of truth: the highest-priority signal drives bias, action and level.
+        // Both the bias card and the interpretation panel read these fields, so the two
+        // surfaces can no longer disagree on direction or level.
+        var top = distinctSignals.FirstOrDefault();
 
-        // Synthesize Market Bias and the Action (what to do, at what level)
         string bias;
         string biasTone;
         string action;
+        double actionPrice;
 
-        // ============================================================
-        // Trapped zone selection — most recent FIRST, nearest to price SECOND.
-        // Rationale: a trapped zone is only actionable while it is the freshest
-        // structural event AND price is still interacting with it. Picking the
-        // oldest matching zone (the old FirstOrDefault) could surface a stale
-        // trap from 2 bars ago while a fresher, opposite-side trap is in play.
-        // ============================================================
-        OrderFlowZone trappedBuy;
-        OrderFlowZone trappedSell;
-        lock (_syncLock)
-        {
-            trappedBuy = _activeZones
-                .Where(z => z.IsBuy && z.IsTrapped)
-                .OrderByDescending(z => z.BarStartTime)
-                .ThenBy(z => Math.Abs(evalPrice - z.LowPrice))
-                .FirstOrDefault();
-
-            trappedSell = _activeZones
-                .Where(z => !z.IsBuy && z.IsTrapped)
-                .OrderByDescending(z => z.BarStartTime)
-                .ThenBy(z => Math.Abs(evalPrice - z.HighPrice))
-                .FirstOrDefault();
-        }
-
-        if (trappedBuy != null)
-        {
-            bias = "Trapped Buyers";
-            biasTone = "bearish";
-            action = $"Fade at {trappedBuy.LowPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
-        }
-        else if (trappedSell != null)
-        {
-            bias = "Trapped Sellers";
-            biasTone = "bullish";
-            action = $"Squeeze at {trappedSell.HighPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
-        }
-        else if (sellerAbsorption)
-        {
-            bias = "Seller Absorption";
-            biasTone = "bearish";
-            action = $"Fade at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}";
-        }
-        else if (buyerAbsorption)
-        {
-            bias = "Buyer Absorption";
-            biasTone = "bullish";
-            action = $"Squeeze at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}";
-        }
-        else if (deltaDivergence == "Bearish")
-        {
-            bias = "Bearish Divergence";
-            biasTone = "bearish";
-            action = $"Fade at {bar.High.ToString("F" + dec, CultureInfo.InvariantCulture)}";
-        }
-        else if (deltaDivergence == "Bullish")
-        {
-            bias = "Bullish Divergence";
-            biasTone = "bullish";
-            action = $"Squeeze at {bar.Low.ToString("F" + dec, CultureInfo.InvariantCulture)}";
-        }
-        else if (distinctSignals.Any(s => s.Tone == "bullish" && s.Type == "stacked_imbalance"))
-        {
-            bias = "Bullish Initiative";
-            biasTone = "bullish";
-            action = $"Buy at {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
-        }
-        else if (distinctSignals.Any(s => s.Tone == "bearish" && s.Type == "stacked_imbalance"))
-        {
-            bias = "Bearish Initiative";
-            biasTone = "bearish";
-            action = $"Sell at {pocPrice.ToString("F" + dec, CultureInfo.InvariantCulture)}";
-        }
-        else
+        if (top == null)
         {
             bias = "Rotational / Balance";
             biasTone = "neutral";
             action = "Stand Aside";
+            actionPrice = pocPrice;
+        }
+        else
+        {
+            biasTone = top.Tone;
+            actionPrice = top.Price > 0 ? top.Price : pocPrice;
+            var level = actionPrice.ToString("F" + dec, CultureInfo.InvariantCulture);
+
+            switch (top.Type)
+            {
+                case "trapped_traders":
+                    bias = top.Tone == "bearish" ? "Trapped Buyers" : "Trapped Sellers";
+                    action = (top.Tone == "bearish" ? "Fade at " : "Squeeze at ") + level;
+                    break;
+                case "absorption":
+                    bias = top.Tone == "bearish" ? "Seller Absorption" : "Buyer Absorption";
+                    action = (top.Tone == "bearish" ? "Fade at " : "Squeeze at ") + level;
+                    break;
+                case "divergence":
+                    bias = top.Tone == "bearish" ? "Bearish Divergence" : "Bullish Divergence";
+                    action = (top.Tone == "bearish" ? "Fade at " : "Squeeze at ") + level;
+                    break;
+                case "exhaustion":
+                    bias = top.Tone == "bearish" ? "Buying Exhaustion" : "Selling Exhaustion";
+                    action = (top.Tone == "bearish" ? "Fade at " : "Squeeze at ") + level;
+                    break;
+                default: // stacked_imbalance
+                    bias = top.Tone == "bearish" ? "Bearish Initiative" : "Bullish Initiative";
+                    action = (top.Tone == "bearish" ? "Sell at " : "Buy at ") + level;
+                    break;
+            }
         }
 
         var result = new OrderFlowContext
@@ -546,6 +560,7 @@ public static class FootprintAnalyzer
             Bias = bias,
             BiasTone = biasTone,
             Action = action,
+            ActionPrice = actionPrice,
             PocPrice = pocPrice,
             CurrentDelta = currentDelta,
             DeltaPercent = deltaPercent,
@@ -559,6 +574,81 @@ public static class FootprintAnalyzer
 
         _lastContext = result;
         return result;
+    }
+
+    // ============================================================
+    // ROLLING PER-LEVEL VOLUME BASELINE (mean / σ)
+    // Used by absorption to flag a price level whose one-sided aggressor
+    // volume is an outlier versus the recent distribution.
+    // ============================================================
+    private static void UpdateLevelVolumeStats()
+    {
+        var n = _recentLevelVolumes.Count;
+        if (n == 0)
+        {
+            _levelVolMean = 0;
+            _levelVolStd = 0;
+            return;
+        }
+
+        double sum = 0;
+        foreach (var v in _recentLevelVolumes)
+            sum += (double)v;
+        var mean = sum / n;
+
+        double sq = 0;
+        foreach (var v in _recentLevelVolumes)
+        {
+            var d = (double)v - mean;
+            sq += d * d;
+        }
+
+        _levelVolMean = mean;
+        _levelVolStd = Math.Sqrt(sq / n);
+    }
+
+    // ============================================================
+    // DELTA DIVERGENCE (windowed CVD vs price, confirmed at bar close)
+    // Bearish: new price high on a lower cumulative-delta high.
+    // Bullish: new price low on a higher cumulative-delta low.
+    // ============================================================
+    private static void ComputeDivergence(double tickSize)
+    {
+        _divergence = "None";
+        _divergencePrice = 0;
+
+        var n = _divergenceWindow.Count;
+        if (n < 3)
+            return;
+
+        var latest = _divergenceWindow[^1];
+
+        var priorHigh = double.MinValue;
+        var priorHighCvd = 0m;
+        var priorLow = double.MaxValue;
+        var priorLowCvd = 0m;
+
+        for (var i = 0; i < n - 1; i++)
+        {
+            var p = _divergenceWindow[i];
+            if (p.High >= priorHigh) { priorHigh = p.High; priorHighCvd = p.Cvd; }
+            if (p.Low <= priorLow) { priorLow = p.Low; priorLowCvd = p.Cvd; }
+        }
+
+        if (latest.High > priorHigh + tickSize * 0.5 &&
+            latest.Cvd < priorHighCvd &&
+            latest.Delta <= 0)
+        {
+            _divergence = "Bearish";
+            _divergencePrice = latest.High;
+        }
+        else if (latest.Low < priorLow - tickSize * 0.5 &&
+                 latest.Cvd > priorLowCvd &&
+                 latest.Delta >= 0)
+        {
+            _divergence = "Bullish";
+            _divergencePrice = latest.Low;
+        }
     }
 
     // ============================================================
@@ -653,43 +743,6 @@ public static class FootprintAnalyzer
                 return false;
         return true;
     }
-
-    /// <summary>
-    /// Legacy compatibility helper mapping context into render lines.
-    /// </summary>
-    public static List<FootprintRenderLine> Analyze(FootprintSnapshot snapshot, double tickSize)
-    {
-        var ctx = AnalyzeContext(snapshot, tickSize);
-        var lines = new List<FootprintRenderLine>();
-
-        if (!string.IsNullOrEmpty(ctx.Action))
-        {
-            lines.Add(new FootprintRenderLine
-            {
-                Text = $"{ctx.Bias}: {ctx.Action}",
-                Tone = ctx.BiasTone == "bullish" ? "up" : ctx.BiasTone == "bearish" ? "down" : "text"
-            });
-        }
-
-        foreach (var sig in ctx.Signals)
-        {
-            lines.Add(new FootprintRenderLine
-            {
-                Text = sig.Title,
-                Tone = sig.Tone == "bullish" ? "up" : sig.Tone == "bearish" ? "down" : "text"
-            });
-        }
-
-        return lines;
-    }
-
-    public static string FmtVol(decimal v) =>
-        Math.Abs(v) >= 1000
-            ? (v / 1000m).ToString("0.0", CultureInfo.InvariantCulture) + "k"
-            : v.ToString(CultureInfo.InvariantCulture);
-
-    public static string Signed(double v, int dec) =>
-        (v >= 0 ? "+" : "-") + Math.Abs(v).ToString("F" + dec, CultureInfo.InvariantCulture);
 
     public static int Decimals(double tickSize)
     {

@@ -40,19 +40,12 @@ public class FootprintRenderBar
     public List<FootprintRenderFooter> Footer { get; set; } = new();
 }
 
-public class FootprintRenderLine
-{
-    public string Text { get; set; } = "";
-    public string Tone { get; set; }
-}
-
 public class FootprintRenderSnapshot
 {
     public double RowSize { get; set; }
     public string[] FooterLabels { get; set; } = { "Delta", "Vol" };
     public Dictionary<string, string> Colors { get; set; } = new();
     public List<FootprintRenderBar> Bars { get; set; } = new();
-    public List<FootprintRenderLine> Analysis { get; set; }
     public OrderFlowContext Context { get; set; }
     public MarketInterpretation Interpretation { get; set; }
 }
@@ -102,7 +95,7 @@ public static class FootprintRenderBuilder
             MarkCurrentPrice(result.Bars[^1], currentPrice, tickSize);
 
         result.Context = FootprintAnalyzer.AnalyzeContext(snapshot, tickSize, currentPrice);
-        result.Interpretation = FootprintInterpreter.Interpret(result.Context, snapshot, tickSize, currentPrice);
+        result.Interpretation = FootprintInterpreter.Interpret(result.Context, snapshot, tickSize);
         return result;
     }
 
