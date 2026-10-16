@@ -24,11 +24,11 @@ public sealed record FootprintBarData(
 
 public sealed record FootprintSnapshot(
     FootprintBarData[] Completed,     // capped history, oldest first
-    FootprintBarData Current);       // in-progress bar (may be null)
+    FootprintBarData Current);       // in-progress bar (maybe null)
 
 public sealed class FootprintClassifier
 {
-    private enum Side { Buy, Sell }
+    private enum Side { AggressiveBuy, AggressiveSell }
 
     private sealed class Level { public decimal Bid, Ask; }
 
@@ -50,7 +50,7 @@ public sealed class FootprintClassifier
     private Q? _quote;
     private long _quoteTime = long.MinValue;
     private double _lastPrice = double.NaN;
-    private Side _lastSide = Side.Buy;
+    private Side _lastSide = Side.AggressiveBuy;
 
     // In-progress bar
     private Dictionary<long, Level> _levels = new();
@@ -166,18 +166,18 @@ public sealed class FootprintClassifier
 
         if (_quote is { } q)
         {
-            if (t.Price >= q.Ask - eps) return Remember(t, Side.Buy);
-            if (t.Price <= q.Bid + eps) return Remember(t, Side.Sell);
+            if (t.Price >= q.Ask - eps) return Remember(t, Side.AggressiveBuy);
+            if (t.Price <= q.Bid + eps) return Remember(t, Side.AggressiveSell);
 
             double mid = (q.Bid + q.Ask) / 2.0;
-            if (t.Price > mid + eps) return Remember(t, Side.Buy);
-            if (t.Price < mid - eps) return Remember(t, Side.Sell);
+            if (t.Price > mid + eps) return Remember(t, Side.AggressiveBuy);
+            if (t.Price < mid - eps) return Remember(t, Side.AggressiveSell);
         }
 
         if (!double.IsNaN(_lastPrice))
         {
-            if (t.Price > _lastPrice) return Remember(t, Side.Buy);
-            if (t.Price < _lastPrice) return Remember(t, Side.Sell);
+            if (t.Price > _lastPrice) return Remember(t, Side.AggressiveBuy);
+            if (t.Price < _lastPrice) return Remember(t, Side.AggressiveSell);
         }
         return Remember(t, _lastSide);
     }
@@ -200,7 +200,7 @@ public sealed class FootprintClassifier
 
         long ticks = (long)Math.Round(t.Price / _tickSize, MidpointRounding.AwayFromZero);
         if (!_levels.TryGetValue(ticks, out var lvl)) _levels[ticks] = lvl = new Level();
-        if (side == Side.Buy) lvl.Ask += t.Size; else lvl.Bid += t.Size;
+        if (side == Side.AggressiveBuy) lvl.Ask += t.Size; else lvl.Bid += t.Size;
 
         if (_count >= _tradesPerBar)
         {
