@@ -19,6 +19,8 @@ namespace NinjaTrader.NinjaScript.Indicators
 		private const float InnerWidth = 450f;
 		private const float PadX = 12f;
 		private const float PadY = 10f;
+		private const float PanelOffsetX = 14f;
+		private const float PanelOffsetY = 60f;
 
 		private static readonly SharpDX.Color ColSection = new SharpDX.Color(120, 190, 255);
 		private static readonly SharpDX.Color ColDim = new SharpDX.Color(165, 168, 175);
@@ -364,8 +366,8 @@ namespace NinjaTrader.NinjaScript.Indicators
 			if (_cachedLayouts == null || _cachedVersion != version || _cachedLayouts.Count != lines.Count)
 				RebuildLayouts(lines, version);
 
-			var panelX = ChartPanel.X + ChartPanel.W - _cachedPanelW - 14f;
-			var panelY = ChartPanel.Y + 14f;
+			var panelX = ChartPanel.X + ChartPanel.W - _cachedPanelW - PanelOffsetX;
+			var panelY = ChartPanel.Y + PanelOffsetY;
 			var rect = new SharpDX.RectangleF(panelX, panelY, _cachedPanelW, _cachedPanelH);
 
 			using (var bg = new SolidColorBrush(RenderTarget, new SharpDX.Color4(0.04f, 0.05f, 0.07f, 0.86f)))
