@@ -14,7 +14,6 @@ namespace FootPrintTrader.Helper
 		public string Tone { get; set; } = "neutral";
 		public double Price { get; set; }
 		public int Priority { get; set; } = 5;
-		public string Description { get; set; } = "";
 		public string Time { get; set; } = "";
 	}
 
@@ -303,7 +302,6 @@ namespace FootPrintTrader.Helper
 								Tone = "bearish",
 								Price = zone.LowPrice,
 								Priority = PriorityTrapped,
-								Description = "Price traded below the buy imbalance at " + P(zone.LowPrice) + "; buyers are stuck offside.",
 								Time = T(zone.BarStartTime)
 							});
 						}
@@ -317,7 +315,6 @@ namespace FootPrintTrader.Helper
 								Tone = "bullish",
 								Price = zone.LowPrice,
 								Priority = PriorityRetest,
-								Description = "Pullback testing the buy imbalance zone " + P(zone.LowPrice) + "-" + P(zone.HighPrice) + " from above.",
 								Time = T(zone.BarStartTime)
 							});
 						}
@@ -330,7 +327,6 @@ namespace FootPrintTrader.Helper
 								Tone = "bullish",
 								Price = zone.LowPrice,
 								Priority = PriorityRetest,
-								Description = "Fresh buy imbalance " + P(zone.LowPrice) + "-" + P(zone.HighPrice) + " holding as support.",
 								Time = T(zone.BarStartTime)
 							});
 						}
@@ -347,7 +343,6 @@ namespace FootPrintTrader.Helper
 								Tone = "bullish",
 								Price = zone.HighPrice,
 								Priority = PriorityTrapped,
-								Description = "Price traded above the sell imbalance at " + P(zone.HighPrice) + "; sellers are stuck offside.",
 								Time = T(zone.BarStartTime)
 							});
 						}
@@ -361,7 +356,6 @@ namespace FootPrintTrader.Helper
 								Tone = "bearish",
 								Price = zone.HighPrice,
 								Priority = PriorityRetest,
-								Description = "Rally testing the sell imbalance zone " + P(zone.LowPrice) + "-" + P(zone.HighPrice) + " from below.",
 								Time = T(zone.BarStartTime)
 							});
 						}
@@ -374,7 +368,6 @@ namespace FootPrintTrader.Helper
 								Tone = "bearish",
 								Price = zone.HighPrice,
 								Priority = PriorityRetest,
-								Description = "Fresh sell imbalance " + P(zone.LowPrice) + "-" + P(zone.HighPrice) + " holding as resistance.",
 								Time = T(zone.BarStartTime)
 							});
 						}
@@ -405,7 +398,6 @@ namespace FootPrintTrader.Helper
 								Tone = "bearish",
 								Price = imb.EndP,
 								Priority = PriorityRetest,
-								Description = "Stacked buying into the bar high at " + P(imb.EndP) + " with price failing to advance; fade candidate.",
 								Time = T(current.StartTime)
 							});
 						}
@@ -418,7 +410,6 @@ namespace FootPrintTrader.Helper
 								Tone = "bullish",
 								Price = imb.EndP,
 								Priority = PriorityDeveloping,
-								Description = "3+ consecutive diagonal buy imbalances topping out at " + P(imb.EndP) + "; buyers lifting offers.",
 								Time = T(current.StartTime)
 							});
 						}
@@ -438,7 +429,6 @@ namespace FootPrintTrader.Helper
 								Tone = "bullish",
 								Price = imb.StartP,
 								Priority = PriorityRetest,
-								Description = "Stacked selling into the bar low at " + P(imb.StartP) + " with price failing to break down; squeeze candidate.",
 								Time = T(current.StartTime)
 							});
 						}
@@ -451,7 +441,6 @@ namespace FootPrintTrader.Helper
 								Tone = "bearish",
 								Price = imb.StartP,
 								Priority = PriorityDeveloping,
-								Description = "3+ consecutive diagonal sell imbalances bottoming at " + P(imb.StartP) + "; sellers hitting bids.",
 								Time = T(current.StartTime)
 							});
 						}
@@ -505,9 +494,6 @@ namespace FootPrintTrader.Helper
 							Tone = c.SellerAbsorption ? "bearish" : "bullish",
 							Price = c.Price,
 							Priority = PriorityAbsorption,
-							Description = c.SellerAbsorption
-								? "Heavy aggressive buying at " + P(c.Price) + " absorbed; price rejected " + AbsorptionDepthTicks + " ticks lower."
-								: "Heavy aggressive selling at " + P(c.Price) + " absorbed; price rejected " + AbsorptionDepthTicks + " ticks higher.",
 							Time = T(c.BarStart)
 						});
 					}
@@ -524,9 +510,6 @@ namespace FootPrintTrader.Helper
 					Tone = deltaDivergence == "Bearish" ? "bearish" : "bullish",
 					Price = _divergencePrice,
 					Priority = PriorityDivergence,
-					Description = deltaDivergence == "Bearish"
-						? "New high at " + P(_divergencePrice) + " on weaker cumulative delta; buyers losing conviction."
-						: "New low at " + P(_divergencePrice) + " on stronger cumulative delta; sellers losing conviction.",
 					Time = T(_divergenceBarStart)
 				});
 			}
@@ -543,9 +526,6 @@ namespace FootPrintTrader.Helper
 						Tone = ua.IsHigh ? "bullish" : "bearish",
 						Price = ua.Price,
 						Priority = PriorityUnfinished,
-						Description = ua.IsHigh
-							? "Sellers also traded the bar high at " + P(ua.Price) + "; the high is unfinished and may be revisited."
-							: "Buyers also traded the bar low at " + P(ua.Price) + "; the low is unfinished and may be revisited.",
 						Time = T(ua.BarStart)
 					});
 				}

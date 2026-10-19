@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
 using NinjaTrader.Cbi;
 using NinjaTrader.Gui.Chart;
 using NinjaTrader.NinjaScript.BarsTypes;
@@ -21,7 +20,6 @@ namespace NinjaTrader.NinjaScript.Indicators
 		private const float PadX = 12f;
 		private const float PadY = 10f;
 
-		private static readonly SharpDX.Color ColGold = new SharpDX.Color(255, 196, 61);
 		private static readonly SharpDX.Color ColSection = new SharpDX.Color(120, 190, 255);
 		private static readonly SharpDX.Color ColDim = new SharpDX.Color(165, 168, 175);
 		private static readonly SharpDX.Color ColWhite = new SharpDX.Color(235, 235, 235);
@@ -33,7 +31,6 @@ namespace NinjaTrader.NinjaScript.Indicators
 		private TextFormat _fmtNormal;
 		private TextFormat _fmtBold;
 		private TextFormat _fmtSmall;
-		private TextFormat _fmtHeader;
 
 		private FootprintSnapshot _snapshot;
 		private OrderFlowContext _ctx;
@@ -84,7 +81,6 @@ namespace NinjaTrader.NinjaScript.Indicators
 				if (_fmtNormal != null) { _fmtNormal.Dispose(); _fmtNormal = null; }
 				if (_fmtBold != null) { _fmtBold.Dispose(); _fmtBold = null; }
 				if (_fmtSmall != null) { _fmtSmall.Dispose(); _fmtSmall = null; }
-				if (_fmtHeader != null) { _fmtHeader.Dispose(); _fmtHeader = null; }
 
 				if (_cachedLayouts != null)
 				{
@@ -246,13 +242,6 @@ namespace NinjaTrader.NinjaScript.Indicators
 			_fmtNormal = new TextFormat(factory, "Consolas", 13f);
 			_fmtBold = new TextFormat(factory, "Consolas", FontWeight.Bold, FontStyle.Normal, 13f);
 			_fmtSmall = new TextFormat(factory, "Consolas", 11f);
-			_fmtHeader = new TextFormat(factory, "Consolas", FontWeight.Bold, FontStyle.Normal, 14f);
-		}
-
-		private string P(double v)
-		{
-			var dec = FootprintAnalyzer.Decimals(TickSize);
-			return v.ToString("F" + dec, CultureInfo.InvariantCulture);
 		}
 
 		private static PanelLine Line(string text, SharpDX.Color color, TextFormat fmt, float gap)
@@ -275,8 +264,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 		{
 			var lines = new List<PanelLine>();
 
-			lines.Add(Line("FOOTPRINT ALERTS", ColGold, _fmtHeader, 0f));
-			lines.Add(Line(_status ?? "", ColDim, _fmtSmall, 2f));
+			lines.Add(Line(_status ?? "", ColDim, _fmtSmall, 0f));
 
 			if (_snapshot == null)
 			{
@@ -304,10 +292,6 @@ namespace NinjaTrader.NinjaScript.Indicators
 			{
 				lines.Add(Line("Bias: " + ctx.Bias, ToneColor(ctx.BiasTone), _fmtBold, 3f));
 				lines.Add(Line("Action: " + ctx.Action, ColWhite, _fmtNormal, 1f));
-				lines.Add(Line("POC " + P(ctx.PocPrice) + "  (" + ctx.PocPosition + " / " + ctx.PocMigration + ")", ColDim, _fmtSmall, 1f));
-				var dsign = ctx.CurrentDelta >= 0 ? "+" : "";
-				lines.Add(Line("Delta " + dsign + ctx.CurrentDelta.ToString("0") + " (" + ctx.DeltaPercent.ToString("0.0") + "%)   Vol " + ctx.CurrentVolume.ToString("0"), ColDim, _fmtSmall, 1f));
-				lines.Add(Line("CVD " + ctx.CumulativeDelta.ToString("0") + "   Divergence: " + ctx.DeltaDivergence, ColDim, _fmtSmall, 1f));
 			}
 			else
 			{
@@ -326,9 +310,6 @@ namespace NinjaTrader.NinjaScript.Indicators
 
 					var time = string.IsNullOrEmpty(s.Time) ? "" : "  [" + s.Time + "]";
 					lines.Add(Line("- " + s.Title + time, ToneColor(s.Tone), _fmtBold, 3f));
-
-					if (!string.IsNullOrEmpty(s.Description))
-						lines.Add(Line("   " + s.Description, ColDim, _fmtSmall, 1f));
 				}
 			}
 			else
