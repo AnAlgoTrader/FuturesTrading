@@ -13,6 +13,18 @@ using FootPrintTrader.Helper;
 
 namespace NinjaTrader.NinjaScript.Indicators
 {
+	// SCOPE: daytrading panel for ONE instrument over a short intraday session (a couple of hours).
+	// It is not expected to run across multiple sessions or switch instruments.
+	//
+	// Deliberate omissions (do not "fix" these):
+	// - No state reset on State.Configure. _analyzer (_cumulativeDelta, _processedBars,
+	//   _activeZones, baselines), _completedCache and _snapshot/_ctx/_interp carry over
+	//   across a reconfigure. That is acceptable here: the only realistic reconfigures are
+	//   a bar-period change or a template reload mid-session, and the panel is rebuilt from
+	//   scratch within a few bars anyway. Resetting would trade a real edge case for churn
+	//   in code that is otherwise stable.
+	// - No multi-session handling: cumulative delta, volume baselines and level-volume stats
+	//   are session-scoped by design and are never rolled over or persisted.
 	public class FootprintAlertPanel : Indicator
 	{
 		private const int CompletedBars = 25;
@@ -35,6 +47,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 		private TextFormat _fmtSmall;
 
 		private FootprintSnapshot _snapshot;
+		private FootprintAnalyzer _analyzer;
 		private OrderFlowContext _ctx;
 		private MarketInterpretation _interp;
 		private string _status = "";
@@ -62,6 +75,56 @@ namespace NinjaTrader.NinjaScript.Indicators
 		[Display(Name = "Update interval (ms)", Description = "Minimum milliseconds between recomputations (0 = every incoming tick).", Order = 1, GroupName = "Parameters")]
 		public int UpdateIntervalMs { get; set; }
 
+		// --- Order flow thresholds ---------------------------------------------
+		// Every value is a ratio, a percentage of a rolling baseline, or a bar count. There are
+		// no absolute trade-count or tick-distance thresholds, so the detector tracks volatility
+		// as it moves within the session. Percent values are whole numbers (25 = 25%).
+
+		[NinjaScriptProperty]
+		[Range(1.5, 10.0)]
+		[Display(Name = "Imbalance ratio", Description = "ask[i+1] must be at least this multiple of bid[i] on adjacent levels. A ratio, not a percent.", Order = 1, GroupName = "Order Flow")]
+		public double ImbalanceRatio { get; set; }
+
+		[NinjaScriptProperty]
+		[Range(1, 100)]
+		[Display(Name = "Imbalance run (% of avg range)", Description = "A run must span at least this % of the recent average bar range to count as stacked.", Order = 2, GroupName = "Order Flow")]
+		public double ImbalanceRunRangePct { get; set; }
+
+		[NinjaScriptProperty]
+		[Range(1, 100)]
+		[Display(Name = "Min bar volume (% of avg)", Description = "A bar must carry at least this % of the recent average bar volume to be considered.", Order = 3, GroupName = "Order Flow")]
+		public double MinBarVolumePct { get; set; }
+
+		[NinjaScriptProperty]
+		[Range(0, 50)]
+		[Display(Name = "Min level volume (% of bar avg)", Description = "A price level must carry at least this % of its bar's average level volume.", Order = 4, GroupName = "Order Flow")]
+		public double MinLevelVolumePct { get; set; }
+
+		[NinjaScriptProperty]
+		[Range(0, 100)]
+		[Display(Name = "Min live trades (% of avg)", Description = "The live bar must show at least this % of the recent average trade count before live signals fire.", Order = 5, GroupName = "Order Flow")]
+		public double MinLiveTradesPct { get; set; }
+
+		[NinjaScriptProperty]
+		[Range(1.0, 8.0)]
+		[Display(Name = "Absorption sigma", Description = "A level qualifies as absorption above mean + sigma x std-dev of recent level volumes.", Order = 6, GroupName = "Order Flow")]
+		public double AbsorptionSigma { get; set; }
+
+		[NinjaScriptProperty]
+		[Range(1, 100)]
+		[Display(Name = "Absorption edge (% of avg range)", Description = "The absorption level must sit within this % of the recent average bar range from the extreme.", Order = 7, GroupName = "Order Flow")]
+		public double AbsorptionEdgePct { get; set; }
+
+		[NinjaScriptProperty]
+		[Range(50, 100)]
+		[Display(Name = "Absorption side dominance (% of level)", Description = "One aggressor side must account for at least this % of the level's total volume.", Order = 8, GroupName = "Order Flow")]
+		public double AbsorptionSidePct { get; set; }
+
+		[NinjaScriptProperty]
+		[Range(1, 25)]
+		[Display(Name = "Zone age (bars)", Description = "How many bars a stacked-imbalance zone stays active before it is discarded.", Order = 9, GroupName = "Order Flow")]
+		public int MaxZoneAgeBars { get; set; }
+
 		protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
@@ -77,6 +140,17 @@ namespace NinjaTrader.NinjaScript.Indicators
 				PaintPriceMarkers			= false;
 				ScaleJustification			= ScaleJustification.Right;
 				UpdateIntervalMs			= 2000;
+
+				// Order Flow defaults. Kept in sync with FootprintSettings.
+				ImbalanceRatio				= 3.0;
+				ImbalanceRunRangePct		= 25;
+				MinBarVolumePct				= 25;
+				MinLevelVolumePct			= 5;
+				MinLiveTradesPct			= 60;
+				AbsorptionSigma				= 3.0;
+				AbsorptionEdgePct			= 25;
+				AbsorptionSidePct			= 60;
+				MaxZoneAgeBars				= 8;
 			}
 			else if (State == State.Terminated)
 			{
@@ -107,9 +181,12 @@ namespace NinjaTrader.NinjaScript.Indicators
 
 			try
 			{
+				if (_analyzer == null)
+					_analyzer = new FootprintAnalyzer(BuildSettings());
+
 				var snapshot = BuildSnapshot();
 				_snapshot = snapshot;
-				_ctx = FootprintAnalyzer.AnalyzeContext(snapshot, TickSize, Close[0]);
+				_ctx = _analyzer.AnalyzeContext(snapshot, TickSize, Close[0]);
 				_interp = FootprintInterpreter.Interpret(_ctx, snapshot, TickSize);
 				_status = "Updated " + Time[0].ToString("HH:mm:ss") + "  |  Bar " + CurrentBar;
 			}
@@ -119,6 +196,22 @@ namespace NinjaTrader.NinjaScript.Indicators
 			}
 
 			RefreshLines();
+		}
+
+		private FootprintSettings BuildSettings()
+		{
+			return new FootprintSettings
+			{
+				ImbalanceRatio			= ImbalanceRatio,
+				ImbalanceRunRangePct	= ImbalanceRunRangePct,
+				MinBarVolumePct			= MinBarVolumePct,
+				MinLevelVolumePct		= MinLevelVolumePct,
+				MinLiveTradesPct		= MinLiveTradesPct,
+				AbsorptionSigma			= AbsorptionSigma,
+				AbsorptionEdgePct		= AbsorptionEdgePct,
+				AbsorptionSidePct		= AbsorptionSidePct,
+				MaxZoneAgeBars			= MaxZoneAgeBars
+			};
 		}
 
 		private void RefreshLines()
@@ -274,36 +367,33 @@ namespace NinjaTrader.NinjaScript.Indicators
 				return lines;
 			}
 
-			lines.Add(Line("INTERPRETATION", ColSection, _fmtBold, 10f));
+			// Only sections with something actionable are drawn: no "nothing is happening"
+			// placeholders. On a quiet bar the panel is the status line and the auction bias.
 			if (_interp != null && !string.IsNullOrEmpty(_interp.Title))
 			{
+				lines.Add(Line("INTERPRETATION", ColSection, _fmtBold, 10f));
 				lines.Add(Line(_interp.Title, ToneColor(_interp.Tone), _fmtBold, 3f));
 				if (!string.IsNullOrEmpty(_interp.Action))
 					lines.Add(Line("Action: " + _interp.Action, ToneColor(_interp.Tone), _fmtNormal, 1f));
 				if (!string.IsNullOrEmpty(_interp.Details))
 					lines.Add(Line(_interp.Details, ColDim, _fmtSmall, 1f));
 			}
-			else
-			{
-				lines.Add(Line("No actionable structure.", ColNeutral, _fmtNormal, 3f));
-			}
 
 			var ctx = _ctx;
-			lines.Add(Line("AUCTION BIAS", ColSection, _fmtBold, 10f));
 			if (ctx != null)
 			{
+				lines.Add(Line("AUCTION BIAS", ColSection, _fmtBold, 10f));
 				lines.Add(Line("Bias: " + ctx.Bias, ToneColor(ctx.BiasTone), _fmtBold, 3f));
 				lines.Add(Line("Action: " + ctx.Action, ColWhite, _fmtNormal, 1f));
-			}
-			else
-			{
-				lines.Add(Line("-", ColNeutral, _fmtNormal, 3f));
+				lines.Add(Line("Structure: " + ctx.StructureBias + " (" +
+					(ctx.StructureScore >= 0 ? "+" : "") + ctx.StructureScore + "/4)",
+					ToneColor(ctx.StructureTone), _fmtSmall, 1f));
 			}
 
-			lines.Add(Line("ORDER FLOW MESSAGES", ColSection, _fmtBold, 10f));
 			var sigs = ctx != null ? ctx.Signals : null;
 			if (sigs != null && sigs.Count > 0)
 			{
+				lines.Add(Line("ORDER FLOW MESSAGES", ColSection, _fmtBold, 10f));
 				var n = 0;
 				foreach (var s in sigs)
 				{
@@ -313,10 +403,6 @@ namespace NinjaTrader.NinjaScript.Indicators
 					var time = string.IsNullOrEmpty(s.Time) ? "" : "  [" + s.Time + "]";
 					lines.Add(Line("- " + s.Title + time, ToneColor(s.Tone), _fmtBold, 3f));
 				}
-			}
-			else
-			{
-				lines.Add(Line("No high-conviction signals.", ColNeutral, _fmtNormal, 3f));
 			}
 
 			return lines;

@@ -17,7 +17,12 @@ namespace FootPrintTrader.Helper
 
 	public static class FootprintInterpreter
 	{
+		// Fallback only, used before enough completed bars exist to establish an average range.
 		public const int MinTicksForTrade = 10;
+
+		// The last bar is "compressed" when its range is under this fraction of the recent
+		// average bar range. Relative, so it means the same thing on any instrument.
+		private const double MinCompressedRangeRatio = 0.4;
 
 		public static MarketInterpretation Interpret(
 			OrderFlowContext context,
@@ -44,24 +49,31 @@ namespace FootPrintTrader.Helper
 
 			var refBar = completed.Length > 0 ? completed[completed.Length - 1] : bar;
 			var range = Math.Max(0, refBar.High - refBar.Low);
+			var rangeText = range.ToString("F" + dec, CultureInfo.InvariantCulture);
+
+			var compressed = context.AvgBarRange > 0
+				? range < context.AvgBarRange * MinCompressedRangeRatio
+				: range < tickSize * MinTicksForTrade;
 
 			if (hasBullStrong && hasBearStrong)
 			{
 				interp.Title = "Conflicting Auction (Bracket)";
 				interp.Tone = "warning";
 				interp.Action = "STAND ASIDE";
-				interp.Details = range < tickSize * MinTicksForTrade
-					? "Opposing structural flow inside a compressed " + range.ToString("F" + dec, CultureInfo.InvariantCulture) + "-pt range."
+				interp.Details = compressed
+					? "Opposing structural flow inside a compressed " + rangeText + "-pt range."
 					: "Opposing structural flow. Wait for one side to take control.";
 				return interp;
 			}
 
-			if (range < tickSize * MinTicksForTrade && context.Bias != "Rotational / Balance")
+			if (compressed && context.Bias != "Rotational / Balance")
 			{
 				interp.Title = context.Bias + " (Range Compressed)";
 				interp.Tone = "warning";
 				interp.Action = "STAND ASIDE";
-				interp.Details = "Prior bar range is only " + range.ToString("F" + dec, CultureInfo.InvariantCulture) + " pts. Poor risk/reward.";
+				interp.Details = "Prior bar range is only " + rangeText + " pts vs a " +
+					context.AvgBarRange.ToString("F" + dec, CultureInfo.InvariantCulture) +
+					"-pt average. Poor risk/reward.";
 				return interp;
 			}
 
@@ -70,18 +82,13 @@ namespace FootPrintTrader.Helper
 
 			var level = context.ActionPrice > 0 ? context.ActionPrice : context.PocPrice;
 
-			if (context.Bias == "Unfinished High" || context.Bias == "Unfinished Low")
-			{
-				interp.Title = context.Bias;
-				interp.Tone = context.BiasTone;
-				interp.Action = context.Action;
-				interp.Details = Describe(context, level, P);
-				return interp;
-			}
-
 			interp.Title = context.Bias;
 			interp.Tone = context.BiasTone;
-			interp.Action = context.BiasTone == "bearish" ? "SHORT @ " + P(level) : "LONG @ " + P(level);
+
+			// The analyzer owns the action wording. Rewriting it here used to produce
+			// "SHORT @ <level below market>" for a retest entry, which reads as a market order
+			// at an unfillable price.
+			interp.Action = context.Action;
 			interp.Details = Describe(context, level, P);
 
 			return interp;
@@ -97,8 +104,8 @@ namespace FootPrintTrader.Helper
 			{
 				case "trapped_traders":
 					return top.Tone == "bearish"
-						? "Longs trapped below " + P(level) + ". Look for continuation lower."
-						: "Shorts trapped above " + P(level) + ". Look for a squeeze higher.";
+						? "Longs trapped below " + P(level) + ". Expect a failed retest of " + P(level) + "."
+						: "Shorts trapped above " + P(level) + ". Expect a failed retest of " + P(level) + ".";
 				case "absorption":
 					return top.Tone == "bearish"
 						? "Heavy buying absorbed at " + P(level) + "; seller defending the high."
@@ -111,10 +118,6 @@ namespace FootPrintTrader.Helper
 					return top.Tone == "bearish"
 						? "Buying exhaustion at " + P(level) + "."
 						: "Selling exhaustion at " + P(level) + ".";
-				case "unfinished_auction":
-					return top.Tone == "bearish"
-						? "Unfinished low at " + P(level) + ": buyers and sellers both traded the extreme; the auction is unfinished and may be revisited."
-						: "Unfinished high at " + P(level) + ": buyers and sellers both traded the extreme; the auction is unfinished and may be revisited.";
 				default:
 					return top.Tone == "bearish"
 						? "Aggressive sellers in control. Sell rallies to " + P(level) + "."

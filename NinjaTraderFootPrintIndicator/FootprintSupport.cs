@@ -33,6 +33,51 @@ namespace FootPrintTrader.Helper
 		public FootprintBarData Current { get; set; }
 	}
 
+	// Tunable order-flow thresholds.
+	//
+	// Every value is either a ratio between two volumes, a percentage of a rolling baseline
+	// (average bar volume / range / trade count over the recent window), or a bar count for a
+	// time horizon. There are no absolute price or trade-count thresholds, so the detector
+	// tracks volatility as it changes within the session instead of being tuned to one
+	// instrument's typical range.
+	//
+	// Percent values are whole numbers: 25 means 25%, not 0.25.
+	public class FootprintSettings
+	{
+		// ask[i+1] >= bid[i] * ratio on adjacent price levels. Already a ratio, not a percent.
+		public double ImbalanceRatio { get; set; } = 3.0;
+
+		// An imbalance run must span at least this % of the recent average bar range before it
+		// counts as "stacked". Replaces a fixed level count.
+		public double ImbalanceRunRangePct { get; set; } = 25;
+
+		// A bar must carry at least this % of the recent average bar volume to be considered.
+		public double MinBarVolumePct { get; set; } = 25;
+
+		// An individual price level must carry at least this % of its own bar's average level
+		// volume, filtering out levels that are too thin to read.
+		public double MinLevelVolumePct { get; set; } = 5;
+
+		// The live bar must show at least this % of the recent average trade count before
+		// live-bar signals (stacked imbalance, exhaustion, absorption) are allowed.
+		public double MinLiveTradesPct { get; set; } = 60;
+
+		// A level qualifies as absorption when its volume exceeds mean + sigma * std-dev of the
+		// rolling level-volume distribution.
+		public double AbsorptionSigma { get; set; } = 3.0;
+
+		// The absorption level must sit within this % of the recent average bar range from the
+		// bar's extreme. Replaces a fixed tick distance.
+		public double AbsorptionEdgePct { get; set; } = 25;
+
+		// One aggressor side must account for at least this % of the level's total volume.
+		public double AbsorptionSidePct { get; set; } = 60;
+
+		// How many bars a stacked-imbalance zone stays active before it is discarded.
+		// Deliberately in bars, not percent: this is a time horizon, not a volatility measure.
+		public int MaxZoneAgeBars { get; set; } = 8;
+	}
+
 	// Formatting helpers shared by the analyzer / interpreter / panel.
 	public static class FootprintRenderBuilder
 	{
