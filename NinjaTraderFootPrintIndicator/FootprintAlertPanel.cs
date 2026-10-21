@@ -139,18 +139,18 @@ namespace NinjaTrader.NinjaScript.Indicators
 				DrawOnPricePanel			= true;
 				PaintPriceMarkers			= false;
 				ScaleJustification			= ScaleJustification.Right;
-				UpdateIntervalMs			= 2000;
+				UpdateIntervalMs			= 500;
 
 				// Order Flow defaults. Kept in sync with FootprintSettings.
 				ImbalanceRatio				= 3.0;
 				ImbalanceRunRangePct		= 25;
 				MinBarVolumePct				= 25;
-				MinLevelVolumePct			= 5;
-				MinLiveTradesPct			= 60;
+				MinLevelVolumePct			= 25;
+				MinLiveTradesPct			= 35;
 				AbsorptionSigma				= 3.0;
 				AbsorptionEdgePct			= 25;
 				AbsorptionSidePct			= 60;
-				MaxZoneAgeBars				= 8;
+				MaxZoneAgeBars				= 20;
 			}
 			else if (State == State.Terminated)
 			{
@@ -367,11 +367,13 @@ namespace NinjaTrader.NinjaScript.Indicators
 				return lines;
 			}
 
-			// Only sections with something actionable are drawn: no "nothing is happening"
-			// placeholders. On a quiet bar the panel is the status line and the auction bias.
+			// Section headers are always drawn; only the content under them is conditional.
+			// In a neutral state the auction bias content is omitted entirely — no
+			// "Stand Aside", no "Rotational / Balance", no "(0/4)" score — the header
+			// stays visible with nothing under it (RULESET.md section 8).
+			lines.Add(Line("INTERPRETATION", ColSection, _fmtBold, 10f));
 			if (_interp != null && !string.IsNullOrEmpty(_interp.Title))
 			{
-				lines.Add(Line("INTERPRETATION", ColSection, _fmtBold, 10f));
 				lines.Add(Line(_interp.Title, ToneColor(_interp.Tone), _fmtBold, 3f));
 				if (!string.IsNullOrEmpty(_interp.Action))
 					lines.Add(Line("Action: " + _interp.Action, ToneColor(_interp.Tone), _fmtNormal, 1f));
@@ -380,9 +382,10 @@ namespace NinjaTrader.NinjaScript.Indicators
 			}
 
 			var ctx = _ctx;
-			if (ctx != null)
+
+			lines.Add(Line("AUCTION BIAS", ColSection, _fmtBold, 10f));
+			if (ctx != null && !IsNeutralState(ctx))
 			{
-				lines.Add(Line("AUCTION BIAS", ColSection, _fmtBold, 10f));
 				lines.Add(Line("Bias: " + ctx.Bias, ToneColor(ctx.BiasTone), _fmtBold, 3f));
 				lines.Add(Line("Action: " + ctx.Action, ColWhite, _fmtNormal, 1f));
 				lines.Add(Line("Structure: " + ctx.StructureBias + " (" +
@@ -390,10 +393,10 @@ namespace NinjaTrader.NinjaScript.Indicators
 					ToneColor(ctx.StructureTone), _fmtSmall, 1f));
 			}
 
+			lines.Add(Line("ORDER FLOW MESSAGES", ColSection, _fmtBold, 10f));
 			var sigs = ctx != null ? ctx.Signals : null;
 			if (sigs != null && sigs.Count > 0)
 			{
-				lines.Add(Line("ORDER FLOW MESSAGES", ColSection, _fmtBold, 10f));
 				var n = 0;
 				foreach (var s in sigs)
 				{
@@ -406,6 +409,22 @@ namespace NinjaTrader.NinjaScript.Indicators
 			}
 
 			return lines;
+		}
+
+		// Neutral state: structural balance with no structural (P1-P4) signal to set the
+		// headline. Retests and developing imbalances do not count — they stay listed under
+		// ORDER FLOW MESSAGES but never make the auction bias non-neutral.
+		private static bool IsNeutralState(OrderFlowContext ctx)
+		{
+			if (ctx.StructureBias != "Rotational / Balance")
+				return false;
+
+			if (ctx.Signals != null)
+				foreach (var s in ctx.Signals)
+					if (s.Priority <= FootprintAnalyzer.PriorityDivergence)
+						return false;
+
+			return true;
 		}
 
 		private void RebuildLayouts(List<PanelLine> lines, int version)

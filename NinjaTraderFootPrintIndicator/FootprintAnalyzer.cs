@@ -593,7 +593,9 @@ namespace FootPrintTrader.Helper
 			// Structural bias is the base layer; only trapped / absorption / exhaustion /
 			// divergence can override it. Retests and developing imbalances stay in the signal
 			// list but no longer get to set the headline, so the panel reports what the market
-			// is actually doing between events instead of defaulting to "Stand Aside".
+			// is actually doing between events. A neutral structure produces no action message
+			// at all: the panel leaves the auction bias content empty rather than printing a
+			// stand-aside line (RULESET.md sections 5 and 7).
 			var structure = ComputeStructureBias(tickSize, _avgBarVolume);
 			var top = distinctSignals.FirstOrDefault(s => s.Priority <= PriorityDivergence);
 
@@ -610,7 +612,7 @@ namespace FootPrintTrader.Helper
 				actionPrice = pocPrice;
 				action = structure.Tone == "bullish" ? "Buy pullbacks to " + pocLevel
 					: structure.Tone == "bearish" ? "Sell rallies to " + pocLevel
-					: "Stand Aside";
+					: "";
 			}
 			else
 			{

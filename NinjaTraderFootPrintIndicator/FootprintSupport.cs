@@ -42,6 +42,9 @@ namespace FootPrintTrader.Helper
 	// instrument's typical range.
 	//
 	// Percent values are whole numbers: 25 means 25%, not 0.25.
+	//
+	// Defaults are tuned for ES on 1000-tick bars during RTH (see RULESET.md, section
+	// "Default profile"). On other instruments or bar types, re-tune against ATR(20).
 	public class FootprintSettings
 	{
 		// ask[i+1] >= bid[i] * ratio on adjacent price levels. Already a ratio, not a percent.
@@ -55,12 +58,15 @@ namespace FootPrintTrader.Helper
 		public double MinBarVolumePct { get; set; } = 25;
 
 		// An individual price level must carry at least this % of its own bar's average level
-		// volume, filtering out levels that are too thin to read.
-		public double MinLevelVolumePct { get; set; } = 5;
+		// volume, filtering out levels that are too thin to read. 5% was barely a filter: it
+		// let thin prints form imbalances wherever the opposite side was zero.
+		public double MinLevelVolumePct { get; set; } = 25;
 
 		// The live bar must show at least this % of the recent average trade count before
-		// live-bar signals (stacked imbalance, exhaustion, absorption) are allowed.
-		public double MinLiveTradesPct { get; set; } = 60;
+		// live-bar signals (stacked imbalance, exhaustion, absorption) are allowed. On tick
+		// bars every completed bar holds ~bar-period trades, so this is effectively "bar is
+		// X% complete": 60 delayed live signals to the end of a ~30 s bar.
+		public double MinLiveTradesPct { get; set; } = 35;
 
 		// A level qualifies as absorption when its volume exceeds mean + sigma * std-dev of the
 		// rolling level-volume distribution.
@@ -75,7 +81,8 @@ namespace FootPrintTrader.Helper
 
 		// How many bars a stacked-imbalance zone stays active before it is discarded.
 		// Deliberately in bars, not percent: this is a time horizon, not a volatility measure.
-		public int MaxZoneAgeBars { get; set; } = 8;
+		// 20 bars is ~10 min on 1000-tick bars, and matches the 25-bar snapshot size.
+		public int MaxZoneAgeBars { get; set; } = 20;
 	}
 
 	// Formatting helpers shared by the analyzer / interpreter / panel.
