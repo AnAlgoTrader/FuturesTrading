@@ -28,6 +28,11 @@ namespace NinjaTrader.NinjaScript.Indicators
 	//   parameter change applies on the next tick while the analyzer state survives.
 	// - No multi-session handling: cumulative delta, volume baselines and level-volume stats
 	//   are session-scoped by design and are never rolled over or persisted.
+	//
+	// The processed-bar set is keyed on bar StartTime (unix seconds), not on bar index.
+	// That is what makes the reconfigure case above safe: after a bar-period change or
+	// template reload, a bar that is re-evaluated with a shifted CurrentBar still has the
+	// same StartTime and is not double-counted into CVD or the baselines.
 	public class FootprintAlertPanel : Indicator
 	{
 		private const int CompletedBars = 25;
@@ -75,23 +80,29 @@ namespace NinjaTrader.NinjaScript.Indicators
 			public float Gap;
 		}
 
+		[NinjaScriptProperty]
 		[Range(0, 60000)]
 		[Display(Name = "Update interval (ms)", Description = "Minimum milliseconds between recomputations (0 = every incoming tick).", Order = 1, GroupName = "Parameters")]
 		public int UpdateIntervalMs { get; set; }
 
+		[NinjaScriptProperty]
+		[Display(Name = "Show gate diagnostics", Description = "Renders a one-line gate state (zones, live trades/volume/levels vs required) under the message list. Use this to see why the message list is empty.", Order = 2, GroupName = "Parameters")]
+		public bool ShowGateDiagnostics { get; set; }
+
 		// --- Order flow thresholds ---------------------------------------------
 		// Every value is a ratio, a percentage of a rolling baseline, or a bar count. There are
 		// no absolute trade-count or tick-distance thresholds, so the detector tracks volatility
-		// as it moves within the session. Percent values are whole numbers (25 = 25%).
+		// as it moves within the session. Percent values are whole numbers (25 = 25%); every
+		// consumer divides by 100 before using them as multipliers.
 
 		[NinjaScriptProperty]
 		[Range(1.5, 10.0)]
-		[Display(Name = "Imbalance ratio", Description = "ask[i+1] must be at least this multiple of bid[i] on adjacent levels. A ratio, not a percent.", Order = 1, GroupName = "Order Flow")]
+		[Display(Name = "Imbalance ratio", Description = "ask[i+1] must be at least this multiple of bid[i] on adjacent levels. A ratio, not a percent. 2.0 is the ES setting; 3.0+ is for large-tick instruments.", Order = 1, GroupName = "Order Flow")]
 		public double ImbalanceRatio { get; set; }
 
 		[NinjaScriptProperty]
 		[Range(1, 100)]
-		[Display(Name = "Imbalance run (% of avg range)", Description = "A run must span at least this % of the recent average bar range to count as stacked. Capped at 4 consecutive levels, the industry standard stack depth.", Order = 2, GroupName = "Order Flow")]
+		[Display(Name = "Imbalance run (% of avg range)", Description = "A run must span at least this % of the recent average bar range to count as stacked. Capped at 4 consecutive levels.", Order = 2, GroupName = "Order Flow")]
 		public double ImbalanceRunRangePct { get; set; }
 
 		[NinjaScriptProperty]
@@ -106,27 +117,37 @@ namespace NinjaTrader.NinjaScript.Indicators
 
 		[NinjaScriptProperty]
 		[Range(0, 100)]
-		[Display(Name = "Min live trades (% of avg)", Description = "The live bar must show at least this % of the recent average trade count before live signals fire.", Order = 5, GroupName = "Order Flow")]
+		[Display(Name = "Min live trades (% of avg)", Description = "The live bar must show at least this % of the recent average trade count before live signals fire. 60 = roughly the last third of the bar.", Order = 5, GroupName = "Order Flow")]
 		public double MinLiveTradesPct { get; set; }
 
 		[NinjaScriptProperty]
+		[Range(2, 200)]
+		[Display(Name = "Min live levels", Description = "The live bar must have printed at least this many price levels before live signals are allowed. Guards against reading a stacked run off a truncated ladder.", Order = 6, GroupName = "Order Flow")]
+		public int MinLiveLevels { get; set; }
+
+		[NinjaScriptProperty]
 		[Range(1.0, 8.0)]
-		[Display(Name = "Absorption sigma", Description = "A level qualifies as absorption above mean + sigma x std-dev of recent level volumes.", Order = 6, GroupName = "Order Flow")]
+		[Display(Name = "Absorption sigma", Description = "A level qualifies as absorption above mean + sigma x std-dev of recent level volumes.", Order = 7, GroupName = "Order Flow")]
 		public double AbsorptionSigma { get; set; }
 
 		[NinjaScriptProperty]
 		[Range(1, 100)]
-		[Display(Name = "Absorption edge (% of avg range)", Description = "The absorption level must sit within this % of the recent average bar range from the extreme.", Order = 7, GroupName = "Order Flow")]
+		[Display(Name = "Absorption edge (% of avg range)", Description = "The absorption level must sit within this % of the recent average bar range from the extreme.", Order = 8, GroupName = "Order Flow")]
 		public double AbsorptionEdgePct { get; set; }
 
 		[NinjaScriptProperty]
 		[Range(50, 100)]
-		[Display(Name = "Absorption side dominance (% of level)", Description = "One aggressor side must account for at least this % of the level's total volume.", Order = 8, GroupName = "Order Flow")]
+		[Display(Name = "Absorption side dominance (% of level)", Description = "One aggressor side must account for at least this % of the level's total volume.", Order = 9, GroupName = "Order Flow")]
 		public double AbsorptionSidePct { get; set; }
 
 		[NinjaScriptProperty]
+		[Range(1, 50)]
+		[Display(Name = "Absorption min confirm depth (ticks)", Description = "A rejection must move at least this many ticks beyond the absorption level to confirm. Prevents 1-tick confirms during warm-up.", Order = 10, GroupName = "Order Flow")]
+		public double AbsorptionMinDepthTicks { get; set; }
+
+		[NinjaScriptProperty]
 		[Range(1, 25)]
-		[Display(Name = "Zone age (bars)", Description = "How many bars a stacked-imbalance zone stays active before it is discarded.", Order = 9, GroupName = "Order Flow")]
+		[Display(Name = "Zone age (bars)", Description = "How many bars a stacked-imbalance zone stays active before it is discarded.", Order = 11, GroupName = "Order Flow")]
 		public int MaxZoneAgeBars { get; set; }
 
 		protected override void OnStateChange()
@@ -144,16 +165,19 @@ namespace NinjaTrader.NinjaScript.Indicators
 				PaintPriceMarkers			= false;
 				ScaleJustification			= ScaleJustification.Right;
 				UpdateIntervalMs			= 500;
+				ShowGateDiagnostics			= false;
 
 				// Order Flow defaults. Kept in sync with FootprintSettings.
-				ImbalanceRatio				= 3.0;
-				ImbalanceRunRangePct		= 25;
+				ImbalanceRatio				= 2.0;
+				ImbalanceRunRangePct		= 15;
 				MinBarVolumePct				= 25;
 				MinLevelVolumePct			= 25;
-				MinLiveTradesPct			= 35;
+				MinLiveTradesPct			= 60;
+				MinLiveLevels				= 8;
 				AbsorptionSigma				= 3.0;
 				AbsorptionEdgePct			= 25;
 				AbsorptionSidePct			= 60;
+				AbsorptionMinDepthTicks		= 3.0;
 				MaxZoneAgeBars				= 20;
 			}
 			else if (State == State.Terminated)
@@ -168,6 +192,9 @@ namespace NinjaTrader.NinjaScript.Indicators
 						l.Dispose();
 					_cachedLayouts = null;
 				}
+				// The analyzer holds the settings object by reference; dropping it on
+				// terminate is fine because a fresh instance is built on next State.Realtime.
+				_settings = null;
 			}
 		}
 
@@ -178,8 +205,14 @@ namespace NinjaTrader.NinjaScript.Indicators
 
 			var nowMs = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
 
+			// Throttle: when analysis is skipped, still refresh the cheap status line so the
+			// panel does not show a stale timestamp with a fresh context. Only the expensive
+			// analyzer pass is throttled.
 			if (!IsFirstTickOfBar && UpdateIntervalMs > 0 && nowMs - _lastCalcMs < UpdateIntervalMs)
+			{
+				_status = "Throttled  |  " + Time[0].ToString("HH:mm:ss") + "  |  Bar " + CurrentBar;
 				return;
+			}
 
 			_lastCalcMs = nowMs;
 
@@ -216,11 +249,13 @@ namespace NinjaTrader.NinjaScript.Indicators
 			_settings.ImbalanceRatio			= ImbalanceRatio;
 			_settings.ImbalanceRunRangePct	= ImbalanceRunRangePct;
 			_settings.MinBarVolumePct		= MinBarVolumePct;
-			_settings.MinLevelVolumePct	= MinLevelVolumePct;
+			_settings.MinLevelVolumePct		= MinLevelVolumePct;
 			_settings.MinLiveTradesPct		= MinLiveTradesPct;
+			_settings.MinLiveLevels			= MinLiveLevels;
 			_settings.AbsorptionSigma		= AbsorptionSigma;
-			_settings.AbsorptionEdgePct	= AbsorptionEdgePct;
-			_settings.AbsorptionSidePct	= AbsorptionSidePct;
+			_settings.AbsorptionEdgePct		= AbsorptionEdgePct;
+			_settings.AbsorptionSidePct		= AbsorptionSidePct;
+			_settings.AbsorptionMinDepthTicks = AbsorptionMinDepthTicks;
 			_settings.MaxZoneAgeBars		= MaxZoneAgeBars;
 
 			return _settings;
@@ -228,7 +263,13 @@ namespace NinjaTrader.NinjaScript.Indicators
 
 		private void RefreshLines()
 		{
+			// EnsureFormats can fail if the DirectWrite factory is not ready yet (cold start,
+			// State.Realtime transition). Retry on each RefreshLines instead of letting the
+			// null TextFormat turn into a per-tick exception loop.
 			EnsureFormats();
+			if (_fmtNormal == null || _fmtBold == null || _fmtSmall == null)
+				return;
+
 			_lines = BuildLines();
 			_linesVersion++;
 			RequestRedraw();
@@ -243,6 +284,15 @@ namespace NinjaTrader.NinjaScript.Indicators
 			if (barsType == null)
 				return null;
 
+			// Rebuild the completed-bar window only when the bar index changes. Within a bar,
+			// the cache is frozen on purpose: completed bars do not change. The current bar
+			// is rebuilt every call because it is still developing.
+			//
+			// Indexing invariant: BuildCompleted iterates barsAgo from min(CompletedBars,
+			// CurrentBar) down to 1 and computes volIndex = CurrentBar - barsAgo. This
+			// assumes BarsSeries is zero-based and that CurrentBar equals the last index.
+			// Both hold for the standard NinjaTrader bar series; do not reuse this helper
+			// against a sliced or offset series without re-deriving the index mapping.
 			if (_completedCache == null || _completedCacheBar != CurrentBar)
 			{
 				_completedCache = BuildCompleted(barsType);
@@ -291,6 +341,10 @@ namespace NinjaTrader.NinjaScript.Indicators
 			var levels = new List<FootprintLevel>();
 			var guard = 0;
 
+			// Cost note: this loops every tick level in [low, high] and calls
+			// GetBid/AskVolumeForPrice twice per level. On a 1000-tick ES bar that is
+			// ~40-80 levels x 2 calls. That is fine at 2 Hz but should be revisited if
+			// the update interval is dropped to 0 on a slow machine.
 			for (var p = low; p <= high + tick * 0.5 && guard < 5000; p += tick, guard++)
 			{
 				var price = Instrument.MasterInstrument.RoundToTickSize(p);
@@ -345,10 +399,23 @@ namespace NinjaTrader.NinjaScript.Indicators
 			if (_fmtNormal != null)
 				return;
 
-			var factory = Core.Globals.DirectWriteFactory;
-			_fmtNormal = new TextFormat(factory, "Consolas", 13f);
-			_fmtBold = new TextFormat(factory, "Consolas", FontWeight.Bold, FontStyle.Normal, 13f);
-			_fmtSmall = new TextFormat(factory, "Consolas", 11f);
+			try
+			{
+				var factory = Core.Globals.DirectWriteFactory;
+				if (factory == null)
+					return;
+
+				_fmtNormal = new TextFormat(factory, "Consolas", 13f);
+				_fmtBold = new TextFormat(factory, "Consolas", FontWeight.Bold, FontStyle.Normal, 13f);
+				_fmtSmall = new TextFormat(factory, "Consolas", 11f);
+			}
+			catch
+			{
+				// Leave formats null; RefreshLines will retry on the next tick.
+				if (_fmtNormal != null) { _fmtNormal.Dispose(); _fmtNormal = null; }
+				if (_fmtBold != null) { _fmtBold.Dispose(); _fmtBold = null; }
+				if (_fmtSmall != null) { _fmtSmall.Dispose(); _fmtSmall = null; }
+			}
 		}
 
 		private static PanelLine Line(string text, SharpDX.Color color, TextFormat fmt, float gap)
@@ -380,8 +447,8 @@ namespace NinjaTrader.NinjaScript.Indicators
 			}
 
 			// Section headers are always drawn; only the content under them is conditional.
-			// In a neutral state the auction bias content is omitted entirely — no
-			// "Stand Aside", no "Rotational / Balance", no "(0/4)" score — the header
+			// In a neutral state the auction bias content is omitted entirely - no
+			// "Stand Aside", no "Rotational / Balance", no "(0/4)" score - the header
 			// stays visible with nothing under it.
 			lines.Add(Line("INTERPRETATION", ColSection, _fmtBold, 10f));
 			if (_interp != null && !string.IsNullOrEmpty(_interp.Title))
@@ -420,23 +487,35 @@ namespace NinjaTrader.NinjaScript.Indicators
 				}
 			}
 
+			// Gate diagnostics: shows exactly which gate is blocking live signals. This is
+			// the line that makes "why is the message list empty" answerable without a
+			// debugger. Cur/req are the raw values the analyzer compared this pass.
+			if (ShowGateDiagnostics && ctx != null)
+			{
+				var gateText = string.Format(
+					"Gates: zones={0}  signals={1}  live={2} (trades {3}/{4}, vol {5}/{6}, levels {7}/{8})",
+					ctx.ActiveZones,
+					ctx.LiveSignalCount,
+					ctx.GateLiveOpen ? "OPEN" : "closed",
+					ctx.GateLiveTradesCurrent,
+					ctx.GateLiveTradesRequired,
+					ctx.GateLiveVolumeCurrent.ToString("F0"),
+					ctx.GateLiveVolumeRequired.ToString("F0"),
+					ctx.GateLiveLevelsCurrent,
+					ctx.GateLiveLevelsRequired);
+
+				lines.Add(Line(gateText, ColWarn, _fmtSmall, 6f));
+			}
+
 			return lines;
 		}
 
-		// Neutral state: structural balance with no structural (P1-P4) signal to set the
-		// headline. Retests and developing imbalances do not count — they stay listed under
-		// ORDER FLOW MESSAGES but never make the auction bias non-neutral.
+		// Neutral state is now sourced from the analyzer, which computes it from the same
+		// structure read and the same priority threshold used to pick the headline. If the
+		// neutral rule changes in the analyzer, this panel follows without a second edit.
 		private static bool IsNeutralState(OrderFlowContext ctx)
 		{
-			if (ctx.StructureBias != "Rotational / Balance")
-				return false;
-
-			if (ctx.Signals != null)
-				foreach (var s in ctx.Signals)
-					if (s.Priority <= FootprintAnalyzer.PriorityDivergence)
-						return false;
-
-			return true;
+			return ctx == null || ctx.IsNeutral;
 		}
 
 		private void RebuildLayouts(List<PanelLine> lines, int version)
@@ -483,7 +562,13 @@ namespace NinjaTrader.NinjaScript.Indicators
 			if (_cachedLayouts == null || _cachedVersion != version || _cachedLayouts.Count != lines.Count)
 				RebuildLayouts(lines, version);
 
+			// Clamp to the chart panel so a narrow chart does not push the panel off the left
+			// edge. If the panel is wider than the chart, it anchors to the left edge and
+			// clips on the right, which is the least-bad outcome.
 			var panelX = ChartPanel.X + ChartPanel.W - _cachedPanelW - PanelOffsetX;
+			if (panelX < ChartPanel.X)
+				panelX = ChartPanel.X;
+
 			var panelY = ChartPanel.Y + PanelOffsetY;
 			var rect = new SharpDX.RectangleF(panelX, panelY, _cachedPanelW, _cachedPanelH);
 

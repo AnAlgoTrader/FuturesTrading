@@ -77,7 +77,7 @@ namespace FootPrintTrader.Helper
 				return interp;
 			}
 
-			if (context.Bias == "Rotational / Balance" || context.BiasTone == "neutral" || string.IsNullOrEmpty(context.Action))
+			if (context.IsNeutral || context.Bias == "Rotational / Balance" || context.BiasTone == "neutral" || string.IsNullOrEmpty(context.Action))
 				return interp;
 
 			var level = context.ActionPrice > 0 ? context.ActionPrice : context.PocPrice;
@@ -90,6 +90,13 @@ namespace FootPrintTrader.Helper
 			// at an unfillable price.
 			interp.Action = context.Action;
 			interp.Details = Describe(context, level, P);
+
+			if (context.DivergenceIsLagging &&
+				context.Signals != null &&
+				context.Signals.Any(s => s.Type == "divergence"))
+			{
+				interp.Details += " (computed on last closed bar)";
+			}
 
 			return interp;
 		}

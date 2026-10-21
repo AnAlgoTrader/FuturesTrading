@@ -56,6 +56,11 @@ namespace FootPrintTrader.Helper
 		public double CumulativeDelta { get; set; }
 		public string DeltaDivergence { get; set; } = "None";
 
+		// Divergence is computed over the completed-bar window, so it always lags the live
+		// bar by one closed bar. Surfaces that to the interpreter/panel so the UI does not
+		// imply the live bar is being read.
+		public bool DivergenceIsLagging { get; set; }
+
 		// Recent average bar range, handed to the interpreter so "compressed range" can be
 		// judged against the session's own volatility instead of a flat tick count.
 		public double AvgBarRange { get; set; }
@@ -65,6 +70,24 @@ namespace FootPrintTrader.Helper
 		public string StructureBias { get; set; } = "Rotational / Balance";
 		public string StructureTone { get; set; } = "neutral";
 		public int StructureScore { get; set; }
+
+		// True when the structure read is neutral AND no structural (P1-P4) signal is live.
+		// Computed by the analyzer so the panel does not duplicate the neutral rule; if the
+		// rule changes here, the panel follows without a second edit.
+		public bool IsNeutral { get; set; }
+
+		// --- Gate diagnostics (for the panel's optional "Gates:" line) ---
+		// These are the raw cur/req values the gates compared this pass. They make it
+		// possible to see *why* the message list is empty instead of guessing.
+		public int ActiveZones { get; set; }
+		public int LiveSignalCount { get; set; }
+		public int GateLiveTradesCurrent { get; set; }
+		public int GateLiveTradesRequired { get; set; }
+		public decimal GateLiveVolumeCurrent { get; set; }
+		public decimal GateLiveVolumeRequired { get; set; }
+		public int GateLiveLevelsCurrent { get; set; }
+		public int GateLiveLevelsRequired { get; set; }
+		public bool GateLiveOpen { get; set; }
 
 		// Active Signals
 		public List<OrderFlowSignal> Signals { get; set; } = new List<OrderFlowSignal>();
@@ -123,7 +146,13 @@ namespace FootPrintTrader.Helper
 		// STATE (per analyzer instance: one chart, one indicator)
 		// ============================================================
 		private readonly List<OrderFlowZone> _activeZones = new List<OrderFlowZone>();
+
+		// Keyed on BarStartTime (unix seconds), NOT on bar index. That is what makes the
+		// "no reset on reconfigure" scope decision safe: after a bar-period change or template
+		// reload, a bar that is re-evaluated with a shifted CurrentBar still has the same
+		// StartTime, so it is not double-counted into CVD or the baselines.
 		private readonly HashSet<long> _processedBars = new HashSet<long>();
+
 		private readonly Queue<decimal> _recentBarVolumes = new Queue<decimal>();
 		private readonly Queue<double> _recentBarRanges = new Queue<double>();
 		private readonly Queue<int> _recentBarTrades = new Queue<int>();
@@ -132,6 +161,10 @@ namespace FootPrintTrader.Helper
 		private decimal _cumulativeDelta;
 
 		// The three adaptive baselines everything relative is measured against.
+		// Warm-up note: RollMean seeds the queue with the first observed value, so on the
+		// very first completed bar the "average" is that bar itself. Early bars are therefore
+		// judged against themselves, not a real baseline, until the window fills. The
+		// MinLiveTradesPct / MinLiveLevels gates keep that from producing live signals.
 		private decimal _avgBarVolume;
 		private double _avgBarRange;
 		private double _avgBarTrades;
@@ -180,6 +213,11 @@ namespace FootPrintTrader.Helper
 		// one-off signals. Structural signals (trapped/absorption/exhaustion/divergence) still
 		// override it; this only decides the headline when nothing structural is firing.
 		private const double StructureCvdSlopeRatio = 0.15;
+
+		// Symmetric persistence thresholds: 10-bar window, 7 votes bull, 3 votes bear. The
+		// asymmetry (7 vs 3) is intentional: a single weak bar can knock a bull run below 7,
+		// but a single strong bar cannot lift a bear run above 3 without the run being real.
+		// If you want a symmetric read, set both to 6/4.
 		private const double StructurePersistenceBullRatio = 0.70;
 		private const double StructurePersistenceBearRatio = 0.30;
 		private const int StructurePersistenceWindowBars = 10;
@@ -279,6 +317,7 @@ namespace FootPrintTrader.Helper
 					while (_barWindow.Count > DivergenceWindowBars)
 						_barWindow.RemoveAt(0);
 
+					// UNIT: MinBarVolumePct is a percent (25 = 25%), divided by 100 before use.
 					var barImbalances = compBar.Volume >= _avgBarVolume * (decimal)(_settings.MinBarVolumePct / 100.0)
 						? DetectStackedImbalances(compBar, tickSize)
 						: new List<ImbalanceRun>();
@@ -327,6 +366,9 @@ namespace FootPrintTrader.Helper
 			// one-bar retest, so it stops feeding the interpreter's conflict gate for 8 bars.
 			_activeZones.RemoveAll(z => z.AgeBars > (z.IsTrapped ? TrappedZoneMaxAgeBars : _settings.MaxZoneAgeBars));
 
+			// Prune processed-bar keys that have fallen out of the completed window. Keyed on
+			// StartTime (not bar index), so a reconfigure that renumbers bars cannot cause a
+			// bar to be re-processed into CVD or the baselines.
 			if (completed.Length > 0)
 			{
 				var oldestInWindow = completed.Min(c => c.StartTime);
@@ -433,9 +475,33 @@ namespace FootPrintTrader.Helper
 				}
 			}
 
-			if (current != null && _avgBarTrades > 0 &&
-				current.TradeCount >= _avgBarTrades * _settings.MinLiveTradesPct &&
-				current.Volume >= _avgBarVolume * (decimal)(_settings.MinBarVolumePct / 100.0))
+			// ------------------------------------------------------------------
+			// LIVE-BAR GATES
+			//
+			// UNIT NOTE: MinLiveTradesPct and MinBarVolumePct are whole-number percents
+			// (60 = 60%, 25 = 25%). Both must be divided by 100 before being used as a
+			// multiplier. The previous build used MinLiveTradesPct as a raw multiplier
+			// (i.e. required 60x the average trade count), which silently disabled
+			// exhaustion, live stacked imbalance and absorption on every instrument.
+			//
+			// The three requirements are computed explicitly so the same numbers can be
+			// surfaced as gate diagnostics.
+			// ------------------------------------------------------------------
+			var reqLiveTrades = _avgBarTrades * (_settings.MinLiveTradesPct / 100.0);
+			var reqLiveVolume = _avgBarVolume * (decimal)(_settings.MinBarVolumePct / 100.0);
+			var reqLiveLevels = _settings.MinLiveLevels;
+
+			var curLiveTrades = current != null ? current.TradeCount : 0;
+			var curLiveVolume = current != null ? current.Volume : 0m;
+			var curLiveLevels = current != null && current.Levels != null ? current.Levels.Length : 0;
+
+			var liveGateOpen = current != null
+				&& _avgBarTrades > 0
+				&& curLiveTrades >= reqLiveTrades
+				&& curLiveVolume >= reqLiveVolume
+				&& curLiveLevels >= reqLiveLevels;
+
+			if (liveGateOpen)
 			{
 				var liveImbalances = DetectStackedImbalances(current, tickSize);
 				var liveRange = current.High - current.Low;
@@ -518,12 +584,22 @@ namespace FootPrintTrader.Helper
 			// tick so a collapsed baseline cannot make the whole bar an "edge".
 			var absorptionDepth = Math.Max(tickSize, _avgBarRange * (_settings.AbsorptionEdgePct / 100.0));
 
+			// Confirmation depth: take the SMALLER of the edge window and the min-ticks floor.
+			// Using Max here made confirmation require the full edge depth (often 8+ ticks on
+			// a busy ES bar), which, combined with the 2-bar candidate lifetime, suppressed
+			// most confirmations. The min-ticks floor alone is the right guard against the
+			// warm-up collapse to 1 tick.
+			var absorptionConfirmDepth = Math.Min(absorptionDepth, Math.Max(tickSize, tickSize * _settings.AbsorptionMinDepthTicks));
+
 			// Detection needs enough trades on the live bar to make a level meaningful, so it is
 			// gated. Pruning and confirmation are NOT: they used to sit inside the same guard,
 			// which made confirmed absorption signals blink off at the start of every bar.
+			//
+			// UNIT NOTE: MinLiveTradesPct is a percent (60 = 60%), divided by 100 before use.
 			var canDetectAbsorption = absorptionThreshold > 0 && levels.Length > 0 &&
-				_avgBarTrades > 0 && bar.TradeCount >= _avgBarTrades * _settings.MinLiveTradesPct &&
-				bar.Volume >= _avgBarVolume * (decimal)(_settings.MinBarVolumePct / 100.0);
+				_avgBarTrades > 0 && bar.TradeCount >= _avgBarTrades * (_settings.MinLiveTradesPct / 100.0) &&
+				bar.Volume >= _avgBarVolume * (decimal)(_settings.MinBarVolumePct / 100.0) &&
+				levels.Length >= _settings.MinLiveLevels;
 
 			var absorptionSide = (decimal)(_settings.AbsorptionSidePct / 100.0);
 
@@ -557,8 +633,8 @@ namespace FootPrintTrader.Helper
 			foreach (var c in _absorptionCandidates)
 			{
 				var rejected = c.SellerAbsorption
-					? evalPrice <= c.Price - absorptionDepth
-					: evalPrice >= c.Price + absorptionDepth;
+					? evalPrice <= c.Price - absorptionConfirmDepth
+					: evalPrice >= c.Price + absorptionConfirmDepth;
 				if (!rejected) continue;
 
 				signals.Add(new OrderFlowSignal
@@ -653,6 +729,10 @@ namespace FootPrintTrader.Helper
 				}
 			}
 
+			// Neutral state is computed once, here, so the panel does not duplicate the rule.
+			var neutral = structure.Bias == "Rotational / Balance"
+				&& !distinctSignals.Any(s => s.Priority <= PriorityDivergence);
+
 			var result = new OrderFlowContext
 			{
 				Bias = bias,
@@ -668,9 +748,22 @@ namespace FootPrintTrader.Helper
 				CumulativeDelta = cumulativeDelta,
 				AvgBarRange = _avgBarRange,
 				DeltaDivergence = deltaDivergence,
+				DivergenceIsLagging = deltaDivergence != "None",
 				StructureBias = structure.Bias,
 				StructureTone = structure.Tone,
 				StructureScore = structure.Score,
+				IsNeutral = neutral,
+
+				ActiveZones = _activeZones.Count,
+				LiveSignalCount = signals.Count,
+				GateLiveTradesCurrent = curLiveTrades,
+				GateLiveTradesRequired = (int)Math.Ceiling(reqLiveTrades),
+				GateLiveVolumeCurrent = curLiveVolume,
+				GateLiveVolumeRequired = reqLiveVolume,
+				GateLiveLevelsCurrent = curLiveLevels,
+				GateLiveLevelsRequired = reqLiveLevels,
+				GateLiveOpen = liveGateOpen,
+
 				Signals = distinctSignals
 			};
 
@@ -822,7 +915,9 @@ namespace FootPrintTrader.Helper
 			if (cvdDelta > cvdThreshold) score++;
 			else if (cvdDelta < -cvdThreshold) score--;
 
-			// 2. Delta persistence
+			// 2. Delta persistence. See the ratio comment above: 7/10 bull vs 3/10 bear is
+			// deliberate. A single weak bar can drop a bull run below 7; a single strong bar
+			// cannot lift a bear run above 3 without the run being real.
 			var persistCount = Math.Min(StructurePersistenceWindowBars, n);
 			var positive = 0;
 			for (var i = n - persistCount; i < n; i++)
@@ -891,7 +986,14 @@ namespace FootPrintTrader.Helper
 				requiredRun = Math.Min(requiredRun, MaxImbalanceRunLevels);
 			}
 
-			var avgLevelVol = bar.Volume / levels.Length;
+			// Denominator is the sum of the per-level totals, not bar.Volume. bar.Volume can
+			// include trades that did not map to a level inside [low, high] (round-to-tick
+			// guard, bookkeeping), which would bias the per-level average high and make
+			// MinLevelVolumePct stricter than intended.
+			decimal levelSum = 0;
+			foreach (var l in levels)
+				levelSum += l.Total;
+			var avgLevelVol = levels.Length > 0 ? levelSum / levels.Length : 0m;
 			var minLevelVol = avgLevelVol * (decimal)(_settings.MinLevelVolumePct / 100.0);
 			var imbalanceRatio = (decimal)_settings.ImbalanceRatio;
 
