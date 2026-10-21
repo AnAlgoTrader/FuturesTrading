@@ -51,7 +51,9 @@ namespace FootPrintTrader.Helper
 		public double ImbalanceRatio { get; set; } = 3.0;
 
 		// An imbalance run must span at least this % of the recent average bar range before it
-		// counts as "stacked". Replaces a fixed level count.
+		// counts as "stacked". Replaces a fixed level count. The analyzer caps the resulting
+		// run at 4 consecutive levels: the percentage is meant to lower the bar on tight
+		// bars, not to demand an impossible run on wide ones.
 		public double ImbalanceRunRangePct { get; set; } = 25;
 
 		// A bar must carry at least this % of the recent average bar volume to be considered.

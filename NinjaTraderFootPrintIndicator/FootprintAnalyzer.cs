@@ -97,6 +97,14 @@ namespace FootPrintTrader.Helper
 		// produce a 1-level "stack".
 		private const int MinImbalanceRunLevels = 2;
 
+		// Ceiling for the same rule. The run length is derived from the bar's tick count, so
+		// without a cap a 40-tick bar demands 10+ consecutive levels of 3:1 diagonal
+		// imbalance - which essentially never happens, and the whole detector goes silent.
+		// The range-relative rule is meant to *lower* the bar on tight bars; it must not be
+		// allowed to raise it without limit on wide ones. 4 levels matches the industry
+		// standard stack depth (3-4 levels).
+		private const int MaxImbalanceRunLevels = 4;
+
 		// --- Signal priority (lower = more important) ---
 		// Ranked by (Priority, then newest BarTime first). Exhaustion is ranked with the
 		// structural signals rather than with retests, so a live-bar exhaustion can win the
@@ -873,12 +881,14 @@ namespace FootPrintTrader.Helper
 			// average bar range, not a fixed count. Three ticks of imbalance means something
 			// different on a 4-point bar than on a 40-point one. The average range (rather than
 			// this bar's own) keeps the threshold stable on a developing bar whose range is
-			// still small. Floored so a tight bar cannot produce a one-level "stack".
+			// still small. Floored so a tight bar cannot produce a one-level "stack", and
+			// capped at MaxImbalanceRunLevels so a wide bar cannot demand an impossible run.
 			var requiredRun = MinImbalanceRunLevels;
 			if (tickSize > 0 && _avgBarRange > 0)
 			{
 				requiredRun = Math.Max(MinImbalanceRunLevels,
 					(int)Math.Ceiling(_avgBarRange / tickSize * (_settings.ImbalanceRunRangePct / 100.0)));
+				requiredRun = Math.Min(requiredRun, MaxImbalanceRunLevels);
 			}
 
 			var avgLevelVol = bar.Volume / levels.Length;

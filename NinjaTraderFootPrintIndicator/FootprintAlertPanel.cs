@@ -23,6 +23,9 @@ namespace NinjaTrader.NinjaScript.Indicators
 	//   a bar-period change or a template reload mid-session, and the panel is rebuilt from
 	//   scratch within a few bars anyway. Resetting would trade a real edge case for churn
 	//   in code that is otherwise stable.
+	//   The thresholds themselves are NOT frozen, though: BuildSettings writes the current
+	//   UI values into the one settings object the analyzer holds a reference to, so a
+	//   parameter change applies on the next tick while the analyzer state survives.
 	// - No multi-session handling: cumulative delta, volume baselines and level-volume stats
 	//   are session-scoped by design and are never rolled over or persisted.
 	public class FootprintAlertPanel : Indicator
@@ -48,6 +51,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
 		private FootprintSnapshot _snapshot;
 		private FootprintAnalyzer _analyzer;
+		private FootprintSettings _settings;
 		private OrderFlowContext _ctx;
 		private MarketInterpretation _interp;
 		private string _status = "";
@@ -87,7 +91,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
 		[NinjaScriptProperty]
 		[Range(1, 100)]
-		[Display(Name = "Imbalance run (% of avg range)", Description = "A run must span at least this % of the recent average bar range to count as stacked.", Order = 2, GroupName = "Order Flow")]
+		[Display(Name = "Imbalance run (% of avg range)", Description = "A run must span at least this % of the recent average bar range to count as stacked. Capped at 4 consecutive levels, the industry standard stack depth.", Order = 2, GroupName = "Order Flow")]
 		public double ImbalanceRunRangePct { get; set; }
 
 		[NinjaScriptProperty]
@@ -181,8 +185,14 @@ namespace NinjaTrader.NinjaScript.Indicators
 
 			try
 			{
+				// The analyzer holds a reference to this settings object, so writing the
+				// current UI values into it on every update makes a parameter change take
+				// effect immediately - without throwing away the analyzer's accumulated
+				// state (CVD, zones, baselines).
+				var settings = BuildSettings();
+
 				if (_analyzer == null)
-					_analyzer = new FootprintAnalyzer(BuildSettings());
+					_analyzer = new FootprintAnalyzer(settings);
 
 				var snapshot = BuildSnapshot();
 				_snapshot = snapshot;
@@ -200,18 +210,20 @@ namespace NinjaTrader.NinjaScript.Indicators
 
 		private FootprintSettings BuildSettings()
 		{
-			return new FootprintSettings
-			{
-				ImbalanceRatio			= ImbalanceRatio,
-				ImbalanceRunRangePct	= ImbalanceRunRangePct,
-				MinBarVolumePct			= MinBarVolumePct,
-				MinLevelVolumePct		= MinLevelVolumePct,
-				MinLiveTradesPct		= MinLiveTradesPct,
-				AbsorptionSigma			= AbsorptionSigma,
-				AbsorptionEdgePct		= AbsorptionEdgePct,
-				AbsorptionSidePct		= AbsorptionSidePct,
-				MaxZoneAgeBars			= MaxZoneAgeBars
-			};
+			if (_settings == null)
+				_settings = new FootprintSettings();
+
+			_settings.ImbalanceRatio			= ImbalanceRatio;
+			_settings.ImbalanceRunRangePct	= ImbalanceRunRangePct;
+			_settings.MinBarVolumePct		= MinBarVolumePct;
+			_settings.MinLevelVolumePct	= MinLevelVolumePct;
+			_settings.MinLiveTradesPct		= MinLiveTradesPct;
+			_settings.AbsorptionSigma		= AbsorptionSigma;
+			_settings.AbsorptionEdgePct	= AbsorptionEdgePct;
+			_settings.AbsorptionSidePct	= AbsorptionSidePct;
+			_settings.MaxZoneAgeBars		= MaxZoneAgeBars;
+
+			return _settings;
 		}
 
 		private void RefreshLines()
