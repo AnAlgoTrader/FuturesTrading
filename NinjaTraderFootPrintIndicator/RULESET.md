@@ -52,13 +52,13 @@ percentage of a rolling baseline — there are no absolute price/trade-count thr
 | `ImbalanceRatio` | 3.0 | 1.5–10 | `ask[i+1] >= bid[i] * ratio` on adjacent levels (a ratio, not %) |
 | `ImbalanceRunRangePct` | 25 | 1–100 | A run must span ≥ this % of the recent avg bar range to count as "stacked" |
 | `MinBarVolumePct` | 25 | 1–100 | A bar must carry ≥ this % of avg bar volume to generate zones |
-| `MinLevelVolumePct` | 5 | 0–50 | A level must carry ≥ this % of its bar's average level volume |
-| `MinLiveTradesPct` | 60 | 0–100 | Live bar must show ≥ this % of avg trade count before live signals fire |
+| `MinLevelVolumePct` | 25 | 0–50 | A level must carry ≥ this % of its bar's average level volume |
+| `MinLiveTradesPct` | 35 | 0–100 | Live bar must show ≥ this % of avg trade count before live signals fire |
 | `AbsorptionSigma` | 3.0 | 1–8 | Absorption = level volume > mean + sigma × std-dev |
 | `AbsorptionEdgePct` | 25 | 1–100 | Absorption level must sit within this % of avg bar range from the extreme |
 | `AbsorptionSidePct` | 60 | 50–100 | One aggressor side must be ≥ this % of the level's total volume |
-| `MaxZoneAgeBars` | 8 | 1–25 | Bars a stacked-imbalance zone stays active |
-| `UpdateIntervalMs` | 2000 | 0–60000 | Min ms between recomputations (0 = every tick) |
+| `MaxZoneAgeBars` | 20 | 1–25 | Bars a stacked-imbalance zone stays active |
+| `UpdateIntervalMs` | 500 | 0–60000 | Min ms between recomputations (0 = every tick) |
 
 ### Internal constants (not user-tunable)
 
@@ -71,6 +71,42 @@ percentage of a rolling baseline — there are no absolute price/trade-count thr
 | `DivergenceCvdGapRatio` | 0.15 | Required CVD shortfall/excess = 15% of one avg bar's volume |
 | `MinCompressedRangeRatio` | 0.4 | Bar range < 40% of avg range ⇒ "compressed" |
 | `MinTicksForTrade` | 10 | Fallback compression threshold before an avg range exists |
+
+
+### Default profile: ES, 1000-tick bars, RTH only
+
+Defaults above are tuned for ES on a **1000-tick** chart during **RTH**. Assumptions
+(estimates, not measured): ~650–800 bars per RTH session (≈30 s per bar on average,
+≈20 s at the open), average bar range ≈ 4–6 ticks, widening to 8–12+ on news/open.
+Verify against `ATR(20)` in ticks on the actual chart and re-tune.
+
+| Setting | Previous | Now | Reason |
+|---|---|---|---|
+| `MinLevelVolumePct` | 5 | 25 | 5% of the average level volume is barely a filter; it lets thin prints form imbalances (especially where the opposite side is zero) |
+| `MinLiveTradesPct` | 60 | 35 | Every completed tick bar holds ~1000 trades, so this gate means "bar is X% complete"; 60% delayed live signals to the end of a ~30 s bar |
+| `MaxZoneAgeBars` | 8 | 20 | 8 bars ≈ 4 min of clock time on 1000-tick bars; 20 ≈ 10 min (max allowed is 25, the snapshot size) |
+| `UpdateIntervalMs` | 2000 | 500 | A 2 s throttle is a large slice of a 20–30 s bar |
+
+**Deliberately unchanged:**
+
+- `ImbalanceRatio` (3.0) — mid-range of the commonly cited 2:1–4:1. Raise to ~4.0 if small-sample noise
+  produces too many stacks.
+- `ImbalanceRunRangePct` (25) — with ~5-tick bars the 2-level floor already applies, and a 3-level stack
+  would cover over half the bar. The percentage only bites above ~8 ticks of average range
+  (25% → 2 levels at 8 ticks, 3 at 12, 4 at 16). Consider 30 if 2-level stacks prove noisy.
+- `MinBarVolumePct`, `AbsorptionSigma`, `AbsorptionEdgePct`, `AbsorptionSidePct` — no basis yet to change; review after replay.
+
+**Caveats at this bar speed:**
+
+- Rolling baselines (20 bars) cover only ~5–15 minutes of clock time, and take ~5–7 minutes to warm up after
+  the 9:30 ET open. The `MinTicksForTrade` fallback (10 ticks) is about double a typical bar range, so if it
+  applies during warm-up nearly every bar reads as compressed (STAND ASIDE).
+- The compression gate (range < 40% of average) is only ~2 ticks on a typical bar; monitor how often it fires.
+- Fixed constants (`TrappedZoneMaxAgeBars` = 1, `AbsorptionMaxAgeBars` = 2, the Buyer Support / Seller
+  Resistance age limit of 2 bars) are expressed in bars, so zone-retest and trapped signals live only seconds
+  to ~1–2 minutes. Changing that requires editing the source.
+- Changing these defaults in this document does **not** change the indicator: the same values must be
+  updated in `FootprintSupport.cs` / the indicator's property defaults.
 
 ---
 
@@ -126,7 +162,7 @@ Buyers/Sellers) and suppresses the "Support / Resistance" reading.
 
 - **Trapped** is an *event*, reported **once** per zone (`TrappedReported`); the zone then
   survives only 1 more bar so a one-bar retest can still be flagged.
-- Zones are discarded after `MaxZoneAgeBars` (default 8).
+- Zones are discarded after `MaxZoneAgeBars` (default 20).
 
 ### 3.4 Live-bar imbalance signals
 
@@ -213,7 +249,7 @@ the headline.
 - **No structural signal:** headline = structural bias, action priced at the POC:
   - bullish → `Buy pullbacks to <POC>`
   - bearish → `Sell rallies to <POC>`
-  - neutral → `Stand Aside`
+  - neutral → **no message** — the AUCTION BIAS section stays visible but its content is empty (see §8)
 - **Structural signal present** (top-ranked, P1–P4), action priced at the signal level:
 
 | Signal type | Headline bias | Action |
@@ -261,7 +297,8 @@ With < 2 bars in the window or no baseline yet: **Rotational / Balance (0)**.
    → `<Bias> (Range Compressed)` · tone **warning** · **STAND ASIDE**
    *(detail: actual range vs average range, "Poor risk/reward").*
 3. **Neutral gate** — bias is Rotational / Balance, tone neutral, or action empty:
-   → no interpretation block is shown.
+   → no interpretation message is shown, **and no AUCTION BIAS message either** (§8). There
+   is no `Stand Aside` text for a neutral state; the sections stay visible but empty.
 4. Otherwise → title = bias, tone = bias tone, action = analyzer's action wording,
    detail = type-specific description:
 
@@ -278,14 +315,24 @@ With < 2 bars in the window or no baseline yet: **Rotational / Balance (0)**.
 ## 8. Execution & display rules
 
 - `Calculate.OnEachTick`; requires `CurrentBar ≥ 1` and a `VolumetricBarsType`.
-- Recomputation throttled to `UpdateIntervalMs` (default 2000 ms), except on the first
+- Recomputation throttled to `UpdateIntervalMs` (default 500 ms), except on the first
   tick of each bar (always recalculated).
 - Completed-bar snapshot cached per `CurrentBar`.
-- Panel sections, drawn only when they have content (no "nothing happening" filler):
+- Panel sections are **always drawn** (headers stay visible); only the messages inside them
+  are conditional:
   1. **Status line** — last update time + bar number (or error text).
-  2. **INTERPRETATION** — title, action, detail (only if a non-empty interpretation).
-  3. **AUCTION BIAS** — bias + action, and `Structure: <bias> (±n/4)`.
-  4. **ORDER FLOW MESSAGES** — up to **5** ranked signals with their bar time.
+  2. **INTERPRETATION** — title, action, detail. Content only if a non-empty interpretation
+     exists; otherwise the section is empty.
+  3. **AUCTION BIAS** — bias + action, and `Structure: <bias> (±n/4)`. Content is **omitted in a
+     neutral state** (structural bias Rotational / Balance and no structural signal P1–P4);
+     otherwise it is shown as before.
+  4. **ORDER FLOW MESSAGES** — up to **5** ranked signals with their bar time. Empty when there
+     are no ranked signals.
+- **Empty messages:** in a neutral state no "Stand Aside", "Rotational / Balance" or
+  "Structure: … (0/4)" text is displayed, and no "nothing happening" filler is added in its
+  place. The section headers remain, with nothing under them. If ranked signals exist (e.g. a
+  developing imbalance, P5/P6) they are still listed under ORDER FLOW MESSAGES even when the
+  bias is neutral.
 - Tone colours: bullish green, bearish red, warning amber, neutral grey.
 - There is no alert/audio/`Alert()` invocation — signals are displayed on the chart
   panel only.
