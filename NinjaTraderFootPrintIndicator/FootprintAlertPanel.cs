@@ -370,7 +370,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 			// Section headers are always drawn; only the content under them is conditional.
 			// In a neutral state the auction bias content is omitted entirely — no
 			// "Stand Aside", no "Rotational / Balance", no "(0/4)" score — the header
-			// stays visible with nothing under it (RULESET.md section 8).
+			// stays visible with nothing under it.
 			lines.Add(Line("INTERPRETATION", ColSection, _fmtBold, 10f));
 			if (_interp != null && !string.IsNullOrEmpty(_interp.Title))
 			{

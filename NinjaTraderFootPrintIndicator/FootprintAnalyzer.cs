@@ -595,7 +595,7 @@ namespace FootPrintTrader.Helper
 			// list but no longer get to set the headline, so the panel reports what the market
 			// is actually doing between events. A neutral structure produces no action message
 			// at all: the panel leaves the auction bias content empty rather than printing a
-			// stand-aside line (RULESET.md sections 5 and 7).
+			// stand-aside line.
 			var structure = ComputeStructureBias(tickSize, _avgBarVolume);
 			var top = distinctSignals.FirstOrDefault(s => s.Priority <= PriorityDivergence);
 

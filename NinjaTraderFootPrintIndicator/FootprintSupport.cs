@@ -43,8 +43,8 @@ namespace FootPrintTrader.Helper
 	//
 	// Percent values are whole numbers: 25 means 25%, not 0.25.
 	//
-	// Defaults are tuned for ES on 1000-tick bars during RTH (see RULESET.md, section
-	// "Default profile"). On other instruments or bar types, re-tune against ATR(20).
+	// Defaults are tuned for ES on 1000-tick bars during RTH. On other instruments or bar
+	// types, re-tune against ATR(20).
 	public class FootprintSettings
 	{
 		// ask[i+1] >= bid[i] * ratio on adjacent price levels. Already a ratio, not a percent.
