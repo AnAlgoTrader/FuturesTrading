@@ -182,10 +182,23 @@
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
     cv.addEventListener('pointerleave', () => {if (!P.size) {hover = null; redraw()} });
     cv.addEventListener('wheel', e => {
-      e.preventDefault(); if (!bars.length) return; const p = pt(e), f = Math.exp(-e.deltaY * .0015);
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {V.x0 += e.deltaX; limits(); redraw()}
-      else if (e.shiftKey) zoomX(f, p.x); else zoomY(f, p.y);
+      e.preventDefault(); if (!bars.length) return;
+      const p = pt(e), d = e.deltaY !== 0 ? e.deltaY : e.deltaX, f = Math.exp(-d * .0015);
+      // Shift / Ctrl / Alt + wheel = horizontal (time) zoom. Plain wheel = vertical
+      // (price) zoom. Horizontal trackpad scroll = pan. Some browsers turn Shift+wheel
+      // into a horizontal scroll (deltaY = 0), so fall back to deltaX for the zoom step.
+      if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) zoomX(f, p.x);
+      else if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {V.x0 += e.deltaX; limits(); redraw()}
+      else zoomY(f, p.y);
     }, {passive: false});
+    window.addEventListener('keydown', e => {
+      const t = e.target;
+      if (!bars.length || e.ctrlKey || e.metaKey || e.altKey ||
+          (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable))) return;
+      if (e.key === '+' || e.key === '=') {zoomXCentre(1.25); e.preventDefault()}
+      else if (e.key === '-' || e.key === '_') {zoomXCentre(.8); e.preventDefault()}
+      else if (e.key === '0') {showAll(); e.preventDefault()}
+    });
     cv.addEventListener('dblclick', () => {fit(); limits(); redraw()});
     new ResizeObserver(() => {size(); limits(); redraw()}).observe(wrap);
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw);
@@ -196,21 +209,35 @@
     // Each call accepts an object or a JSON string and returns {ok:true} or {ok:false,error:"..."}.
     const parse = d => typeof d === 'string' ? JSON.parse(d) : d;
     const api = fn => (...a) => {try {fn(...a); return {ok: true}} catch (e) {console.error(e); toast(e.message); return {ok: false, error: e.message}} };
+    function showAll() {                               // fit every bar in the window (columns may get very narrow)
+      if (!bars.length) return false;
+      size();
+      const available = Math.max(AXIS + 60, W - AXIS);
+      V.colW = clamp(available / bars.length, 4, 220);
+      V.x0 = 0;
+      fit(); limits(); redraw();
+      return true;
+    }
+    function showLatest(count) {                       // frame the latest bars at a readable width
+      if (!bars.length) return false;
+      size();
+      const available = Math.max(AXIS + 60, W - AXIS);
+      const n = Math.max(1, Math.min(bars.length, count || 12));
+      V.colW = clamp(available / n, 60, 220);
+      V.x0 = Math.max(0, bars.length * V.colW - available + 30);
+      fit(); limits(); redraw();
+      return true;
+    }
+    function zoomXCentre(f) {if (bars.length) zoomX(f, (W - AXIS) / 2)}
+    function zoomYCentre(f) {if (bars.length) zoomY(f, (H - FOOT) / 2)}
     window.footprint = {
       load: api(d => load(parse(d))),                 // full snapshot: {rowSize, colors, footerLabels, bars:[...]}
       updateLast: api(b => put(parse(b), false)),      // replace the last (live) bar with a rebuilt version
       append: api(b => put(parse(b), true)),           // start a new bar after the last one
-      showAll: function () {                           // scroll to the oldest bar and shrink columns so every bar fits
-        if (!bars.length) return {ok: false, error: 'no data'};
-        size();
-        V.x0 = 0;
-        const available = Math.max(AXIS + 60, W - AXIS);
-        if (bars.length * V.colW > available) V.colW = Math.max(24, available / bars.length);
-        fit();
-        limits();
-        draw();
-        return {ok: true};
-      }
+      showAll: api(() => showAll()),                   // fit every bar in the window
+      showLatest: api(n => showLatest(n)),             // frame the latest N bars at readable width
+      zoomX: api(f => zoomXCentre(+f || 1.25)),        // horizontal (time) zoom
+      zoomY: api(f => zoomYCentre(+f || 1.25))         // vertical (price) zoom
     };
 
     size(); draw();

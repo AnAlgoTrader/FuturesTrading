@@ -28,7 +28,7 @@ namespace FootPrintTrader
         private const int PriceTickRequestId = 1109;
         private const int TradeTickRequestId = 1110;
         private const double TickSize = 0.25;
-        private const decimal OrderQuantity = 2m;
+        private const decimal OrderQuantity = 1m;
         private const double RoundTripCommission = 0.7 * 2;
 
         private static double _bid;
@@ -102,10 +102,20 @@ namespace FootPrintTrader
                 var jsonPath = Path.Combine(Logger.DATA_DIR, $"footprint-{stamp}.json");
                 File.WriteAllText(jsonPath, JsonSerializer.Serialize(payload, FootprintRenderBuilder.JsonOptions));
 
+                var dataPayload = FootprintDataExporter.Build(
+                    snapshot,
+                    TickSize,
+                    TradingConfig.DataSymbol,
+                    TradingConfig.TradeSymbol,
+                    TradingConfig.TicksPerBucket,
+                    DateTime.Now);
+                var dataPath = Path.Combine(Logger.DATA_DIR, $"footprint-data-{stamp}.json");
+                File.WriteAllText(dataPath, JsonSerializer.Serialize(dataPayload, FootprintRenderBuilder.JsonOptions));
+
                 var htmlPath = Path.Combine(Logger.DATA_DIR, $"footprint-{stamp}.html");
                 File.WriteAllText(htmlPath, FootprintHtmlExporter.Build(payload, DateTime.Now));
 
-                _logger?.WriteLine($"[SNAPSHOT] {Path.GetFileName(jsonPath)} + {Path.GetFileName(htmlPath)}");
+                _logger?.WriteLine($"[SNAPSHOT] {Path.GetFileName(jsonPath)} + {Path.GetFileName(dataPath)} + {Path.GetFileName(htmlPath)}");
             }
             catch (Exception ex)
             {

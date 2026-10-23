@@ -21,9 +21,15 @@ public static class FootprintHtmlExporter
 const data = {json};
 if (data.bars && data.bars.length) {{
     footprint.load(data);
-    footprint.showAll();
+    footprint.showLatest(12);
     if (data.context) updateSidePanel(data.context, data.rowSize || 0.25);
     if (data.interpretation) updateInterpretationPanel(data.interpretation);
+
+    const hint = document.createElement('div');
+    hint.textContent = 'Shift/Ctrl + wheel or + / - = time zoom  ·  drag = pan  ·  0 = show all';
+    hint.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:rgba(23,28,38,.94);border:1px solid #262d3b;color:#8a93a6;padding:6px 12px;border-radius:6px;font:12px system-ui,sans-serif;z-index:40;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.4)';
+    document.body.appendChild(hint);
+    setTimeout(() => hint.remove(), 12000);
 }}
 </script>";
 
