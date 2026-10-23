@@ -45,7 +45,7 @@ public class FootprintRenderSnapshot
 {
     public double RowSize { get; set; }
     public int TradesPerBar { get; set; }
-    public string[] FooterLabels { get; set; } = { "Delta", "Vol" };
+    public string[] FooterLabels { get; set; } = { "Delta", "Vol", "Secs" };
     public Dictionary<string, string> Colors { get; set; } = new();
     public List<FootprintRenderBar> Bars { get; set; } = new();
     public OrderFlowContext Context { get; set; }
@@ -178,7 +178,8 @@ public static class FootprintRenderBuilder
                     Text = delta.ToString(CultureInfo.InvariantCulture),
                     Color = delta > 0 ? UpColor : delta < 0 ? DownColor : null
                 },
-                new() { Text = bar.Volume.ToString(CultureInfo.InvariantCulture) }
+                new() { Text = bar.Volume.ToString(CultureInfo.InvariantCulture) },
+                new() { Text = Math.Max(0, bar.EndTime - bar.StartTime).ToString(CultureInfo.InvariantCulture) + "s" }
             }
         };
     }

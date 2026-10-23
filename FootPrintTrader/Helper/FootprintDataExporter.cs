@@ -18,6 +18,7 @@ public class FootprintDataBar
 {
     public long StartTime { get; set; }
     public long EndTime { get; set; }
+    public long DurationSeconds { get; set; }
     public int TradeCount { get; set; }
     public double Open { get; set; }
     public double High { get; set; }
@@ -88,6 +89,7 @@ public static class FootprintDataExporter
         {
             StartTime = bar.StartTime,
             EndTime = bar.EndTime,
+            DurationSeconds = Math.Max(0, bar.EndTime - bar.StartTime),
             TradeCount = bar.TradeCount,
             Open = bar.Open,
             High = bar.High,
