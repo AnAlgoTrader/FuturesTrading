@@ -10,11 +10,6 @@ namespace FootPrintTrader.Helper;
 
 public class ContractHelper
 {
-    public static Task<ContractDetails> GetContract(IbClient client, MarketProfile market, bool forTrade)
-    {
-        return GetContract(client, market, forTrade ? market.TradeSymbol : market.DataSymbol);
-    }
-
     public static async Task<ContractDetails> GetContract(IbClient client, MarketProfile market, string symbol)
     {
         var contractDataList = await client.GetContractData(new Contract

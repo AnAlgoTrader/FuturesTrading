@@ -179,7 +179,7 @@ namespace FootPrintTrader
                 }
             };
 
-            _client.Start(Market.Host, Market.Port, Market.ClientId);
+            _client.Start("127.0.0.1", 4001, 0);
 
             _dataContract = await ContractHelper.GetContract(_client, Market, Market.DataSymbol);
             _tradeContract = await ContractHelper.GetContract(_client, Market, Market.TradeSymbol);
