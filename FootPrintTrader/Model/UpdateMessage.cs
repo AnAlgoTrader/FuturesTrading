@@ -12,5 +12,6 @@ public class UpdateMessageType
 {
     public const string FOOTPRINT_SNAPSHOT = "FOOTPRINT_SNAPSHOT";
     public const string MARKET_DATA = "MARKET_DATA";
+    public const string MARKET_INFO = "MARKET_INFO";
     public const string POSITION_UPDATE = "POSITION_UPDATE";
 }

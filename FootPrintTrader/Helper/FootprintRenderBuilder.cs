@@ -44,6 +44,7 @@ public class FootprintRenderBar
 public class FootprintRenderSnapshot
 {
     public double RowSize { get; set; }
+    public int PriceDecimals { get; set; }
     public int TradesPerBar { get; set; }
     public string[] FooterLabels { get; set; } = { "Delta", "Vol", "Secs" };
     public Dictionary<string, string> Colors { get; set; } = new();
@@ -71,12 +72,14 @@ public static class FootprintRenderBuilder
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public static FootprintRenderSnapshot Build(FootprintSnapshot snapshot, double tickSize, double currentPrice = 0)
+    public static FootprintRenderSnapshot Build(FootprintSnapshot snapshot, double tickSize, double currentPrice = 0, MarketProfile market = null)
     {
+        market ??= MarketProfile.Current;
         var result = new FootprintRenderSnapshot
         {
             RowSize = tickSize,
-            TradesPerBar = TradingConfig.TicksPerBucket,
+            PriceDecimals = market.PriceDecimals,
+            TradesPerBar = market.TradesPerBar,
             Colors = new Dictionary<string, string>
             {
                 ["background"] = "#0f131a",

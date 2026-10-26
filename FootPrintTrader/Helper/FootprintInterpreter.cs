@@ -15,7 +15,7 @@ public class MarketInterpretation
 
 public static class FootprintInterpreter
 {
-    public const int MinTicksForTrade = 10; // prior-bar range < 10 ticks = compressed (ES: 2.5 pts)
+    public const int MinTicksForTrade = 10; // prior-bar range < 10 ticks = compressed (2.5 pts on ES)
 
     public static MarketInterpretation Interpret(
         OrderFlowContext context,

@@ -7,10 +7,33 @@ function callBackground(message) {
 const handlers = {
     FOOTPRINT_SNAPSHOT: footprintSnapshot,
     MARKET_DATA: marketData,
+    MARKET_INFO: marketInfo,
     POSITION_UPDATE: positionUpdate
 };
 
 let lastSignature = null;
+let priceDecimals = 2;
+
+function marketInfo(data) {
+    if (!data) return;
+
+    priceDecimals = Number.isInteger(data.priceDecimals) ? data.priceDecimals : priceDecimals;
+
+    const symbolEl = document.getElementById('market-symbol');
+    if (symbolEl) {
+        const symbol = data.dataSymbol || '';
+        const exchange = data.exchange ? ` (${data.exchange})` : '';
+        symbolEl.textContent = symbol + exchange;
+    }
+
+    const bucketEl = document.getElementById('bucket-size');
+    if (bucketEl && data.tradesPerBar) bucketEl.textContent = data.tradesPerBar;
+
+    const posSymbolEl = document.getElementById('pos-symbol');
+    if (posSymbolEl && data.tradeSymbol) posSymbolEl.textContent = data.tradeSymbol;
+
+    if (data.displayName) document.title = `FootPrintTrader - ${data.displayName}`;
+}
 
 function receiveFromBackground(message) {
     try {
@@ -35,7 +58,7 @@ function setPrice(id, value) {
     const el = document.getElementById(id);
     if (!el) return;
     const num = Number(value);
-    const text = (!isNaN(num) && num > 0) ? num.toFixed(2) : '-';
+    const text = (!isNaN(num) && num > 0) ? num.toFixed(priceDecimals) : '-';
     if (el.textContent !== text) {
         el.textContent = text;
     }
@@ -44,7 +67,7 @@ function setPrice(id, value) {
 function positionUpdate(data) {
     if (!data) return;
 
-    const symbol = data.symbol ?? data.Symbol ?? 'MES';
+    const symbol = data.symbol ?? data.Symbol ?? '-';
     const direction = data.direction ?? data.Direction ?? '';
     const netQuantity = data.netQuantity ?? data.NetQuantity ?? 0;
     const averagePrice = data.averagePrice ?? data.AveragePrice ?? 0;
@@ -72,7 +95,7 @@ function positionUpdate(data) {
         }
         if (qtyEl) qtyEl.textContent = '0';
         if (avgPriceEl) avgPriceEl.textContent = '-';
-        if (currPriceEl) currPriceEl.textContent = (currentPrice > 0) ? Number(currentPrice).toFixed(2) : '-';
+        if (currPriceEl) currPriceEl.textContent = (currentPrice > 0) ? Number(currentPrice).toFixed(priceDecimals) : '-';
         if (pnlEl) {
             pnlEl.textContent = '$0.00';
             pnlEl.className = 'pos-pnl';
@@ -86,8 +109,8 @@ function positionUpdate(data) {
             directionEl.textContent = isLong ? 'LONG' : 'SHORT';
         }
         if (qtyEl) qtyEl.textContent = String(Math.abs(netQuantity));
-        if (avgPriceEl) avgPriceEl.textContent = (averagePrice > 0) ? Number(averagePrice).toFixed(2) : '-';
-        if (currPriceEl) currPriceEl.textContent = (currentPrice > 0) ? Number(currentPrice).toFixed(2) : '-';
+        if (avgPriceEl) avgPriceEl.textContent = (averagePrice > 0) ? Number(averagePrice).toFixed(priceDecimals) : '-';
+        if (currPriceEl) currPriceEl.textContent = (currentPrice > 0) ? Number(currentPrice).toFixed(priceDecimals) : '-';
 
         const pnl = Number(unrealizedPnL) || 0;
         const pts = Number(pointsPnL) || 0;
@@ -99,7 +122,7 @@ function positionUpdate(data) {
             pnlEl.className = `pos-pnl ${pnl >= 0 ? 'val-up' : 'val-down'}`;
         }
         if (ptsEl) {
-            ptsEl.textContent = `(${ptsSign}${Math.abs(pts).toFixed(2)} pts)`;
+            ptsEl.textContent = `(${ptsSign}${Math.abs(pts).toFixed(priceDecimals)} pts)`;
         }
         if (flattenBtn) flattenBtn.style.display = 'inline-block';
     }
@@ -146,7 +169,7 @@ function fmtSigned(n) {
 function updateSidePanel(ctx, tickSize) {
     if (!ctx) return;
 
-    const dec = (String(tickSize).split('.')[1] || '').length || 2;
+    const dec = Number.isInteger(priceDecimals) ? priceDecimals : 2;
 
     // 1. Bias Card & Headline
     const biasCard = document.getElementById('bias-card');

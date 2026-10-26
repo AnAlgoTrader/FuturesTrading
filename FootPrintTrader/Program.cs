@@ -27,9 +27,8 @@ namespace FootPrintTrader
         private const int MarketDataRequestId = 1108;
         private const int PriceTickRequestId = 1109;
         private const int TradeTickRequestId = 1110;
-        private const double TickSize = 0.25;
-        private const decimal OrderQuantity = 1m;
-        private const double RoundTripCommission = 0.7 * 2;
+
+        private static readonly MarketProfile Market = MarketProfile.Current;
 
         private static double _bid;
         private static double _ask;
@@ -38,14 +37,16 @@ namespace FootPrintTrader
         private static int _snapshotWritten;
 
         private static double TradeMultiplier =>
-            double.TryParse(_tradeContract?.Contract.Multiplier, NumberStyles.Float, CultureInfo.InvariantCulture, out var m) ? m : 5;
+            double.TryParse(_tradeContract?.Contract.Multiplier, NumberStyles.Float, CultureInfo.InvariantCulture, out var m)
+                ? m
+                : Market.TradeMultiplierValue;
 
         [STAThread]
         private static void Main()
         {
-            _footprintClassifier = new FootprintClassifier(tickSize: TickSize, tradesPerBar: TradingConfig.TicksPerBucket);
-            _logger = new Logger();
-            _orderHelper = new OrderHelper(_logger);
+            _footprintClassifier = new FootprintClassifier(tickSize: Market.TickSize, tradesPerBar: Market.TradesPerBar);
+            _logger = new Logger(Market.DataDirectory);
+            _orderHelper = new OrderHelper(_logger, Market.DataDirectory);
             _orderHelper.OnOrdersChanged += _ => SendPositionUpdate();
             _orderHelper.OnPositionChanged += _ => SendPositionUpdate();
 
@@ -55,7 +56,7 @@ namespace FootPrintTrader
             };
 
             _window = window
-                .SetTitle("FootPrintTrader")
+                .SetTitle($"FootPrintTrader - {Market.DisplayName}")
                 .SetUseOsDefaultSize(false)
                 .SetMaximized(true)
                 .RegisterWebMessageReceivedHandler(ReceiveMessage)
@@ -70,11 +71,14 @@ namespace FootPrintTrader
         private static void ReceiveMessage(object sender, string message)
         {
             if (message == "applicationReady")
+            {
+                SendUpdate(UpdateMessageType.MARKET_INFO, Market.ToMarketInfo());
                 _ = InitAndSubscribe();
+            }
             else if (message == "buy")
-                _ = SubmitOrder("BUY", OrderQuantity, _ask > 0 ? _ask : _currentPrice);
+                _ = SubmitOrder("BUY", Market.OrderQuantity, _ask > 0 ? _ask : _currentPrice);
             else if (message == "sell")
-                _ = SubmitOrder("SELL", OrderQuantity, _bid > 0 ? _bid : _currentPrice);
+                _ = SubmitOrder("SELL", Market.OrderQuantity, _bid > 0 ? _bid : _currentPrice);
             else if (message == "closeTrade")
                 _ = CloseActiveTrade();
         }
@@ -95,24 +99,24 @@ namespace FootPrintTrader
                 var snapshot = _footprintClassifier?.GetSnapshot();
                 if (snapshot == null) return;
 
-                Directory.CreateDirectory(Logger.DATA_DIR);
+                Directory.CreateDirectory(Market.DataDirectory);
                 var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-                var payload = FootprintRenderBuilder.Build(snapshot, TickSize, _currentPrice);
+                var payload = FootprintRenderBuilder.Build(snapshot, Market.TickSize, _currentPrice, Market);
 
-                var jsonPath = Path.Combine(Logger.DATA_DIR, $"footprint-{stamp}.json");
+                var jsonPath = Path.Combine(Market.DataDirectory, $"footprint-{stamp}.json");
                 File.WriteAllText(jsonPath, JsonSerializer.Serialize(payload, FootprintRenderBuilder.JsonOptions));
 
                 var dataPayload = FootprintDataExporter.Build(
                     snapshot,
-                    TickSize,
-                    TradingConfig.DataSymbol,
-                    TradingConfig.TradeSymbol,
-                    TradingConfig.TicksPerBucket,
+                    Market.TickSize,
+                    Market.DataSymbol,
+                    Market.TradeSymbol,
+                    Market.TradesPerBar,
                     DateTime.Now);
-                var dataPath = Path.Combine(Logger.DATA_DIR, $"footprint-data-{stamp}.json");
+                var dataPath = Path.Combine(Market.DataDirectory, $"footprint-data-{stamp}.json");
                 File.WriteAllText(dataPath, JsonSerializer.Serialize(dataPayload, FootprintRenderBuilder.JsonOptions));
 
-                var htmlPath = Path.Combine(Logger.DATA_DIR, $"footprint-{stamp}.html");
+                var htmlPath = Path.Combine(Market.DataDirectory, $"footprint-{stamp}.html");
                 File.WriteAllText(htmlPath, FootprintHtmlExporter.Build(payload, DateTime.Now));
 
                 _logger?.WriteLine($"[SNAPSHOT] {Path.GetFileName(jsonPath)} + {Path.GetFileName(dataPath)} + {Path.GetFileName(htmlPath)}");
@@ -168,17 +172,17 @@ namespace FootPrintTrader
                     _orderHelper.CurrentChartPrice = _currentPrice;
                     if (_bid <= 0 && _ask <= 0)
                     {
-                        _bid = _currentPrice - TickSize * 0.5;
-                        _ask = _currentPrice + TickSize * 0.5;
+                        _bid = _currentPrice - Market.TickSize * 0.5;
+                        _ask = _currentPrice + Market.TickSize * 0.5;
                         SendUpdate(UpdateMessageType.MARKET_DATA, new MarketDataUpdate { Bid = _bid, Ask = _ask });
                     }
                 }
             };
 
-            _client.Start("127.0.0.1", 4001, 0);
+            _client.Start(Market.Host, Market.Port, Market.ClientId);
 
-            _dataContract = await ContractHelper.GetContract(_client, TradingConfig.DataSymbol);
-            _tradeContract = await ContractHelper.GetContract(_client, TradingConfig.TradeSymbol);
+            _dataContract = await ContractHelper.GetContract(_client, Market, Market.DataSymbol);
+            _tradeContract = await ContractHelper.GetContract(_client, Market, Market.TradeSymbol);
 
             _client.SubscribeToMarketData(MarketDataRequestId, _dataContract);
             _client.SubscribeToPriceTickByTick(PriceTickRequestId, _dataContract.Contract);
@@ -193,7 +197,7 @@ namespace FootPrintTrader
             var snap = _footprintClassifier.GetSnapshot();
             if (snap.Current != null || snap.Completed.Length > 0)
             {
-                SendUpdate(UpdateMessageType.FOOTPRINT_SNAPSHOT, FootprintRenderBuilder.Build(snap, TickSize, _currentPrice));
+                SendUpdate(UpdateMessageType.FOOTPRINT_SNAPSHOT, FootprintRenderBuilder.Build(snap, Market.TickSize, _currentPrice, Market));
 
                 if (_bid <= 0 && _ask <= 0)
                 {
@@ -202,8 +206,8 @@ namespace FootPrintTrader
                     {
                         _currentPrice = lastBar.Close;
                         _orderHelper.CurrentChartPrice = _currentPrice;
-                        _bid = _currentPrice - TickSize * 0.5;
-                        _ask = _currentPrice + TickSize * 0.5;
+                        _bid = _currentPrice - Market.TickSize * 0.5;
+                        _ask = _currentPrice + Market.TickSize * 0.5;
                     }
                 }
             }
@@ -232,12 +236,12 @@ namespace FootPrintTrader
                 var diff = isBuy ? (evalPrice - entryPrice) : (entryPrice - evalPrice);
                 points = diff;
                 pnlDollar = diff * (double)Math.Abs(position.NetQuantity) * TradeMultiplier;
-                pnlDollar -= RoundTripCommission * (double)Math.Abs(position.NetQuantity);
+                pnlDollar -= Market.RoundTripCommission * (double)Math.Abs(position.NetQuantity);
             }
 
             var update = new PositionUpdate
             {
-                Symbol = TradingConfig.TradeSymbol,
+                Symbol = Market.TradeSymbol,
                 Direction = position.Direction,
                 NetQuantity = position.NetQuantity,
                 Quantity = position.Quantity,

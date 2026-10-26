@@ -14,6 +14,7 @@ public class OrderHelper
 {
     private List<OrderPersistence> _activeOrders = new();
     private PositionSummary _position = new();
+    private readonly string _dataDirectory;
     private readonly string _ordersPath;
     private readonly string _positionPath;
     private readonly Logger _logger;
@@ -53,11 +54,12 @@ public class OrderHelper
         }
     }
 
-    public OrderHelper(Logger logger = null)
+    public OrderHelper(Logger logger = null, string dataDir = null)
     {
         _logger = logger;
-        _ordersPath = Path.Combine(Logger.DATA_DIR, "orders.json");
-        _positionPath = Path.Combine(Logger.DATA_DIR, "position.json");
+        _dataDirectory = string.IsNullOrWhiteSpace(dataDir) ? (logger?.DataDirectory ?? MarketProfile.Current.DataDirectory) : dataDir;
+        _ordersPath = Path.Combine(_dataDirectory, "orders.json");
+        _positionPath = Path.Combine(_dataDirectory, "position.json");
     }
 
     public async Task PersistOrder(Order order)
@@ -88,7 +90,7 @@ public class OrderHelper
         await _lock.WaitAsync();
         try
         {
-            Directory.CreateDirectory(Logger.DATA_DIR);
+            Directory.CreateDirectory(_dataDirectory);
             _activeOrders = await ReadOrdersInternal();
             _position = await ReadPositionInternal();
             OnOrdersChanged?.Invoke(ActiveOrders);
@@ -191,14 +193,14 @@ public class OrderHelper
 
     private async Task SaveActiveOrdersInternal()
     {
-        Directory.CreateDirectory(Logger.DATA_DIR);
+        Directory.CreateDirectory(_dataDirectory);
         var json = JsonSerializer.Serialize(_activeOrders, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(_ordersPath, json);
     }
 
     private async Task SavePositionInternal()
     {
-        Directory.CreateDirectory(Logger.DATA_DIR);
+        Directory.CreateDirectory(_dataDirectory);
         var json = JsonSerializer.Serialize(_position, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(_positionPath, json);
     }

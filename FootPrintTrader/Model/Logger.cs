@@ -5,18 +5,25 @@ namespace FootPrintTrader.Model;
 
 public class Logger : IDisposable
 {
-    public const string DATA_DIR = "/home/oce/LocalDB/logs/footprint";
     private readonly StreamWriter _writer;
 
-    public Logger()
+    public string DataDirectory { get; }
+
+    public Logger(string dataDirectory = null)
     {
-        Directory.CreateDirectory(DATA_DIR);
-        var filePath = Path.Combine(DATA_DIR, "footprint.log");
+        DataDirectory = string.IsNullOrWhiteSpace(dataDirectory)
+            ? MarketProfile.Current.DataDirectory
+            : dataDirectory;
+        Directory.CreateDirectory(DataDirectory);
+        var filePath = Path.Combine(DataDirectory, "footprint.log");
         _writer = new StreamWriter(filePath, append: false) { AutoFlush = true };
     }
 
-    protected Logger(bool silent)
+    protected Logger(bool silent, string dataDirectory = null)
     {
+        DataDirectory = string.IsNullOrWhiteSpace(dataDirectory)
+            ? MarketProfile.Current.DataDirectory
+            : dataDirectory;
         _writer = null;
     }
 

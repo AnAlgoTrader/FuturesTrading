@@ -10,14 +10,20 @@ namespace FootPrintTrader.Helper;
 
 public class ContractHelper
 {
-    public static async Task<ContractDetails> GetContract(IbClient client, string symbol)
+    public static Task<ContractDetails> GetContract(IbClient client, MarketProfile market, bool forTrade)
+    {
+        return GetContract(client, market, forTrade ? market.TradeSymbol : market.DataSymbol);
+    }
+
+    public static async Task<ContractDetails> GetContract(IbClient client, MarketProfile market, string symbol)
     {
         var contractDataList = await client.GetContractData(new Contract
         {
             Symbol = symbol,
-            SecType = TradingConfig.SecurityType,
-            Currency = TradingConfig.Currency,
-            Exchange = TradingConfig.Exchange
+            SecType = market.SecurityType,
+            Currency = market.Currency,
+            Exchange = market.Exchange,
+            Multiplier = string.Equals(symbol, market.TradeSymbol, StringComparison.OrdinalIgnoreCase) ? market.TradeMultiplier : market.DataMultiplier
         });
         return contractDataList.OrderBy(x => x.Contract.LastTradeDate).FirstOrDefault(x =>
             DateTime.ParseExact(x.Contract.LastTradeDate, "yyyyMMdd", CultureInfo.InvariantCulture) > DateTime.Now)!;
