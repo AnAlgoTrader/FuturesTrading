@@ -54,7 +54,9 @@ namespace FootPrintTrader
 
             var window = new PhotinoWindow
             {
-                LogVerbosity = 0
+                LogVerbosity = 0,
+                MinSize = new System.Drawing.Point(800, 600),
+                Size = new System.Drawing.Size(1280, 800)
             };
 
             _window = window
