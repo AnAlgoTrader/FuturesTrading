@@ -30,9 +30,7 @@ namespace FootPrintTrader
 
         private static readonly MarketProfile Market = MarketPresets.EsMes;
 
-        private static readonly string DataDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "FootPrintTrader", Market.DataSymbol + Market.TradeSymbol);
+        private static readonly string DataDirectory = "/home/oce/LocalDB/logs/footprint";
 
         private static double _bid;
         private static double _ask;
