@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using FootPrintTrader.Model;
 
 namespace FootPrintTrader.Helper;
 
@@ -15,12 +16,11 @@ public class MarketInterpretation
 
 public static class FootprintInterpreter
 {
-    public const int MinTicksForTrade = 10; // prior-bar range < 10 ticks = compressed (2.5 pts on ES)
-
     public static MarketInterpretation Interpret(
         OrderFlowContext context,
         FootprintSnapshot snapshot,
-        double tickSize)
+        double tickSize,
+        MarketProfile settings)
     {
         var interp = new MarketInterpretation();
         if (context == null || snapshot == null)
@@ -35,6 +35,7 @@ public static class FootprintInterpreter
         string P(double v) => v.ToString("F" + dec, CultureInfo.InvariantCulture);
 
         var signals = context.Signals ?? new List<OrderFlowSignal>();
+        var minRangeTicks = settings.MinRangeTicksForTrade;
 
         // Conflict uses only high-priority (structural) signals, so a routine two-sided
         // auction — developing/retest imbalances on both sides — no longer forces STAND ASIDE.
@@ -51,13 +52,13 @@ public static class FootprintInterpreter
             interp.Title = "Conflicting Auction (Bracket)";
             interp.Tone = "warning";
             interp.Action = "STAND ASIDE";
-            interp.Details = range < tickSize * MinTicksForTrade
+            interp.Details = range < tickSize * minRangeTicks
                 ? $"Opposing structural flow inside a compressed {range.ToString("F" + dec, CultureInfo.InvariantCulture)}-pt range."
                 : "Opposing structural flow. Wait for one side to take control.";
             return interp;
         }
 
-        if (range < tickSize * MinTicksForTrade && context.Bias != "Rotational / Balance")
+        if (range < tickSize * minRangeTicks && context.Bias != "Rotational / Balance")
         {
             interp.Title = $"{context.Bias} (Range Compressed)";
             interp.Tone = "warning";

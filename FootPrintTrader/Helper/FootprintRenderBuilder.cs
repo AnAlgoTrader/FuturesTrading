@@ -72,9 +72,8 @@ public static class FootprintRenderBuilder
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public static FootprintRenderSnapshot Build(FootprintSnapshot snapshot, double tickSize, double currentPrice = 0, MarketProfile market = null)
+    public static FootprintRenderSnapshot Build(FootprintSnapshot snapshot, double tickSize, double currentPrice, MarketProfile market)
     {
-        market ??= MarketProfile.Current;
         var result = new FootprintRenderSnapshot
         {
             RowSize = tickSize,
@@ -100,8 +99,8 @@ public static class FootprintRenderBuilder
         if (currentPrice > 0 && result.Bars.Count > 0)
             MarkCurrentPrice(result.Bars[^1], currentPrice, tickSize);
 
-        result.Context = FootprintAnalyzer.AnalyzeContext(snapshot, tickSize, currentPrice);
-        result.Interpretation = FootprintInterpreter.Interpret(result.Context, snapshot, tickSize);
+        result.Context = FootprintAnalyzer.AnalyzeContext(snapshot, tickSize, currentPrice, market);
+        result.Interpretation = FootprintInterpreter.Interpret(result.Context, snapshot, tickSize, market);
         return result;
     }
 

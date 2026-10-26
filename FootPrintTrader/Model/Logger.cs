@@ -9,21 +9,17 @@ public class Logger : IDisposable
 
     public string DataDirectory { get; }
 
-    public Logger(string dataDirectory = null)
+    public Logger(string dataDirectory)
     {
-        DataDirectory = string.IsNullOrWhiteSpace(dataDirectory)
-            ? MarketProfile.Current.DataDirectory
-            : dataDirectory;
+        DataDirectory = dataDirectory;
         Directory.CreateDirectory(DataDirectory);
         var filePath = Path.Combine(DataDirectory, "footprint.log");
         _writer = new StreamWriter(filePath, append: false) { AutoFlush = true };
     }
 
-    protected Logger(bool silent, string dataDirectory = null)
+    protected Logger(bool silent, string dataDirectory)
     {
-        DataDirectory = string.IsNullOrWhiteSpace(dataDirectory)
-            ? MarketProfile.Current.DataDirectory
-            : dataDirectory;
+        DataDirectory = dataDirectory;
         _writer = null;
     }
 

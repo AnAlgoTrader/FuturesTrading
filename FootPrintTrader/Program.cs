@@ -28,7 +28,11 @@ namespace FootPrintTrader
         private const int PriceTickRequestId = 1109;
         private const int TradeTickRequestId = 1110;
 
-        private static readonly MarketProfile Market = MarketProfile.Current;
+        private static readonly MarketProfile Market = MarketPresets.EsMes;
+
+        private static readonly string DataDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "FootPrintTrader", Market.DataSymbol + Market.TradeSymbol);
 
         private static double _bid;
         private static double _ask;
@@ -39,14 +43,14 @@ namespace FootPrintTrader
         private static double TradeMultiplier =>
             double.TryParse(_tradeContract?.Contract.Multiplier, NumberStyles.Float, CultureInfo.InvariantCulture, out var m)
                 ? m
-                : Market.TradeMultiplierValue;
+                : Market.TradeMultiplier;
 
         [STAThread]
         private static void Main()
         {
             _footprintClassifier = new FootprintClassifier(tickSize: Market.TickSize, tradesPerBar: Market.TradesPerBar);
-            _logger = new Logger(Market.DataDirectory);
-            _orderHelper = new OrderHelper(_logger, Market.DataDirectory);
+            _logger = new Logger(DataDirectory);
+            _orderHelper = new OrderHelper(_logger);
             _orderHelper.OnOrdersChanged += _ => SendPositionUpdate();
             _orderHelper.OnPositionChanged += _ => SendPositionUpdate();
 
@@ -72,7 +76,15 @@ namespace FootPrintTrader
         {
             if (message == "applicationReady")
             {
-                SendUpdate(UpdateMessageType.MARKET_INFO, Market.ToMarketInfo());
+                SendUpdate(UpdateMessageType.MARKET_INFO, new MarketInfo
+                {
+                    DisplayName = Market.DisplayName,
+                    DataSymbol = Market.DataSymbol,
+                    TradeSymbol = Market.TradeSymbol,
+                    Exchange = Market.Exchange,
+                    PriceDecimals = Market.PriceDecimals,
+                    TradesPerBar = Market.TradesPerBar
+                });
                 _ = InitAndSubscribe();
             }
             else if (message == "buy")
@@ -99,11 +111,11 @@ namespace FootPrintTrader
                 var snapshot = _footprintClassifier?.GetSnapshot();
                 if (snapshot == null) return;
 
-                Directory.CreateDirectory(Market.DataDirectory);
+                Directory.CreateDirectory(DataDirectory);
                 var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
                 var payload = FootprintRenderBuilder.Build(snapshot, Market.TickSize, _currentPrice, Market);
 
-                var jsonPath = Path.Combine(Market.DataDirectory, $"footprint-{stamp}.json");
+                var jsonPath = Path.Combine(DataDirectory, $"footprint-{stamp}.json");
                 File.WriteAllText(jsonPath, JsonSerializer.Serialize(payload, FootprintRenderBuilder.JsonOptions));
 
                 var dataPayload = FootprintDataExporter.Build(
@@ -113,10 +125,10 @@ namespace FootPrintTrader
                     Market.TradeSymbol,
                     Market.TradesPerBar,
                     DateTime.Now);
-                var dataPath = Path.Combine(Market.DataDirectory, $"footprint-data-{stamp}.json");
+                var dataPath = Path.Combine(DataDirectory, $"footprint-data-{stamp}.json");
                 File.WriteAllText(dataPath, JsonSerializer.Serialize(dataPayload, FootprintRenderBuilder.JsonOptions));
 
-                var htmlPath = Path.Combine(Market.DataDirectory, $"footprint-{stamp}.html");
+                var htmlPath = Path.Combine(DataDirectory, $"footprint-{stamp}.html");
                 File.WriteAllText(htmlPath, FootprintHtmlExporter.Build(payload, DateTime.Now));
 
                 _logger?.WriteLine($"[SNAPSHOT] {Path.GetFileName(jsonPath)} + {Path.GetFileName(dataPath)} + {Path.GetFileName(htmlPath)}");
@@ -236,7 +248,7 @@ namespace FootPrintTrader
                 var diff = isBuy ? (evalPrice - entryPrice) : (entryPrice - evalPrice);
                 points = diff;
                 pnlDollar = diff * (double)Math.Abs(position.NetQuantity) * TradeMultiplier;
-                pnlDollar -= Market.RoundTripCommission * (double)Math.Abs(position.NetQuantity);
+                pnlDollar -= Market.CommissionPerSide * 2 * (double)Math.Abs(position.NetQuantity);
             }
 
             var update = new PositionUpdate

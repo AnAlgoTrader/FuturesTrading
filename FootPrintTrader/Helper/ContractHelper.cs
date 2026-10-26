@@ -12,13 +12,17 @@ public class ContractHelper
 {
     public static async Task<ContractDetails> GetContract(IbClient client, MarketProfile market, string symbol)
     {
+        var multiplier = string.Equals(symbol, market.TradeSymbol, StringComparison.OrdinalIgnoreCase)
+            ? market.TradeMultiplier
+            : market.DataMultiplier;
+
         var contractDataList = await client.GetContractData(new Contract
         {
             Symbol = symbol,
             SecType = market.SecurityType,
             Currency = market.Currency,
             Exchange = market.Exchange,
-            Multiplier = string.Equals(symbol, market.TradeSymbol, StringComparison.OrdinalIgnoreCase) ? market.TradeMultiplier : market.DataMultiplier
+            Multiplier = multiplier.ToString(CultureInfo.InvariantCulture)
         });
         return contractDataList.OrderBy(x => x.Contract.LastTradeDate).FirstOrDefault(x =>
             DateTime.ParseExact(x.Contract.LastTradeDate, "yyyyMMdd", CultureInfo.InvariantCulture) > DateTime.Now)!;

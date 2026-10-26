@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
+using FootPrintTrader.Model;
 
 namespace FootPrintTrader.Helper;
 
@@ -53,53 +54,6 @@ public class OrderFlowContext
 
 public static class FootprintAnalyzer
 {
-    // ============================================================
-    // TUNABLE SETTINGS
-    // ------------------------------------------------------------
-    // Ratio-based detection (industry standard, kept fixed).
-    // Magnitude-based filters (relative, adaptive to market activity).
-    // ============================================================
-
-    // --- Diagonal imbalance (relative by nature — adjacent levels) ---
-    private const decimal ImbalanceRatio = 3.0m; // 300% — Bookmap / GoCharting / FC Footprint default
-    private const int StackedLevelsRequired = 3; // 3+ consecutive diagonal imbalances
-
-    // --- Volume floors (percentage-based, relative to recent activity) ---
-    // Ratios alone normalize thin data into looking meaningful, so a bar/level must
-    // also clear a share of its own recent activity before any signal is emitted.
-    private const double MinImbalanceVolRatio = 0.05;      // level >= 5% of the bar's avg level volume
-    private const double MinBarVolumeBaselineRatio = 0.25; // bar >= 25% of the 20-bar rolling avg volume
-
-    // --- Absorption (real-time, per price level; Bookmap / MZpack style) ---
-    // A level is absorbing when one side's aggressor volume is an outlier versus the
-    // recent per-level max-side volume distribution, that side dominates the level,
-    // price stalls at the extreme, and price then rejects by AbsorptionDepthTicks.
-    // Evaluated on the developing bar.
-    private const double AbsorptionLevelSigma = 3.0;  // aggressor vol >= mean + 3σ of recent max-side level volumes
-    private const int AbsorptionDepthTicks = 2;       // price must reject >= 2 ticks from the level
-    private const double AbsorptionSideDominance = 0.6; // aggressor side >= 60% of the level's total volume
-
-    // --- Divergence (windowed CVD vs price; confirmed at bar close) ---
-    private const int DivergenceWindowBars = 20;
-    private const double DivergenceMinCvdGapRatio = 0.10; // CVD gap must be >= 10% of the prior extreme's |CVD|
-
-    // --- Unfinished auction (per-bar extreme; both sides printed == unfinished) ---
-    // Majority footprint convention (Imprint/NT8, ATAS, FTMO, Trader Dale): a completed
-    // bar's high is "finished" when only aggressive buyers printed there (bid volume
-    // == 0); if sellers also hit bids at the high the auction is unfinished — an
-    // unfinished-business reference price the market tends to revisit. Mirror for the low
-    // (ask volume > 0). Evaluated on closed bars only. (An inverted zero-side convention
-    // exists — DeepCharts / Senzoukria — calling the one-sided cell unfinished; we follow
-    // the majority, whose test is any non-zero print at the extreme.) Candidates persist
-    // until a later bar trades back through them.
-    // Ledger keeps up to 4 unrepaired references, but only the one nearest the current
-    // price is emitted, at PriorityUnfinished — it is a reference/magnet, never a bias.
-    private const int MaxUnfinishedAuctions = 4;
-
-    // --- Rolling baselines ---
-    private const int BaselineWindowBars = 20;
-    private const int LevelVolumeWindow = 2000;       // rolling per-level max-side volume samples for mean/σ
-
     // --- Signal priority (lower = more important) ---
     public const int PriorityTrapped = 1;
     public const int PriorityAbsorption = 2;
@@ -107,10 +61,6 @@ public static class FootprintAnalyzer
     public const int PriorityRetest = 4;
     public const int PriorityDeveloping = 5;
     public const int PriorityUnfinished = 6;          // reference only — never drives bias
-
-    // --- Debounce / structural (kept fixed — not magnitude thresholds) ---
-    private const int MinLiveTradesForSignal = 250;
-    private const int MaxZoneAgeBars = 8;
 
     // ============================================================
     // STATE
@@ -154,7 +104,7 @@ public static class FootprintAnalyzer
 
     private readonly record struct DivergencePoint(double High, double Low, decimal Cvd, decimal Delta, long Start);
 
-    public static OrderFlowContext AnalyzeContext(FootprintSnapshot snapshot, double tickSize, double currentPrice = 0)
+    public static OrderFlowContext AnalyzeContext(FootprintSnapshot snapshot, double tickSize, double currentPrice, MarketProfile settings)
     {
         if (snapshot == null)
             return _lastContext ?? new OrderFlowContext();
@@ -176,6 +126,9 @@ public static class FootprintAnalyzer
         string T(long unixSeconds) => FootprintRenderBuilder.FormatTime(unixSeconds);
         var signals = new List<OrderFlowSignal>();
         var evalPrice = currentPrice > 0 ? currentPrice : bar.Close;
+
+        var minLiveTrades = settings.MinLiveTradesForSignal;
+        var absorptionDepthTicks = settings.AbsorptionDepthTicks;
 
         // POC Calculation & Zone Placement for current bar
         var levels = bar.Levels ?? Array.Empty<FootprintLevel>();
@@ -229,7 +182,7 @@ public static class FootprintAnalyzer
 
                     // Maintain rolling baseline bar volume (20-bar average)
                     _recentBarVolumes.Enqueue(compBar.Volume);
-                    while (_recentBarVolumes.Count > BaselineWindowBars)
+                    while (_recentBarVolumes.Count > settings.BaselineWindowBars)
                         _recentBarVolumes.Dequeue();
                     _baselineBarVolume = _recentBarVolumes.Count > 0
                         ? _recentBarVolumes.Average()
@@ -239,13 +192,13 @@ public static class FootprintAnalyzer
                     // for absorption — one side is compared against one side.
                     foreach (var lvl in compBar.Levels)
                         _recentLevelVolumes.Enqueue(Math.Max(lvl.BidVolume, lvl.AskVolume));
-                    while (_recentLevelVolumes.Count > LevelVolumeWindow)
+                    while (_recentLevelVolumes.Count > settings.LevelVolumeWindow)
                         _recentLevelVolumes.Dequeue();
                     UpdateLevelVolumeStats();
 
                     // Maintain the divergence window (price extremes + CVD at bar close).
                     _divergenceWindow.Add(new DivergencePoint(compBar.High, compBar.Low, _sessionCumulativeDelta, compBar.Delta, compBar.StartTime));
-                    while (_divergenceWindow.Count > DivergenceWindowBars)
+                    while (_divergenceWindow.Count > settings.DivergenceWindowBars)
                         _divergenceWindow.RemoveAt(0);
 
                     // Unfinished auctions: retire any active extreme this completed bar has
@@ -254,10 +207,10 @@ public static class FootprintAnalyzer
                         u.BarStart < compBar.StartTime &&
                         u.Price >= compBar.Low - tickSize * 0.5 &&
                         u.Price <= compBar.High + tickSize * 0.5);
-                    DetectUnfinishedAuctions(compBar, tickSize);
+                    DetectUnfinishedAuctions(compBar, tickSize, settings);
 
-                    var barImbalances = compBar.Volume >= _baselineBarVolume * (decimal)MinBarVolumeBaselineRatio
-                        ? DetectStackedImbalances(compBar, _baselineBarVolume)
+                    var barImbalances = compBar.Volume >= _baselineBarVolume * (decimal)settings.MinBarVolumeBaselineRatio
+                        ? DetectStackedImbalances(compBar, _baselineBarVolume, settings)
                         : new List<(bool IsBuy, double StartP, double EndP, int Run)>();
                     var bRange = compBar.High - compBar.Low;
 
@@ -296,7 +249,7 @@ public static class FootprintAnalyzer
             }
 
             // Recompute CVD-vs-price divergence from the confirmed completed-bar window.
-            ComputeDivergence(tickSize);
+            ComputeDivergence(tickSize, settings);
 
             // Update zone age
             foreach (var zone in _activeZones)
@@ -305,7 +258,7 @@ public static class FootprintAnalyzer
             }
 
             // Prune expired zones & obsolete bar cache
-            _activeZones.RemoveAll(z => z.AgeBars > MaxZoneAgeBars);
+            _activeZones.RemoveAll(z => z.AgeBars > settings.MaxZoneAgeBars);
 
             // NOTE on _processedBars: IntersectWith(completed) can cause double-counting
             // if the window slides and a bar re-enters. Safer to only prune bars older
@@ -411,12 +364,12 @@ public static class FootprintAnalyzer
             }
         }
 
-        // Developing Live Bar Signals (Debounced: only when live bar has >= MinLiveTradesForSignal
+        // Developing Live Bar Signals (Debounced: only when live bar has >= settings.MinLiveTradesForSignal
         // and enough volume versus its own 20-bar baseline)
-        if (current is { TradeCount: >= MinLiveTradesForSignal } &&
-            current.Volume >= _baselineBarVolume * (decimal)MinBarVolumeBaselineRatio)
+        if (current != null && current.TradeCount >= minLiveTrades &&
+            current.Volume >= _baselineBarVolume * (decimal)settings.MinBarVolumeBaselineRatio)
         {
-            var liveImbalances = DetectStackedImbalances(current, _baselineBarVolume);
+            var liveImbalances = DetectStackedImbalances(current, _baselineBarVolume, settings);
             var liveRange = current.High - current.Low;
 
             foreach (var imb in liveImbalances)
@@ -494,16 +447,16 @@ public static class FootprintAnalyzer
         // Absorption (real-time, per price level; Bookmap / MZpack style)
         // A level absorbs when one side's aggressor volume is an outlier versus the
         // recent per-level max-side volume distribution, that side dominates the level,
-        // AND price then rejects by AbsorptionDepthTicks.
+        // AND price then rejects by the configured tick depth.
         // Runs on the developing bar, so it does NOT wait for the bar to close.
         // ============================================================
-        var absorptionThreshold = _levelVolMean + AbsorptionLevelSigma * _levelVolStd;
+        var absorptionThreshold = _levelVolMean + settings.AbsorptionLevelSigma * _levelVolStd;
 
         if (absorptionThreshold > 0 && levels.Length > 0 &&
-            bar.TradeCount >= MinLiveTradesForSignal &&
-            bar.Volume >= _baselineBarVolume * (decimal)MinBarVolumeBaselineRatio)
+            bar.TradeCount >= minLiveTrades &&
+            bar.Volume >= _baselineBarVolume * (decimal)settings.MinBarVolumeBaselineRatio)
         {
-            var depth = tickSize * AbsorptionDepthTicks;
+            var depth = tickSize * absorptionDepthTicks;
 
             lock (_syncLock)
             {
@@ -512,7 +465,7 @@ public static class FootprintAnalyzer
                 {
                     // Seller absorption: heavy aggressive buying at/near the high, price stalls.
                     if ((double)lvl.AskVolume >= absorptionThreshold &&
-                        lvl.Total > 0 && lvl.AskVolume >= lvl.Total * (decimal)AbsorptionSideDominance &&
+                        lvl.Total > 0 && lvl.AskVolume >= lvl.Total * (decimal)settings.AbsorptionSideDominance &&
                         lvl.Price >= bar.High - depth + 1e-9 &&
                         !_absorptionCandidates.Any(c => c.SellerAbsorption && c.BarStart == bar.StartTime && Math.Abs(c.Price - lvl.Price) < tickSize * 0.5))
                     {
@@ -521,7 +474,7 @@ public static class FootprintAnalyzer
 
                     // Buyer absorption: heavy aggressive selling at/near the low, price stalls.
                     if ((double)lvl.BidVolume >= absorptionThreshold &&
-                        lvl.Total > 0 && lvl.BidVolume >= lvl.Total * (decimal)AbsorptionSideDominance &&
+                        lvl.Total > 0 && lvl.BidVolume >= lvl.Total * (decimal)settings.AbsorptionSideDominance &&
                         lvl.Price <= bar.Low + depth + 1e-9 &&
                         !_absorptionCandidates.Any(c => !c.SellerAbsorption && c.BarStart == bar.StartTime && Math.Abs(c.Price - lvl.Price) < tickSize * 0.5))
                     {
@@ -551,8 +504,8 @@ public static class FootprintAnalyzer
                         Price = c.Price,
                         Priority = PriorityAbsorption,
                         Description = c.SellerAbsorption
-                            ? $"Heavy aggressive buying at {P(c.Price)} absorbed; price rejected {AbsorptionDepthTicks} ticks lower."
-                            : $"Heavy aggressive selling at {P(c.Price)} absorbed; price rejected {AbsorptionDepthTicks} ticks higher.",
+                            ? $"Heavy aggressive buying at {P(c.Price)} absorbed; price rejected {absorptionDepthTicks} ticks lower."
+                            : $"Heavy aggressive selling at {P(c.Price)} absorbed; price rejected {absorptionDepthTicks} ticks higher.",
                         Time = T(c.BarStart)
                     });
                 }
@@ -726,7 +679,7 @@ public static class FootprintAnalyzer
     // traded the high (any non-zero bid print) the auction is unfinished. Mirror for the
     // low (ask volume). The price is a reference the market tends to revisit.
     // ============================================================
-    private static void DetectUnfinishedAuctions(FootprintBarData bar, double tickSize)
+    private static void DetectUnfinishedAuctions(FootprintBarData bar, double tickSize, MarketProfile settings)
     {
         var levels = bar.Levels;
         if (levels == null || levels.Length == 0)
@@ -749,7 +702,7 @@ public static class FootprintAnalyzer
             }
         }
 
-        while (_unfinishedAuctions.Count > MaxUnfinishedAuctions)
+        while (_unfinishedAuctions.Count > settings.MaxUnfinishedAuctions)
             _unfinishedAuctions.RemoveAt(0);
     }
 
@@ -757,10 +710,10 @@ public static class FootprintAnalyzer
     // DELTA DIVERGENCE (windowed CVD vs price, confirmed at bar close)
     // Bearish: new price high on a lower cumulative-delta high.
     // Bullish: new price low on a higher cumulative-delta low.
-    // The CVD move must be >= DivergenceMinCvdGapRatio of the prior extreme's
+    // The CVD move must be >= settings.DivergenceMinCvdGapRatio of the prior extreme's
     // |CVD| — direction alone (a 1-contract shortfall) is noise.
     // ============================================================
-    private static void ComputeDivergence(double tickSize)
+    private static void ComputeDivergence(double tickSize, MarketProfile settings)
     {
         _divergence = "None";
         _divergencePrice = 0;
@@ -784,8 +737,8 @@ public static class FootprintAnalyzer
             if (p.Low <= priorLow) { priorLow = p.Low; priorLowCvd = p.Cvd; }
         }
 
-        var bearGap = Math.Abs(priorHighCvd) * (decimal)DivergenceMinCvdGapRatio;
-        var bullGap = Math.Abs(priorLowCvd) * (decimal)DivergenceMinCvdGapRatio;
+        var bearGap = Math.Abs(priorHighCvd) * (decimal)settings.DivergenceMinCvdGapRatio;
+        var bullGap = Math.Abs(priorLowCvd) * (decimal)settings.DivergenceMinCvdGapRatio;
 
         if (latest.High > priorHigh + tickSize * 0.5 &&
             latest.Cvd < priorHighCvd - bearGap &&
@@ -814,7 +767,7 @@ public static class FootprintAnalyzer
     // not a signal threshold.
     // ============================================================
     private static List<(bool IsBuy, double StartP, double EndP, int Run)>
-        DetectStackedImbalances(FootprintBarData bar, decimal baselineBarVolume)
+        DetectStackedImbalances(FootprintBarData bar, decimal baselineBarVolume, MarketProfile settings)
     {
         var list = new List<(bool IsBuy, double StartP, double EndP, int Run)>();
         var levels = bar?.Levels;
@@ -826,10 +779,10 @@ public static class FootprintAnalyzer
             levels = levels.OrderBy(l => l.Price).ToArray();
 
         // Minimum level volume = X% of the bar's average level volume (relative noise
-        // filter). The bar itself is gated upstream by MinBarVolumeBaselineRatio, so a
+        // filter). The bar itself is gated upstream by settings.MinBarVolumeBaselineRatio, so a
         // near-empty bar never reaches this point; the 3:1 ratio does the real work.
         var avgLevelVol = bar.Volume / levels.Length;
-        var minLevelVol = avgLevelVol * (decimal)MinImbalanceVolRatio;
+        var minLevelVol = avgLevelVol * (decimal)settings.MinImbalanceVolRatio;
 
         var buyImb = new bool[levels.Length];
         var sellImb = new bool[levels.Length];
@@ -842,7 +795,7 @@ public static class FootprintAnalyzer
             // Buy imbalance at i+1 (Ask at high vs Bid at low)
             if (lHigh.AskVolume >= minLevelVol &&
                 (lLow.BidVolume == 0 ||
-                 lHigh.AskVolume >= lLow.BidVolume * ImbalanceRatio))
+                 lHigh.AskVolume >= lLow.BidVolume * settings.ImbalanceRatio))
             {
                 buyImb[i + 1] = true;
             }
@@ -850,7 +803,7 @@ public static class FootprintAnalyzer
             // Sell imbalance at i (Bid at low vs Ask at high)
             if (lLow.BidVolume >= minLevelVol &&
                 (lHigh.AskVolume == 0 ||
-                 lLow.BidVolume >= lHigh.AskVolume * ImbalanceRatio))
+                 lLow.BidVolume >= lHigh.AskVolume * settings.ImbalanceRatio))
             {
                 sellImb[i] = true;
             }
@@ -863,13 +816,13 @@ public static class FootprintAnalyzer
             if (buyImb[i]) run++;
             else
             {
-                if (run >= StackedLevelsRequired)
+                if (run >= settings.StackedLevelsRequired)
                     list.Add((true, levels[i - run].Price, levels[i - 1].Price, run));
                 run = 0;
             }
         }
 
-        if (run >= StackedLevelsRequired)
+        if (run >= settings.StackedLevelsRequired)
             list.Add((true, levels[levels.Length - run].Price, levels[^1].Price, run));
 
         // Detect Stacked Sell
@@ -879,13 +832,13 @@ public static class FootprintAnalyzer
             if (sellImb[i]) run++;
             else
             {
-                if (run >= StackedLevelsRequired)
+                if (run >= settings.StackedLevelsRequired)
                     list.Add((false, levels[i - run].Price, levels[i - 1].Price, run));
                 run = 0;
             }
         }
 
-        if (run >= StackedLevelsRequired)
+        if (run >= settings.StackedLevelsRequired)
             list.Add((false, levels[levels.Length - run].Price, levels[^1].Price, run));
 
         return list;

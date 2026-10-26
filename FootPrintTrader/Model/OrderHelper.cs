@@ -54,10 +54,10 @@ public class OrderHelper
         }
     }
 
-    public OrderHelper(Logger logger = null, string dataDir = null)
+    public OrderHelper(Logger logger)
     {
         _logger = logger;
-        _dataDirectory = string.IsNullOrWhiteSpace(dataDir) ? (logger?.DataDirectory ?? MarketProfile.Current.DataDirectory) : dataDir;
+        _dataDirectory = logger.DataDirectory;
         _ordersPath = Path.Combine(_dataDirectory, "orders.json");
         _positionPath = Path.Combine(_dataDirectory, "position.json");
     }
