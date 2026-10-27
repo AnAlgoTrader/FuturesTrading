@@ -15,6 +15,12 @@ public class MarketProfile
     public double DataMultiplier { get; set; }
     public double TradeMultiplier { get; set; }
 
+    // Underlying IB symbol & trading classes (for markets where IB root symbol differs or requires trading class)
+    public string UnderlyingSymbol { get; set; }
+    public string DataTradingClass { get; set; }
+    public string TradeTradingClass { get; set; }
+    public string CurrencySign { get; set; }
+
     // Price / chart
     public double TickSize { get; set; }
     public int PriceDecimals { get; set; }
@@ -62,4 +68,5 @@ public class MarketInfo
     public string Exchange { get; set; }
     public int PriceDecimals { get; set; }
     public int TradesPerBar { get; set; }
+    public string CurrencySign { get; set; }
 }

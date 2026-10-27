@@ -13,11 +13,13 @@ const handlers = {
 
 let lastSignature = null;
 let priceDecimals = 2;
+let currencySign = '$';
 
 function marketInfo(data) {
     if (!data) return;
 
     priceDecimals = Number.isInteger(data.priceDecimals) ? data.priceDecimals : priceDecimals;
+    if (data.currencySign) currencySign = data.currencySign;
 
     const symbolEl = document.getElementById('market-symbol');
     if (symbolEl) {
@@ -97,7 +99,7 @@ function positionUpdate(data) {
         if (avgPriceEl) avgPriceEl.textContent = '-';
         if (currPriceEl) currPriceEl.textContent = (currentPrice > 0) ? Number(currentPrice).toFixed(priceDecimals) : '-';
         if (pnlEl) {
-            pnlEl.textContent = '$0.00';
+            pnlEl.textContent = `${currencySign}0.00`;
             pnlEl.className = 'pos-pnl';
         }
         if (ptsEl) ptsEl.textContent = '(0.00 pts)';
@@ -118,7 +120,7 @@ function positionUpdate(data) {
         const ptsSign = pts >= 0 ? '+' : '−';
 
         if (pnlEl) {
-            pnlEl.textContent = `${pnlSign}$${Math.abs(pnl).toFixed(2)}`;
+            pnlEl.textContent = `${pnlSign}${currencySign}${Math.abs(pnl).toFixed(2)}`;
             pnlEl.className = `pos-pnl ${pnl >= 0 ? 'val-up' : 'val-down'}`;
         }
         if (ptsEl) {
