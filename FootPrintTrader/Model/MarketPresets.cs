@@ -20,22 +20,8 @@ public static class MarketPresets
         PriceDecimals = 2,
 
         TradesPerBar = 1000,
-        MinLiveTradesForSignal = 250,
-        AbsorptionDepthTicks = 2,
-        MinRangeTicksForTrade = 10,
-
-        ImbalanceRatio = 3.0m,
-        StackedLevelsRequired = 3,
-        MinImbalanceVolRatio = 0.05,
-        MinBarVolumeBaselineRatio = 0.25,
-        AbsorptionLevelSigma = 3.0,
-        AbsorptionSideDominance = 0.6,
         DivergenceWindowBars = 20,
         DivergenceMinCvdGapRatio = 0.10,
-        MaxUnfinishedAuctions = 4,
-        BaselineWindowBars = 20,
-        LevelVolumeWindow = 2000,
-        MaxZoneAgeBars = 8,
 
         OrderQuantity = 1m,
         CommissionPerSide = 0.7,
@@ -66,22 +52,8 @@ public static class MarketPresets
         PriceDecimals = 0,
 
         TradesPerBar = 500,
-        MinLiveTradesForSignal = 125,
-        AbsorptionDepthTicks = 2,
-        MinRangeTicksForTrade = 8,
-
-        ImbalanceRatio = 3.0m,
-        StackedLevelsRequired = 3,
-        MinImbalanceVolRatio = 0.05,
-        MinBarVolumeBaselineRatio = 0.25,
-        AbsorptionLevelSigma = 3.0,
-        AbsorptionSideDominance = 0.6,
         DivergenceWindowBars = 20,
         DivergenceMinCvdGapRatio = 0.10,
-        MaxUnfinishedAuctions = 4,
-        BaselineWindowBars = 20,
-        LevelVolumeWindow = 1000,
-        MaxZoneAgeBars = 8,
 
         OrderQuantity = 1m,
         CommissionPerSide = 0.50

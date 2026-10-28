@@ -23,7 +23,6 @@ if (data.bars && data.bars.length) {{
     footprint.load(data);
     footprint.showLatest(12);
     if (data.context) updateSidePanel(data.context, data.rowSize || 0.25);
-    if (data.interpretation) updateInterpretationPanel(data.interpretation);
 
     const hint = document.createElement('div');
     hint.textContent = 'Shift/Ctrl + wheel or + / - = time zoom  ·  drag = pan  ·  0 = show all';

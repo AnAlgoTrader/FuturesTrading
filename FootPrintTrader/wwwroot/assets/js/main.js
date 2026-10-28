@@ -140,9 +140,6 @@ function footprintSnapshot(data) {
     if (data.context) {
         updateSidePanel(data.context, data.rowSize || 0.25);
     }
-    if (data.interpretation) {
-        updateInterpretationPanel(data.interpretation);
-    }
 
     const bars = data.bars;
     const signature = bars.length + ':' + bars[0].id;
@@ -173,48 +170,7 @@ function updateSidePanel(ctx, tickSize) {
 
     const dec = Number.isInteger(priceDecimals) ? priceDecimals : 2;
 
-    // 1. Bias Card & Headline
-    const biasCard = document.getElementById('bias-card');
-    const biasHeadline = document.getElementById('bias-headline');
-    const biasAction = document.getElementById('bias-action');
-
-    const tone = ctx.biasTone || 'neutral';
-    if (biasCard) {
-        biasCard.style.display = '';
-        biasCard.className = `card bias-card tone-${tone}`;
-    }
-    if (biasHeadline) biasHeadline.textContent = ctx.bias || 'Balanced';
-    if (biasAction) biasAction.textContent = ctx.action || '-';
-
-    // 2. Signals Container
-    const signalsCount = document.getElementById('signals-count');
-    const signalsContainer = document.getElementById('signals-container');
-
-    const signals = Array.isArray(ctx.signals) ? ctx.signals : [];
-    if (signalsCount) signalsCount.textContent = signals.length;
-
-    if (signalsContainer) {
-        if (!signals.length) {
-            signalsContainer.innerHTML = '<div class="empty-state">No active order flow signals</div>';
-        } else {
-            signalsContainer.innerHTML = signals.map(sig => {
-                const sTone = sig.tone || 'neutral';
-                const desc = sig.description ? `<div class="signal-desc">${escapeHtml(sig.description)}</div>` : '';
-                const time = sig.time ? `<span class="signal-time">${escapeHtml(sig.time)}</span>` : '';
-                return `
-                    <div class="signal-item tone-${sTone}">
-                        <div class="signal-header">
-                            <span class="signal-title">${escapeHtml(sig.title)}</span>
-                            ${time}
-                        </div>
-                        ${desc}
-                    </div>
-                `;
-            }).join('');
-        }
-    }
-
-    // 3. Live Bar Metrics
+    // 1. Live Bar Metrics
     const mDelta = document.getElementById('m-delta');
     const mDeltaPct = document.getElementById('m-delta-pct');
     const mVol = document.getElementById('m-vol');
@@ -259,62 +215,5 @@ function updateSidePanel(ctx, tickSize) {
         if (divText.includes('Bullish')) mDiv.className = 'metric-val val-up';
         else if (divText.includes('Bearish')) mDiv.className = 'metric-val val-down';
         else mDiv.className = 'metric-val';
-    }
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
-
-function updateInterpretationPanel(interp) {
-    if (!interp) return;
-
-    const card = document.getElementById('interpretation-card');
-    const headline = document.getElementById('interp-headline');
-    const action = document.getElementById('interp-action');
-    const actionRow = document.getElementById('interp-action-row') || (action ? action.parentElement : null);
-    const details = document.getElementById('interp-details');
-
-    const tone = interp.tone || 'neutral';
-    if (card) {
-        card.style.display = '';
-        card.className = `card interpretation-card tone-${tone}`;
-    }
-
-    const isNeutral = tone === 'neutral' || (!interp.action && !interp.title);
-
-    if (isNeutral) {
-        if (headline) headline.textContent = '-';
-        if (action) action.textContent = '';
-        if (actionRow) actionRow.style.display = 'none';
-        if (details) {
-            details.textContent = '';
-            details.style.display = 'none';
-        }
-        return;
-    }
-
-    if (headline) {
-        headline.textContent = interp.title || '-';
-    }
-
-    if (action && actionRow) {
-        if (interp.action) {
-            action.textContent = interp.action;
-            actionRow.style.display = '';
-        } else {
-            action.textContent = '';
-            actionRow.style.display = 'none';
-        }
-    }
-
-    if (details) {
-        details.textContent = interp.details || '';
-        details.style.display = interp.details ? '' : 'none';
     }
 }

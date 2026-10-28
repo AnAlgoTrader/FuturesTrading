@@ -28,7 +28,7 @@ namespace FootPrintTrader
         private const int PriceTickRequestId = 1109;
         private const int TradeTickRequestId = 1110;
 
-        private static readonly MarketProfile Market = MarketPresets.DaxFdxs;
+        private static readonly MarketProfile Market = MarketPresets.EsMes;
 
         private static readonly string DataDirectory = "/home/oce/LocalDB/logs/footprint";
 
