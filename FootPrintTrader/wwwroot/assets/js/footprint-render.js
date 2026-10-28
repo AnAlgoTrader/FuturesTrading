@@ -17,6 +17,12 @@
       }
       return o;
     }
+    function parseTag(t) {
+      if (!t) return null;
+      if (typeof t === 'string') return { text: t };
+      if (typeof t === 'object' && t.text != null) return Object.assign({}, t, { text: String(t.text) });
+      return null;
+    }
     function parseBar(r, idx, nR) {
       if (!r || !Array.isArray(r.rows) || !r.rows.length) throw new Error(`bar ${idx + 1} has no "rows"`);
       const rows = [], map = {}; let pmin = Infinity, pmax = -Infinity;
@@ -30,12 +36,14 @@
         id: r.id != null ? String(r.id) : label + '|' + (r.group || ''), rows, map, pmin, pmax,
         hi: isNum(r.high) ? +r.high : pmax, lo: isNum(r.low) ? +r.low : pmin,
         open: isNum(r.open) ? +r.open : null, close: isNum(r.close) ? +r.close : null, color: r.color,
-        footer: Array.isArray(r.footer) ? r.footer : [], label, group: r.group ? String(r.group) : ''
+        footer: Array.isArray(r.footer) ? r.footer : [], label, group: r.group ? String(r.group) : '',
+        header: parseTag(r.header),
+        candleFooter: parseTag(r.candleFooter || r.barFooter || r.footerCell)
       };
     }
     function refreshMeta() {
       let fn = 0; minP = Infinity; maxP = -Infinity;
-      for (const b of bars) {minP = Math.min(minP, b.lo); maxP = Math.max(maxP, b.hi); fn = Math.max(fn, b.footer.length)}
+      for (const b of bars) {minP = Math.min(minP, b.lo - R); maxP = Math.max(maxP, b.hi + R); fn = Math.max(fn, b.footer.length)}
       while (labels.length < fn) labels.push('');
       FOOT = 16 * (labels.length + 1) + 8;
     }
@@ -78,7 +86,7 @@
     function fit() {
       if (!bars.length) return;
       const cw = W - AXIS, ch = H - FOOT, i0 = Math.max(0, Math.floor(V.x0 / V.colW)), i1 = Math.min(bars.length - 1, Math.floor((V.x0 + cw) / V.colW));
-      let hi = -Infinity, lo = Infinity; for (let i = i0; i <= i1; i++) {hi = Math.max(hi, bars[i].hi); lo = Math.min(lo, bars[i].lo)}
+      let hi = -Infinity, lo = Infinity; for (let i = i0; i <= i1; i++) {hi = Math.max(hi, bars[i].hi + R); lo = Math.min(lo, bars[i].lo - R)}
       const pad = Math.max(R * 3, (hi - lo) * .06); V.ppu = clamp(ch / (hi - lo + 2 * pad), .3 / R, 32 / R); V.top = hi + pad;
     }
     function box(c, w, x1, x2, y, h) {if (!c) return; ctx.strokeStyle = c; ctx.lineWidth = w || 2; ctx.strokeRect(x1 + 1, y + 1.5, x2 - x1 - 2, h - 2); ctx.lineWidth = 1}
@@ -96,6 +104,69 @@
       const i0 = Math.max(0, Math.floor(V.x0 / cwid)), i1 = Math.min(bars.length - 1, Math.floor((V.x0 + cw) / cwid));
       const yP = p => (V.top - p) * ppu;
 
+      function drawCandleCell(tag, y, cl, cr, mid) {
+        if (y + rowH < 0 || y > ch) return;
+        const w = cr - cl;
+        if (w < 6) return;
+
+        const text = (tag && tag.text) ? String(tag.text).trim() : '';
+
+        if (text) {
+          let textCol = tag.color;
+          let bgCol = tag.bg || tag.bgColor;
+          let borderCol = tag.border || tag.borderColor;
+
+          if (!textCol || !bgCol || !borderCol) {
+            const u = text.toUpperCase();
+            if (u.includes('SAB') || u.includes('BRK')) {
+              textCol = textCol || col.up;
+              bgCol = bgCol || 'rgba(47, 207, 147, 0.22)';
+              borderCol = borderCol || 'rgba(47, 207, 147, 0.75)';
+            } else if (u.includes('BAB') || u.includes('CDIV')) {
+              textCol = textCol || col.down;
+              bgCol = bgCol || 'rgba(240, 100, 123, 0.22)';
+              borderCol = borderCol || 'rgba(240, 100, 123, 0.75)';
+            } else if (u.includes('SLW') || u.includes('SLOW')) {
+              textCol = textCol || (custom.warn || '#f2b705');
+              bgCol = bgCol || 'rgba(242, 183, 5, 0.22)';
+              borderCol = borderCol || 'rgba(242, 183, 5, 0.75)';
+            } else {
+              textCol = textCol || col.text;
+              bgCol = bgCol || 'rgba(138, 147, 166, 0.18)';
+              borderCol = borderCol || 'rgba(138, 147, 166, 0.5)';
+            }
+          }
+
+          ctx.fillStyle = bgCol;
+          ctx.fillRect(cl + 1, y + 1, w - 2, rowH - 2);
+
+          ctx.strokeStyle = borderCol;
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(cl + 1, y + 1, w - 2, rowH - 2);
+          ctx.lineWidth = 1;
+
+          if (cwid >= 28 && rowH >= 8) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(cl + 2, y, w - 4, rowH);
+            ctx.clip();
+            ctx.fillStyle = textCol;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const fSize = clamp(Math.floor(Math.min(rowH - 2, 11)), 8, 11);
+            ctx.font = `bold ${fSize}px ui-monospace,Menlo,Consolas,monospace`;
+            ctx.fillText(text, mid, y + rowH / 2 + 0.5);
+            ctx.restore();
+          }
+        } else {
+          ctx.fillStyle = 'rgba(23, 28, 38, 0.45)';
+          ctx.fillRect(cl + 1, y + 1, w - 2, rowH - 2);
+          ctx.strokeStyle = col.grid;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(cl + 1, y + 1, w - 2, rowH - 2);
+        }
+      }
+
       ctx.save(); ctx.beginPath(); ctx.rect(0, 0, cw, ch); ctx.clip();
       for (let i = i0; i <= i1; i++) {
         const b = bars[i], x = i * cwid - V.x0, cl = x + 9, cr = x + cwid - 4, mid = (cl + cr) / 2, hw = (cr - cl) / 2 - 2;
@@ -111,6 +182,8 @@
           if (showNum) {ctx.fillStyle = col.text; ctx.textAlign = 'right'; ctx.fillText(fmt(r.bid), mid - 5, y + rowH / 2 + 1); ctx.textAlign = 'left'; ctx.fillText(fmt(r.ask), mid + 5, y + rowH / 2 + 1)}
         }
         if (showNum) {ctx.strokeStyle = col.grid; ctx.beginPath(); ctx.moveTo(Math.round(mid) + .5, yP(b.pmax + R / 2)); ctx.lineTo(Math.round(mid) + .5, yP(b.pmin - R / 2)); ctx.stroke()}
+        drawCandleCell(b.header, yP(b.pmax + 1.5 * R), cl, cr, mid);
+        drawCandleCell(b.candleFooter, yP(b.pmin - 0.5 * R), cl, cr, mid);
         const yH = yP(b.hi + R / 2), yL = yP(b.lo - R / 2);
         ctx.fillStyle = b.color || (b.close !== null && b.open !== null && b.close < b.open ? col.down : col.up);
         ctx.fillRect(x + 3, yH, 1, yL - yH);

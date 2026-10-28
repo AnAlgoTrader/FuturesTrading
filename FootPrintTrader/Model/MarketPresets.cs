@@ -23,39 +23,26 @@ public static class MarketPresets
         DivergenceWindowBars = 20,
         DivergenceMinCvdGapRatio = 0.10,
 
+        Signals = new SignalSettings
+        {
+            MinDeltaAbsorption = 250m,
+            SwingLookback = 10,
+            ToleranceTicks = 1,
+            CvdDivergenceLookback = 15,
+            BreakoutLookback = 10,
+            MinDeltaBreakout = 100m,
+            MinBuyImbalancesBreakout = 3,
+            ImbalanceRatio = 3.0m,
+            ImbalanceMinVolume = 10m,
+            FastThresholdRatio = 0.70,
+            SlowdownThresholdRatio = 1.50,
+            SpeedMedianWindow = 20,
+            SpeedMinBars = 8,
+            RepeatControlBars = 3
+        },
+
         OrderQuantity = 1m,
         CommissionPerSide = 0.7,
         CurrencySign = "$"
-    };
-
-    /// <summary>
-    /// DAX 40 (FDAX) market data, Micro-DAX (FDXS) order routing on Eurex.
-    /// Watching the full benchmark future for maximum liquidity &amp; order book depth,
-    /// while trading the 1 EUR/point micro contract.
-    /// </summary>
-    public static readonly MarketProfile DaxFdxs = new()
-    {
-        DisplayName = "DAX 40 / Micro-DAX",
-        UnderlyingSymbol = "DAX",
-        DataSymbol = "FDAX",
-        TradeSymbol = "FDXS",
-        DataTradingClass = "FDAX",
-        TradeTradingClass = "FDXS",
-        SecurityType = "FUT",
-        Currency = "EUR",
-        CurrencySign = "€",
-        Exchange = "EUREX",
-        DataMultiplier = 25,
-        TradeMultiplier = 1,
-
-        TickSize = 1.0,
-        PriceDecimals = 0,
-
-        TradesPerBar = 500,
-        DivergenceWindowBars = 20,
-        DivergenceMinCvdGapRatio = 0.10,
-
-        OrderQuantity = 1m,
-        CommissionPerSide = 0.50
     };
 }

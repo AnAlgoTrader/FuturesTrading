@@ -32,6 +32,9 @@ public class MarketProfile
     public int DivergenceWindowBars { get; set; }
     public double DivergenceMinCvdGapRatio { get; set; }    // CVD gap >= 10% of prior extreme
 
+    // Signals
+    public SignalSettings Signals { get; set; } = new();
+
     // Trading
     public decimal OrderQuantity { get; set; }
     public double CommissionPerSide { get; set; }

@@ -18,3 +18,4 @@ sweep_results.txt
 /FootPrintTrader/obj
 /Common/bin
 /Common/obj
+*.user

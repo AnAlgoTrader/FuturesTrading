@@ -1,0 +1,305 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using FootPrintTrader.Model;
+
+namespace FootPrintTrader.Helper;
+
+public enum FootprintSignalType
+{
+    SellAbsorption,      // SAB - Bullish
+    BuyAbsorption,       // BAB - Bearish
+    CvdDivergence,       // CDIV - Bearish
+    BreakoutConfirmation,// BRK - Bullish
+    Slowdown             // SLW - Phase
+}
+
+public class DetectedFootprintSignal
+{
+    public FootprintSignalType Type { get; init; }
+    public string Acronym { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Tone { get; init; } = "neutral"; // "bullish", "bearish", "phase"
+    public bool IsFast { get; init; }
+    public long BarStartTime { get; init; }
+}
+
+public static class FootprintSignalDetector
+{
+    public const string UpColor = "#2fcf93";
+    public const string DownColor = "#f0647b";
+    public const string WarnColor = "#f2b705";
+
+    /// <summary>
+    /// Scans completed footprint bars in chronological order and detects the 5 signals
+    /// specified in the Footprint Signal Detector specification.
+    /// Returns a dictionary mapping BarStartTime to the list of detected signals for that bar.
+    /// </summary>
+    public static Dictionary<long, List<DetectedFootprintSignal>> DetectSignals(
+        FootprintBarData[] completed,
+        double tickSize,
+        SignalSettings settings)
+    {
+        var result = new Dictionary<long, List<DetectedFootprintSignal>>();
+        if (completed == null || completed.Length == 0) return result;
+
+        settings ??= new SignalSettings();
+        var n = completed.Length;
+
+        // Precompute CVD, durations, and buy imbalances for every completed bar
+        var cvdArray = new decimal[n];
+        var durations = new double[n];
+        var buyImbalances = new int[n];
+
+        decimal runningCvd = 0m;
+        for (var i = 0; i < n; i++)
+        {
+            var b = completed[i];
+            runningCvd += b.Delta;
+            cvdArray[i] = runningCvd;
+            durations[i] = Math.Max(1.0, b.EndTime - b.StartTime);
+            buyImbalances[i] = CountBuyImbalances(b, tickSize, settings.ImbalanceMinVolume, settings.ImbalanceRatio);
+        }
+
+        // Repeat control tracking: maps signal type to last bar index it fired on
+        var lastFired = new Dictionary<FootprintSignalType, int>();
+
+        for (var i = 0; i < n; i++)
+        {
+            var bar = completed[i];
+            var signals = new List<DetectedFootprintSignal>();
+
+            // 1. Swing High & Swing Low (previous 10 bars, not including current bar)
+            if (i >= settings.SwingLookback)
+            {
+                var swingLow = double.MaxValue;
+                var swingHigh = double.MinValue;
+                for (var k = i - settings.SwingLookback; k < i; k++)
+                {
+                    if (completed[k].Low < swingLow) swingLow = completed[k].Low;
+                    if (completed[k].High > swingHigh) swingHigh = completed[k].High;
+                }
+
+                var tolerance = settings.ToleranceTicks * tickSize + 1e-9;
+
+                // Signal 1: Sell absorption (bullish) - SAB
+                // Fires when delta is -250 or lower, and low did not break swing low by more than 1 tick.
+                if (bar.Delta <= -settings.MinDeltaAbsorption && bar.Low >= swingLow - tolerance)
+                {
+                    if (!lastFired.TryGetValue(FootprintSignalType.SellAbsorption, out var lastIdx) || (i - lastIdx > settings.RepeatControlBars))
+                    {
+                        signals.Add(new DetectedFootprintSignal
+                        {
+                            Type = FootprintSignalType.SellAbsorption,
+                            Acronym = "SAB",
+                            Name = "Sell Absorption",
+                            Tone = "bullish",
+                            BarStartTime = bar.StartTime
+                        });
+                        lastFired[FootprintSignalType.SellAbsorption] = i;
+                    }
+                }
+
+                // Signal 2: Buy absorption (bearish) - BAB
+                // Fires when delta is +250 or higher, and high did not exceed swing high by more than 1 tick.
+                if (bar.Delta >= settings.MinDeltaAbsorption && bar.High <= swingHigh + tolerance)
+                {
+                    if (!lastFired.TryGetValue(FootprintSignalType.BuyAbsorption, out var lastIdx) || (i - lastIdx > settings.RepeatControlBars))
+                    {
+                        signals.Add(new DetectedFootprintSignal
+                        {
+                            Type = FootprintSignalType.BuyAbsorption,
+                            Acronym = "BAB",
+                            Name = "Buy Absorption",
+                            Tone = "bearish",
+                            BarStartTime = bar.StartTime
+                        });
+                        lastFired[FootprintSignalType.BuyAbsorption] = i;
+                    }
+                }
+            }
+
+            // 2. CVD Divergence (bearish) - CDIV (previous 15 bars)
+            if (i >= settings.CvdDivergenceLookback)
+            {
+                var priorMaxCvd = decimal.MinValue;
+                var priorMaxHigh = double.MinValue;
+                for (var k = i - settings.CvdDivergenceLookback; k < i; k++)
+                {
+                    if (cvdArray[k] > priorMaxCvd) priorMaxCvd = cvdArray[k];
+                    if (completed[k].High > priorMaxHigh) priorMaxHigh = completed[k].High;
+                }
+
+                // Bar's CVD is above every one of prior 15 bars, but bar's high is below highest high of those 15 bars
+                if (cvdArray[i] > priorMaxCvd && bar.High < priorMaxHigh)
+                {
+                    if (!lastFired.TryGetValue(FootprintSignalType.CvdDivergence, out var lastIdx) || (i - lastIdx > settings.RepeatControlBars))
+                    {
+                        signals.Add(new DetectedFootprintSignal
+                        {
+                            Type = FootprintSignalType.CvdDivergence,
+                            Acronym = "CDIV",
+                            Name = "CVD Divergence",
+                            Tone = "bearish",
+                            BarStartTime = bar.StartTime
+                        });
+                        lastFired[FootprintSignalType.CvdDivergence] = i;
+                    }
+                }
+            }
+
+            // 3. Speed Median Calculation (requires at least 8 earlier bars, up to 20 bars lookback)
+            double? medianSeconds = null;
+            if (i >= settings.SpeedMinBars)
+            {
+                var win = Math.Min(settings.SpeedMedianWindow, i);
+                var speedSample = new double[win];
+                for (var k = 0; k < win; k++)
+                    speedSample[k] = durations[i - win + k];
+                Array.Sort(speedSample);
+                medianSeconds = (win % 2 == 1)
+                    ? speedSample[win / 2]
+                    : (speedSample[win / 2 - 1] + speedSample[win / 2]) / 2.0;
+            }
+
+            // 4. Breakout Confirmation (bullish) - BRK (previous 10 bars)
+            if (i >= settings.BreakoutLookback)
+            {
+                var priorMaxHigh = double.MinValue;
+                for (var k = i - settings.BreakoutLookback; k < i; k++)
+                {
+                    if (completed[k].High > priorMaxHigh) priorMaxHigh = completed[k].High;
+                }
+
+                // Close above highest high of prior 10 bars, delta >= 100, buy imbalances >= 3
+                if (bar.Close > priorMaxHigh &&
+                    bar.Delta >= settings.MinDeltaBreakout &&
+                    buyImbalances[i] >= settings.MinBuyImbalancesBreakout)
+                {
+                    if (!lastFired.TryGetValue(FootprintSignalType.BreakoutConfirmation, out var lastIdx) || (i - lastIdx > settings.RepeatControlBars))
+                    {
+                        var isFast = medianSeconds.HasValue && durations[i] < settings.FastThresholdRatio * medianSeconds.Value;
+                        signals.Add(new DetectedFootprintSignal
+                        {
+                            Type = FootprintSignalType.BreakoutConfirmation,
+                            Acronym = isFast ? "BRK ⚡F" : "BRK",
+                            Name = isFast ? "Breakout Confirmation (FAST)" : "Breakout Confirmation",
+                            Tone = "bullish",
+                            IsFast = isFast,
+                            BarStartTime = bar.StartTime
+                        });
+                        lastFired[FootprintSignalType.BreakoutConfirmation] = i;
+                    }
+                }
+            }
+
+            // 5. Slowdown (phase indicator) - SLW
+            // Average seconds of last 3 bars > 1.5 * median of previous 20 bars
+            if (i >= Math.Max(2, settings.SpeedMinBars) && medianSeconds.HasValue)
+            {
+                var avg3 = (durations[i] + durations[i - 1] + durations[i - 2]) / 3.0;
+                if (avg3 > settings.SlowdownThresholdRatio * medianSeconds.Value)
+                {
+                    if (!lastFired.TryGetValue(FootprintSignalType.Slowdown, out var lastIdx) || (i - lastIdx > settings.RepeatControlBars))
+                    {
+                        signals.Add(new DetectedFootprintSignal
+                        {
+                            Type = FootprintSignalType.Slowdown,
+                            Acronym = "SLW",
+                            Name = "Slowdown",
+                            Tone = "phase",
+                            BarStartTime = bar.StartTime
+                        });
+                        lastFired[FootprintSignalType.Slowdown] = i;
+                    }
+                }
+            }
+
+            if (signals.Count > 0)
+            {
+                result[bar.StartTime] = signals;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Formats detected signals into a FootprintBarTag for rendering in the candle header and footer cells.
+    /// </summary>
+    public static FootprintBarTag CreateTag(IReadOnlyList<DetectedFootprintSignal> signals)
+    {
+        if (signals == null || signals.Count == 0) return null;
+
+        var text = string.Join(" · ", signals.Select(s => s.Acronym));
+
+        var hasBullish = signals.Any(s => s.Tone == "bullish");
+        var hasBearish = signals.Any(s => s.Tone == "bearish");
+        var hasPhase = signals.Any(s => s.Tone == "phase");
+
+        string color;
+        string bg;
+        string border;
+
+        if (hasBullish && !hasBearish)
+        {
+            color = UpColor;
+            bg = "rgba(47, 207, 147, 0.22)";
+            border = "rgba(47, 207, 147, 0.75)";
+        }
+        else if (hasBearish && !hasBullish)
+        {
+            color = DownColor;
+            bg = "rgba(240, 100, 123, 0.22)";
+            border = "rgba(240, 100, 123, 0.75)";
+        }
+        else if (hasPhase && !hasBullish && !hasBearish)
+        {
+            color = WarnColor;
+            bg = "rgba(242, 183, 5, 0.22)";
+            border = "rgba(242, 183, 5, 0.75)";
+        }
+        else
+        {
+            color = "#e4e8f0";
+            bg = "rgba(138, 147, 166, 0.22)";
+            border = "rgba(138, 147, 166, 0.70)";
+        }
+
+        return new FootprintBarTag(text, color, bg, border);
+    }
+
+    /// <summary>
+    /// Counts diagonal buy imbalances for a bar:
+    /// For each price row, ask volume >= minVolume and ask volume >= 3 * bid volume one tick lower.
+    /// </summary>
+    public static int CountBuyImbalances(FootprintBarData bar, double tickSize, decimal minVolume, decimal ratio)
+    {
+        var levels = bar.Levels;
+        if (levels == null || levels.Length < 2) return 0;
+
+        var dict = new Dictionary<long, FootprintLevel>(levels.Length);
+        foreach (var lvl in levels)
+        {
+            var key = (long)Math.Round(lvl.Price / tickSize, MidpointRounding.AwayFromZero);
+            dict[key] = lvl;
+        }
+
+        var count = 0;
+        foreach (var lvl in levels)
+        {
+            var ask = lvl.AskVolume;
+            if (ask < minVolume) continue;
+
+            var lowerKey = (long)Math.Round(lvl.Price / tickSize, MidpointRounding.AwayFromZero) - 1;
+            var bidLower = dict.TryGetValue(lowerKey, out var lowerLvl) ? lowerLvl.BidVolume : 0m;
+
+            if (bidLower == 0m || ask >= bidLower * ratio)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+}

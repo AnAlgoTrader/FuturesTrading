@@ -27,6 +27,26 @@ public class FootprintRenderFooter
     public string Color { get; set; }
 }
 
+public class FootprintBarTag
+{
+    public string Text { get; set; } = "";
+    public string Color { get; set; }
+    public string BgColor { get; set; }
+    public string BorderColor { get; set; }
+
+    public FootprintBarTag() { }
+    public FootprintBarTag(string text, string color = null, string bgColor = null, string borderColor = null)
+    {
+        Text = text;
+        Color = color;
+        BgColor = bgColor;
+        BorderColor = borderColor;
+    }
+
+    public static implicit operator FootprintBarTag(string text) =>
+        string.IsNullOrEmpty(text) ? null : new FootprintBarTag(text);
+}
+
 public class FootprintRenderBar
 {
     public string Id { get; set; } = "";
@@ -37,6 +57,8 @@ public class FootprintRenderBar
     public double Low { get; set; }
     public double Close { get; set; }
     public string Color { get; set; }
+    public FootprintBarTag Header { get; set; }
+    public FootprintBarTag CandleFooter { get; set; }
     public List<FootprintRenderRow> Rows { get; set; } = new();
     public List<FootprintRenderFooter> Footer { get; set; } = new();
 }
@@ -90,8 +112,20 @@ public static class FootprintRenderBuilder
             }
         };
 
+        var signalsMap = FootprintSignalDetector.DetectSignals(snapshot.Completed, tickSize, market.Signals);
+
         foreach (var bar in snapshot.Completed)
-            result.Bars.Add(ConvertBar(bar));
+        {
+            var renderBar = ConvertBar(bar);
+            if (signalsMap.TryGetValue(bar.StartTime, out var signals))
+            {
+                var tag = FootprintSignalDetector.CreateTag(signals);
+                renderBar.Header = tag;
+                renderBar.CandleFooter = tag;
+            }
+            result.Bars.Add(renderBar);
+        }
+
         if (snapshot.Current != null)
             result.Bars.Add(ConvertBar(snapshot.Current));
 
