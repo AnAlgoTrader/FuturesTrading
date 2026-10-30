@@ -15,7 +15,8 @@ namespace FootPrintTrader
     internal class Program
     {
         private static FootprintClassifier _footprintClassifier;
-        private static PhotinoWindow _window;
+        private static PhotinoWindow _futuresWindow;
+        private static PhotinoWindow _optionsWindow;
         private static readonly IbClient _client = new();
         private static Logger _logger;
         private static Timer _threadedTimer;
@@ -52,24 +53,39 @@ namespace FootPrintTrader
             _orderHelper.OnOrdersChanged += _ => SendPositionUpdate();
             _orderHelper.OnPositionChanged += _ => SendPositionUpdate();
 
-            var window = new PhotinoWindow
+            var futuresWindow = new PhotinoWindow
             {
                 LogVerbosity = 0,
                 MinSize = new System.Drawing.Point(800, 600),
                 Size = new System.Drawing.Size(1280, 800)
             };
 
-            _window = window
-                .SetTitle($"FootPrintTrader - {Market.DisplayName}")
+            _futuresWindow = futuresWindow
+                .SetTitle($"Footprint Trader - {Market.DisplayName}")
                 .SetUseOsDefaultSize(false)
                 .SetMaximized(true)
                 .RegisterWebMessageReceivedHandler(ReceiveMessage)
                 .Load("wwwroot/futures.html");
 
-            _window.WindowClosing += OnWindowClosing;
+            _futuresWindow.WindowClosing += OnFuturesWindowClosing;
+            
+            var optionsWindow = new PhotinoWindow
+            {
+                LogVerbosity = 0,
+                MinSize = new System.Drawing.Point(800, 600),
+                Size = new System.Drawing.Size(1280, 800)
+            };
+            
+            _optionsWindow = optionsWindow
+                .SetTitle($"Options Trader - {Market.DisplayName}")
+                .SetUseOsDefaultSize(false)
+                .SetMaximized(true)
+                .RegisterWebMessageReceivedHandler(ReceiveMessage)
+                .Load("wwwroot/options.html");
+            
             AppDomain.CurrentDomain.ProcessExit += (_, _) => WriteSnapshot();
 
-            _window.WaitForClose();
+            _futuresWindow.WaitForClose();
         }
 
         private static void ReceiveMessage(object sender, string message)
@@ -96,9 +112,10 @@ namespace FootPrintTrader
                 _ = CloseActiveTrade();
         }
 
-        private static bool OnWindowClosing(object sender, EventArgs e)
+        private static bool OnFuturesWindowClosing(object sender, EventArgs e)
         {
             _threadedTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _optionsWindow.Close();
             WriteSnapshot();
             return false;
         }
@@ -335,7 +352,7 @@ namespace FootPrintTrader
                 Type = type,
                 Data = JsonSerializer.SerializeToElement(data, FootprintRenderBuilder.JsonOptions)
             };
-            _window?.SendWebMessage(JsonSerializer.Serialize(message));
+            _futuresWindow?.SendWebMessage(JsonSerializer.Serialize(message));
         }
     }
 }
