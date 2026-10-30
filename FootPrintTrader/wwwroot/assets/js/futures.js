@@ -1,3 +1,7 @@
+// Futures trading window client.
+// Handles Photino messages for the footprint chart, order-flow panel,
+// futures order entry buttons, and position card. Loaded by futures.html.
+
 function callBackground(message) {
     if (window.external && window.external.sendMessage) {
         window.external.sendMessage(message);

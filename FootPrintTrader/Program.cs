@@ -64,7 +64,7 @@ namespace FootPrintTrader
                 .SetUseOsDefaultSize(false)
                 .SetMaximized(true)
                 .RegisterWebMessageReceivedHandler(ReceiveMessage)
-                .Load("wwwroot/index.html");
+                .Load("wwwroot/futures.html");
 
             _window.WindowClosing += OnWindowClosing;
             AppDomain.CurrentDomain.ProcessExit += (_, _) => WriteSnapshot();

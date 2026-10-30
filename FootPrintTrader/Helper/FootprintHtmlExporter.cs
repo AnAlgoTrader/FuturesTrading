@@ -9,10 +9,10 @@ public static class FootprintHtmlExporter
     public static string Build(FootprintRenderSnapshot snapshot, DateTime timestamp)
     {
         var wwwRoot = FindWwwRoot();
-        var template = File.ReadAllText(Path.Combine(wwwRoot, "index.html"));
+        var template = File.ReadAllText(Path.Combine(wwwRoot, "futures.html"));
         var renderer = File.ReadAllText(Path.Combine(wwwRoot, "assets", "js", "footprint-render.js"));
-        var mainJs = File.ReadAllText(Path.Combine(wwwRoot, "assets", "js", "main.js"));
-        var css = File.ReadAllText(Path.Combine(wwwRoot, "assets", "main.css"));
+        var futuresJs = File.ReadAllText(Path.Combine(wwwRoot, "assets", "js", "futures.js"));
+        var css = File.ReadAllText(Path.Combine(wwwRoot, "assets", "futures.css"));
         var json = JsonSerializer.Serialize(snapshot, FootprintRenderBuilder.JsonOptions)
             .Replace("</", "<\\/");
 
@@ -33,10 +33,10 @@ if (data.bars && data.bars.length) {{
 </script>";
 
         var html = template
-            .Replace("<link rel=\"stylesheet\" href=\"assets/main.css\" />", $"<style>\n{css}\n</style>")
+            .Replace("<link rel=\"stylesheet\" href=\"assets/futures.css\" />", $"<style>\n{css}\n</style>")
             .Replace("<script src=\"app://dynamic.js\"></script>", "")
             .Replace("<script src=\"assets/js/footprint-render.js\"></script>", $"<script>\n{renderer}\n</script>")
-            .Replace("<script src=\"assets/js/main.js\"></script>", $"<script>\n{mainJs}\n</script>");
+            .Replace("<script src=\"assets/js/futures.js\"></script>", $"<script>\n{futuresJs}\n</script>");
 
         var startIdx = html.IndexOf("window.external.receiveMessage", StringComparison.Ordinal);
         if (startIdx >= 0)

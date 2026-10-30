@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!--
+        Futures trading window.
+        Live ES footprint chart, order-flow context, and MES order entry / flatten.
+        Hosted by Program.Main through Photino at wwwroot/futures.html.
+    -->
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FootPrintTrader</title>
-    <link rel="stylesheet" href="assets/main.css" />
+    <title>Futures Footprint Trader</title>
+    <link rel="stylesheet" href="assets/futures.css" />
 </head>
 <body>
 
@@ -169,7 +174,7 @@
 
 <script src="app://dynamic.js"></script>
 <script src="assets/js/footprint-render.js"></script>
-<script src="assets/js/main.js"></script>
+<script src="assets/js/futures.js"></script>
 <script>
     window.external.receiveMessage(message => receiveFromBackground(message));
     callBackground('applicationReady');
