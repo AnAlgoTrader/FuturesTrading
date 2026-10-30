@@ -68,24 +68,31 @@ namespace FootPrintTrader
                 .Load("wwwroot/futures.html");
 
             _futuresWindow.WindowClosing += OnFuturesWindowClosing;
-            
-            var optionsWindow = new PhotinoWindow
+
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => WriteSnapshot();
+
+            _futuresWindow.WaitForClose();
+        }
+
+        private static void OpenOptionsWindow()
+        {
+            if (_optionsWindow != null) return;
+
+            var optionsWindow = new PhotinoWindow(_futuresWindow)
             {
                 LogVerbosity = 0,
                 MinSize = new System.Drawing.Point(800, 600),
                 Size = new System.Drawing.Size(1280, 800)
             };
-            
+
             _optionsWindow = optionsWindow
                 .SetTitle($"Options Trader - {Market.DisplayName}")
                 .SetUseOsDefaultSize(false)
                 .SetMaximized(true)
                 .RegisterWebMessageReceivedHandler(ReceiveMessage)
                 .Load("wwwroot/options.html");
-            
-            AppDomain.CurrentDomain.ProcessExit += (_, _) => WriteSnapshot();
 
-            _futuresWindow.WaitForClose();
+            _optionsWindow.WaitForClose();
         }
 
         private static void ReceiveMessage(object sender, string message)
@@ -103,6 +110,7 @@ namespace FootPrintTrader
                     CurrencySign = Market.CurrencySign ?? "$"
                 });
                 _ = InitAndSubscribe();
+                OpenOptionsWindow();
             }
             else if (message == "buy")
                 _ = SubmitOrder("BUY", Market.OrderQuantity, _ask > 0 ? _ask : _currentPrice);
@@ -115,7 +123,7 @@ namespace FootPrintTrader
         private static bool OnFuturesWindowClosing(object sender, EventArgs e)
         {
             _threadedTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-            _optionsWindow.Close();
+            _optionsWindow?.Close();
             WriteSnapshot();
             return false;
         }
