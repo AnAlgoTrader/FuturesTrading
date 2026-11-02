@@ -65,6 +65,8 @@ function renderChain(data) {
         strikeCell.textContent = strike.toFixed(2);
         tr.appendChild(strikeCell);
 
+        appendCell(tr, fmtGex(row.gex), false, null, row.gex, 'gex-col');
+
         appendCell(tr, fmtPrice(row.putBid), putItm, 'itm-put');
         appendCell(tr, fmtPrice(row.putAsk), putItm, 'itm-put');
         appendCell(tr, fmtIv(row.putIv), putItm, 'itm-put');
@@ -86,10 +88,11 @@ function renderChain(data) {
     setStatus(`${data.rows.length} strikes`, false);
 }
 
-function appendCell(tr, text, itm, itmClass, rawValue) {
+function appendCell(tr, text, itm, itmClass, rawValue, extraClass) {
     const td = document.createElement('td');
     td.textContent = text;
     if (itm && itmClass) td.classList.add(itmClass);
+    if (extraClass) td.classList.add(extraClass);
 
     const value = toNumber(rawValue);
     if (value > 0) td.classList.add('val-up');
@@ -150,4 +153,18 @@ function fmtGreek(value, decimals) {
 function fmtOpenInterest(value) {
     const n = toNumber(value);
     return n > 0 ? Math.round(n).toLocaleString() : '-';
+}
+
+function fmtGex(value) {
+    const n = toNumber(value);
+    if (n === 0) return '-';
+    const sign = n > 0 ? '+' : '\u2212';
+    return sign + '$' + compactNumber(Math.abs(n));
+}
+
+function compactNumber(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return n.toFixed(0);
 }

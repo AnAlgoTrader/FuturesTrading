@@ -21,15 +21,16 @@ public class OptionsChainUpdate
     public static OptionsChainUpdate From(CboeChain chain, DateTime timestamp)
     {
         var source = chain.Data ?? new List<OptionChainData>();
+        var spot = source.Count > 0 ? source[0].UnderlyingPrice : 0;
 
         return new OptionsChainUpdate
         {
             Symbol = chain.Symbol ?? "",
             ExpirationDate = chain.ExpirationDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            UnderlyingPrice = source.Count > 0 ? source[0].UnderlyingPrice : 0,
+            UnderlyingPrice = spot,
             UpdatedAt = timestamp.ToString("HH:mm:ss", CultureInfo.InvariantCulture),
             Rows = source
-                .OrderBy(row => row.Strike)
+                .OrderByDescending(row => row.Strike)
                 .Select(row => new OptionsChainRow
                 {
                     Strike = row.Strike,
@@ -44,10 +45,27 @@ public class OptionsChainUpdate
                     PutIv = row.PutIv,
                     PutDelta = row.PutDelta,
                     PutGamma = row.PutGamma,
-                    PutOpenInterest = row.PutOpenInterest
+                    PutOpenInterest = row.PutOpenInterest,
+                    Gex = ComputeGex(row, spot)
                 })
                 .ToList()
         };
+    }
+
+    /// <summary>
+    /// Dealer gamma exposure per 1% move at this strike:
+    /// (call gamma * call OI - put gamma * put OI) * 100 * spot² * 0.01.
+    /// Assumes dealers are long call gamma and short put gamma.
+    /// </summary>
+    private static double ComputeGex(OptionChainData row, double spot)
+    {
+        if (spot <= 0) return 0;
+
+        const double contractMultiplier = 100.0;
+        const double onePercent = 0.01;
+
+        return (row.CallGamma * row.CallOpenInterest - row.PutGamma * row.PutOpenInterest)
+               * contractMultiplier * spot * spot * onePercent;
     }
 }
 
@@ -68,6 +86,9 @@ public class OptionsChainRow
     public double PutDelta { get; set; }
     public double PutGamma { get; set; }
     public double PutOpenInterest { get; set; }
+
+    /// <summary>Gamma exposure per 1% underlying move, in dollars.</summary>
+    public double Gex { get; set; }
 }
 
 public class OptionsErrorUpdate

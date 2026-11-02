@@ -152,7 +152,7 @@ html, body {
 
 #chain-table {
     width: 100%;
-    min-width: 1080px;
+    min-width: 1140px;
     border-collapse: separate;
     border-spacing: 0;
 }
@@ -176,24 +176,18 @@ html, body {
     white-space: nowrap;
 }
 
-.group-row th {
-    border-bottom: 1px solid #303849;
-    background: #121620;
-}
-
-.calls-group {
-    color: var(--up) !important;
-}
-
-.puts-group {
-    color: var(--down) !important;
-}
-
 #chain-table th.strike-col {
     text-align: center;
     color: #fff;
     background: var(--card);
     border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+}
+
+#chain-table th.gex-col {
+    text-align: center;
+    color: var(--warn);
+    background: #121620;
     border-right: 1px solid var(--border);
 }
 
@@ -214,6 +208,13 @@ html, body {
     color: #fff;
     background: var(--card);
     border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+}
+
+#chain-table tbody td.gex-col {
+    text-align: right;
+    font-weight: 600;
+    background: #151a24;
     border-right: 1px solid var(--border);
 }
 

@@ -250,7 +250,7 @@ namespace FootPrintTrader
 
             SendPositionUpdate();
             _futuresTimer = new Timer(FuturesTimerCallback, null, 0, 1000);
-            _optionsTimer = new Timer(OptionsTimerCallback, null, 0, 10000); 
+            _optionsTimer = new Timer(OptionsTimerCallback, null, 0, 60000); 
         }
 
         private static void OptionsTimerCallback(object state)
