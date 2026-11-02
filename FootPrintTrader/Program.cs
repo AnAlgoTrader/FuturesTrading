@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using FootPrintTrader.Helper;
 using FootPrintTrader.Model;
 using Ib.Csharp.Api.Client.Implementation;
+using Ib.Csharp.Api.Client.Implementation.Helper;
 using IBApi;
 using Photino.NET;
 
@@ -19,7 +20,8 @@ namespace FootPrintTrader
         private static PhotinoWindow _optionsWindow;
         private static readonly IbClient _client = new();
         private static Logger _logger;
-        private static Timer _threadedTimer;
+        private static Timer _futuresTimer;
+        private static Timer _optionsTimer;
         private static OrderHelper _orderHelper;
 
         private static ContractDetails _dataContract;
@@ -122,7 +124,8 @@ namespace FootPrintTrader
 
         private static bool OnFuturesWindowClosing(object sender, EventArgs e)
         {
-            _threadedTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _futuresTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _optionsTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             _optionsWindow?.Close();
             WriteSnapshot();
             return false;
@@ -227,10 +230,17 @@ namespace FootPrintTrader
             _client.SubscribeToTradesTickByTick(TradeTickRequestId, _dataContract.Contract);
 
             SendPositionUpdate();
-            _threadedTimer = new Timer(TimerCallback, null, 0, 1000);
+            _futuresTimer = new Timer(FuturesTimerCallback, null, 0, 1000);
+            _optionsTimer = new Timer(OptionsTimerCallback, null, 0, 10000); 
         }
 
-        private static void TimerCallback(object state)
+        private static async void OptionsTimerCallback(object state)
+        {
+            var chain = await CboeHelper.GetTodaySpxwChain();
+            //TODO send the update to a table on the optionsWindow
+        }
+
+        private static void FuturesTimerCallback(object state)
         {
             var snap = _footprintClassifier.GetSnapshot();
             if (snap.Current != null || snap.Completed.Length > 0)
