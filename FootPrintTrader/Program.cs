@@ -40,6 +40,8 @@ namespace FootPrintTrader
         private static double _currentPrice;
         private static int _closeTradeInProgress;
         private static int _snapshotWritten;
+        private static int _optionsFetchInProgress;
+        private static volatile OptionsChainUpdate _lastOptionsChain;
 
         private static double TradeMultiplier =>
             double.TryParse(_tradeContract?.Contract.Multiplier, NumberStyles.Float, CultureInfo.InvariantCulture, out var m)
@@ -91,10 +93,11 @@ namespace FootPrintTrader
                 .SetTitle($"Options Trader - {Market.DisplayName}")
                 .SetUseOsDefaultSize(false)
                 .SetMaximized(true)
-                .RegisterWebMessageReceivedHandler(ReceiveMessage)
+                .RegisterWebMessageReceivedHandler(ReceiveOptionsMessage)
                 .Load("wwwroot/options.html");
 
-            _optionsWindow.WaitForClose();
+            _optionsWindow.WindowClosing += OnOptionsWindowClosing;
+            optionsWindow.WaitForClose();
         }
 
         private static void ReceiveMessage(object sender, string message)
@@ -120,6 +123,22 @@ namespace FootPrintTrader
                 _ = SubmitOrder("SELL", Market.OrderQuantity, _bid > 0 ? _bid : _currentPrice);
             else if (message == "closeTrade")
                 _ = CloseActiveTrade();
+        }
+
+        private static void ReceiveOptionsMessage(object sender, string message)
+        {
+            if (message != "optionsReady") return;
+
+            if (_lastOptionsChain != null)
+                SendOptionsUpdate(UpdateMessageType.OPTIONS_CHAIN, _lastOptionsChain);
+
+            _ = FetchOptionsChainAsync();
+        }
+
+        private static bool OnOptionsWindowClosing(object sender, EventArgs e)
+        {
+            _optionsWindow = null;
+            return false;
         }
 
         private static bool OnFuturesWindowClosing(object sender, EventArgs e)
@@ -234,10 +253,43 @@ namespace FootPrintTrader
             _optionsTimer = new Timer(OptionsTimerCallback, null, 0, 10000); 
         }
 
-        private static async void OptionsTimerCallback(object state)
+        private static void OptionsTimerCallback(object state)
         {
-            var chain = await CboeHelper.GetTodaySpxwChain();
-            //TODO send the update to a table on the optionsWindow
+            _ = FetchOptionsChainAsync();
+        }
+
+        private static async Task FetchOptionsChainAsync()
+        {
+            if (Interlocked.Exchange(ref _optionsFetchInProgress, 1) == 1) return;
+
+            try
+            {
+                var chain = await CboeHelper.GetTodaySpxwChain();
+                if (chain == null)
+                {
+                    const string message = "No SPXW chain found for today.";
+                    _logger?.WriteLine($"[OPTIONS] {message}");
+                    SendOptionsUpdate(UpdateMessageType.OPTIONS_ERROR, new OptionsErrorUpdate { Message = message });
+                    return;
+                }
+
+                var update = OptionsChainUpdate.From(chain, DateTime.Now);
+                _lastOptionsChain = update;
+                SendOptionsUpdate(UpdateMessageType.OPTIONS_CHAIN, update);
+                _logger?.WriteLine($"[OPTIONS] {update.Symbol} {update.ExpirationDate} - {update.Rows.Count} strikes @ {update.UnderlyingPrice:F2}");
+            }
+            catch (Exception ex)
+            {
+                _logger?.WriteLine($"[OPTIONS] Fetch failed: {ex}");
+                SendOptionsUpdate(UpdateMessageType.OPTIONS_ERROR, new OptionsErrorUpdate
+                {
+                    Message = "Options chain unavailable. Check cboeData.json."
+                });
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _optionsFetchInProgress, 0);
+            }
         }
 
         private static void FuturesTimerCallback(object state)
@@ -365,12 +417,32 @@ namespace FootPrintTrader
 
         private static void SendUpdate(string type, object data)
         {
+            SendUpdate(_futuresWindow, type, data);
+        }
+
+        private static void SendOptionsUpdate(string type, object data)
+        {
+            SendUpdate(_optionsWindow, type, data);
+        }
+
+        private static void SendUpdate(PhotinoWindow window, string type, object data)
+        {
+            if (window == null) return;
+
             var message = new UpdateMessage
             {
                 Type = type,
                 Data = JsonSerializer.SerializeToElement(data, FootprintRenderBuilder.JsonOptions)
             };
-            _futuresWindow?.SendWebMessage(JsonSerializer.Serialize(message));
+
+            try
+            {
+                window.SendWebMessage(JsonSerializer.Serialize(message));
+            }
+            catch (Exception ex)
+            {
+                _logger?.WriteLine($"[UI] Failed to send {type}: {ex.Message}");
+            }
         }
     }
 }

@@ -14,4 +14,6 @@ public class UpdateMessageType
     public const string MARKET_DATA = "MARKET_DATA";
     public const string MARKET_INFO = "MARKET_INFO";
     public const string POSITION_UPDATE = "POSITION_UPDATE";
+    public const string OPTIONS_CHAIN = "OPTIONS_CHAIN";
+    public const string OPTIONS_ERROR = "OPTIONS_ERROR";
 }

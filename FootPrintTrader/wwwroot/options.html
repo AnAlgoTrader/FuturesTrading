@@ -1,10 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!--
+        Options window.
+        Renders the Cboe SPXW chain pushed by Program.FetchOptionsChainAsync.
+        Hosted by Program.OpenOptionsWindow through Photino at wwwroot/options.html.
+    -->
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Options Trader</title>
+    <link rel="stylesheet" href="assets/options.css" />
 </head>
 <body>
-    <p>Options window loaded.</p>
+
+<div id="options-layout">
+    <header class="options-header">
+        <div class="title-block">
+            <div class="title">SPXW OPTIONS CHAIN</div>
+            <div class="subtitle">
+                <span id="opt-symbol">-</span> &bull; <span id="opt-expiry">-</span>
+            </div>
+        </div>
+        <div class="header-metrics">
+            <div class="header-metric">
+                <span class="header-label">Spot</span>
+                <span class="header-value" id="opt-spot">-</span>
+            </div>
+            <div class="header-metric">
+                <span class="header-label">Updated</span>
+                <span class="header-value" id="opt-updated">-</span>
+            </div>
+            <div class="live-tag">
+                <span class="live-dot"></span>LIVE
+            </div>
+        </div>
+    </header>
+
+    <main id="table-wrap">
+        <table id="chain-table">
+            <thead>
+                <tr class="group-row">
+                    <th colspan="6" class="calls-group">CALLS</th>
+                    <th class="strike-col">STRIKE</th>
+                    <th colspan="6" class="puts-group">PUTS</th>
+                </tr>
+                <tr class="column-row">
+                    <th>Bid</th>
+                    <th>Ask</th>
+                    <th>IV</th>
+                    <th>&Delta;</th>
+                    <th>&Gamma;</th>
+                    <th>OI</th>
+                    <th class="strike-col">Strike</th>
+                    <th>Bid</th>
+                    <th>Ask</th>
+                    <th>IV</th>
+                    <th>&Delta;</th>
+                    <th>&Gamma;</th>
+                    <th>OI</th>
+                </tr>
+            </thead>
+            <tbody id="chain-body"></tbody>
+        </table>
+        <div id="empty-state">Waiting for Cboe chain&hellip;</div>
+    </main>
+
+    <footer class="status-bar">
+        <span id="status-text">Connecting&hellip;</span>
+        <span id="status-count"></span>
+    </footer>
+</div>
+
+<script src="app://dynamic.js"></script>
+<script src="assets/js/options.js"></script>
+<script>
+    window.external.receiveMessage(message => receiveFromBackground(message));
+    window.external.sendMessage('optionsReady');
+</script>
 </body>
 </html>
