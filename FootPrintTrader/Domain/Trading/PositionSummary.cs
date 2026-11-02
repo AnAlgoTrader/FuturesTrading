@@ -1,4 +1,4 @@
-namespace FootPrintTrader.Model;
+namespace FootPrintTrader.Domain.Trading;
 
 public class PositionSummary
 {

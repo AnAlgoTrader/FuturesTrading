@@ -5,12 +5,14 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using FootPrintTrader.Domain.Trading;
+using FootPrintTrader.Services.Logging;
 using Ib.Csharp.Api.Client.Implementation.Model;
 using IBApi;
 
-namespace FootPrintTrader.Model;
+namespace FootPrintTrader.Services.Trading;
 
-public class OrderHelper
+public class OrderManager
 {
     private List<OrderPersistence> _activeOrders = new();
     private PositionSummary _position = new();
@@ -29,7 +31,7 @@ public class OrderHelper
     {
         get
         {
-            lock (_activeOrders)
+            lock (_lock)
             {
                 return _activeOrders.ToList();
             }
@@ -40,7 +42,7 @@ public class OrderHelper
     {
         get
         {
-            lock (_position)
+            lock (_lock)
             {
                 return new PositionSummary
                 {
@@ -54,7 +56,7 @@ public class OrderHelper
         }
     }
 
-    public OrderHelper(Logger logger)
+    public OrderManager(Logger logger)
     {
         _logger = logger;
         _dataDirectory = logger.DataDirectory;

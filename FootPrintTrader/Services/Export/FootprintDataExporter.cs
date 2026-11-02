@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using FootPrintTrader.Domain.Footprint;
 
-namespace FootPrintTrader.Helper;
+namespace FootPrintTrader.Services.Export;
 
 public class FootprintDataExport
 {
@@ -72,20 +73,7 @@ public static class FootprintDataExporter
 
     private static FootprintDataBar ConvertBar(FootprintBarData bar)
     {
-        var levels = new List<FootprintDataLevel>(bar.Levels.Length);
-        foreach (var level in bar.Levels)
-        {
-            levels.Add(new FootprintDataLevel
-            {
-                Price = Math.Round(level.Price, 10),
-                BidVolume = level.BidVolume,
-                AskVolume = level.AskVolume,
-                Total = level.Total,
-                Delta = level.Delta
-            });
-        }
-
-        return new FootprintDataBar
+        var result = new FootprintDataBar
         {
             StartTime = bar.StartTime,
             EndTime = bar.EndTime,
@@ -96,8 +84,21 @@ public static class FootprintDataExporter
             Low = bar.Low,
             Close = bar.Close,
             Volume = bar.Volume,
-            Delta = bar.Delta,
-            Levels = levels
+            Delta = bar.Delta
         };
+
+        foreach (var lvl in bar.Levels)
+        {
+            result.Levels.Add(new FootprintDataLevel
+            {
+                Price = Math.Round(lvl.Price, 10),
+                BidVolume = lvl.BidVolume,
+                AskVolume = lvl.AskVolume,
+                Total = lvl.Total,
+                Delta = lvl.Delta
+            });
+        }
+
+        return result;
     }
 }

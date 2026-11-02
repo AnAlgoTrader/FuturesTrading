@@ -4,80 +4,17 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using FootPrintTrader.Model;
+using FootPrintTrader.Configuration;
+using FootPrintTrader.Domain.Footprint;
+using FootPrintTrader.UI.Models;
 
-namespace FootPrintTrader.Helper;
-
-public class FootprintRenderRow
-{
-    public double Price { get; set; }
-    public decimal Bid { get; set; }
-    public decimal Ask { get; set; }
-    public double BidBar { get; set; }
-    public double AskBar { get; set; }
-    public string BidFill { get; set; }
-    public string AskFill { get; set; }
-    public string Border { get; set; }
-    public string PriceBorder { get; set; }
-}
-
-public class FootprintRenderFooter
-{
-    public string Text { get; set; } = "";
-    public string Color { get; set; }
-}
-
-public class FootprintBarTag
-{
-    public string Text { get; set; } = "";
-    public string Color { get; set; }
-    public string BgColor { get; set; }
-    public string BorderColor { get; set; }
-
-    public FootprintBarTag() { }
-    public FootprintBarTag(string text, string color = null, string bgColor = null, string borderColor = null)
-    {
-        Text = text;
-        Color = color;
-        BgColor = bgColor;
-        BorderColor = borderColor;
-    }
-
-    public static implicit operator FootprintBarTag(string text) =>
-        string.IsNullOrEmpty(text) ? null : new FootprintBarTag(text);
-}
-
-public class FootprintRenderBar
-{
-    public string Id { get; set; } = "";
-    public string Label { get; set; } = "";
-    public string Group { get; set; } = "";
-    public double Open { get; set; }
-    public double High { get; set; }
-    public double Low { get; set; }
-    public double Close { get; set; }
-    public string Color { get; set; }
-    public FootprintBarTag Header { get; set; }
-    public FootprintBarTag CandleFooter { get; set; }
-    public List<FootprintRenderRow> Rows { get; set; } = new();
-    public List<FootprintRenderFooter> Footer { get; set; } = new();
-}
-
-public class FootprintRenderSnapshot
-{
-    public double RowSize { get; set; }
-    public int PriceDecimals { get; set; }
-    public int TradesPerBar { get; set; }
-    public string[] FooterLabels { get; set; } = { "Delta", "Vol", "Secs" };
-    public Dictionary<string, string> Colors { get; set; } = new();
-    public List<FootprintRenderBar> Bars { get; set; } = new();
-    public OrderFlowContext Context { get; set; }
-}
+namespace FootPrintTrader.UI.Rendering;
 
 public static class FootprintRenderBuilder
 {
     public const string UpColor = "#2fcf93";
     public const string DownColor = "#f0647b";
+    public const string WarnColor = "#f2b705";
     public const string PocBorder = "#f2b705";
     public const string PriceBorder = "#ff8c1a";
     public const string AskFill = "rgba(47,207,147,0.42)";
@@ -86,14 +23,18 @@ public static class FootprintRenderBuilder
     private const decimal ImbalanceRatio = 0.6m;
     private const decimal MinVolumeRatio = 0.1m;
 
-
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public static FootprintRenderSnapshot Build(FootprintSnapshot snapshot, double tickSize, double currentPrice, MarketProfile market)
+    public static FootprintRenderSnapshot Build(
+        FootprintSnapshot snapshot,
+        double tickSize,
+        double currentPrice,
+        MarketProfile market,
+        FootprintAnalyzer analyzer = null)
     {
         var result = new FootprintRenderSnapshot
         {
@@ -119,7 +60,7 @@ public static class FootprintRenderBuilder
             var renderBar = ConvertBar(bar);
             if (signalsMap.TryGetValue(bar.StartTime, out var signals))
             {
-                var tag = FootprintSignalDetector.CreateTag(signals);
+                var tag = CreateTag(signals);
                 renderBar.Header = tag;
                 renderBar.CandleFooter = tag;
             }
@@ -132,8 +73,54 @@ public static class FootprintRenderBuilder
         if (currentPrice > 0 && result.Bars.Count > 0)
             MarkCurrentPrice(result.Bars[^1], currentPrice, tickSize);
 
-        result.Context = FootprintAnalyzer.AnalyzeContext(snapshot, tickSize, currentPrice, market);
+        if (analyzer != null)
+        {
+            result.Context = analyzer.AnalyzeContext(snapshot, tickSize, currentPrice, market);
+        }
+
         return result;
+    }
+
+    public static FootprintBarTag CreateTag(IReadOnlyList<DetectedFootprintSignal> signals)
+    {
+        if (signals == null || signals.Count == 0) return null;
+
+        var text = string.Join(" · ", signals.Select(s => s.Acronym));
+
+        var hasBullish = signals.Any(s => s.Tone == "bullish");
+        var hasBearish = signals.Any(s => s.Tone == "bearish");
+        var hasPhase = signals.Any(s => s.Tone == "phase");
+
+        string color;
+        string bg;
+        string border;
+
+        if (hasBullish && !hasBearish)
+        {
+            color = UpColor;
+            bg = "rgba(47, 207, 147, 0.22)";
+            border = "rgba(47, 207, 147, 0.75)";
+        }
+        else if (hasBearish && !hasBullish)
+        {
+            color = DownColor;
+            bg = "rgba(240, 100, 123, 0.22)";
+            border = "rgba(240, 100, 123, 0.75)";
+        }
+        else if (hasPhase && !hasBullish && !hasBearish)
+        {
+            color = WarnColor;
+            bg = "rgba(242, 183, 5, 0.22)";
+            border = "rgba(242, 183, 5, 0.75)";
+        }
+        else
+        {
+            color = "#e4e8f0";
+            bg = "rgba(138, 147, 166, 0.22)";
+            border = "rgba(138, 147, 166, 0.70)";
+        }
+
+        return new FootprintBarTag(text, color, bg, border);
     }
 
     private static void MarkCurrentPrice(FootprintRenderBar bar, double price, double tickSize)

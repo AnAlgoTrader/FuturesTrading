@@ -1,4 +1,4 @@
-namespace FootPrintTrader.Model;
+namespace FootPrintTrader.UI.Models;
 
 public class PositionUpdate
 {
@@ -17,4 +17,15 @@ public class MarketDataUpdate
 {
     public double Bid { get; set; }
     public double Ask { get; set; }
+}
+
+public class MarketInfo
+{
+    public string DisplayName { get; set; } = "";
+    public string DataSymbol { get; set; } = "";
+    public string TradeSymbol { get; set; } = "";
+    public string Exchange { get; set; } = "";
+    public int PriceDecimals { get; set; }
+    public int TradesPerBar { get; set; }
+    public string CurrencySign { get; set; } = "$";
 }

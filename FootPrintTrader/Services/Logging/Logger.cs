@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace FootPrintTrader.Model;
+namespace FootPrintTrader.Services.Logging;
 
 public class Logger : IDisposable
 {

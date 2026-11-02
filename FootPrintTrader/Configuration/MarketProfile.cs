@@ -1,4 +1,4 @@
-namespace FootPrintTrader.Model;
+namespace FootPrintTrader.Configuration;
 
 /// <summary>
 /// Plain market configuration. Values are supplied by a preset.
@@ -6,12 +6,12 @@ namespace FootPrintTrader.Model;
 public class MarketProfile
 {
     // Contract
-    public string DisplayName { get; set; }
-    public string DataSymbol { get; set; }
-    public string TradeSymbol { get; set; }
-    public string SecurityType { get; set; }
-    public string Currency { get; set; }
-    public string Exchange { get; set; }
+    public string DisplayName { get; set; } = "";
+    public string DataSymbol { get; set; } = "";
+    public string TradeSymbol { get; set; } = "";
+    public string SecurityType { get; set; } = "FUT";
+    public string Currency { get; set; } = "USD";
+    public string Exchange { get; set; } = "";
     public double DataMultiplier { get; set; }
     public double TradeMultiplier { get; set; }
 
@@ -19,7 +19,7 @@ public class MarketProfile
     public string UnderlyingSymbol { get; set; }
     public string DataTradingClass { get; set; }
     public string TradeTradingClass { get; set; }
-    public string CurrencySign { get; set; }
+    public string CurrencySign { get; set; } = "$";
 
     // Price / chart
     public double TickSize { get; set; }
@@ -38,15 +38,4 @@ public class MarketProfile
     // Trading
     public decimal OrderQuantity { get; set; }
     public double CommissionPerSide { get; set; }
-}
-
-public class MarketInfo
-{
-    public string DisplayName { get; set; }
-    public string DataSymbol { get; set; }
-    public string TradeSymbol { get; set; }
-    public string Exchange { get; set; }
-    public int PriceDecimals { get; set; }
-    public int TradesPerBar { get; set; }
-    public string CurrencySign { get; set; }
 }

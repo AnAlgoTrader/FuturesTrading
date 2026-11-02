@@ -1,8 +1,10 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using FootPrintTrader.UI.Models;
+using FootPrintTrader.UI.Rendering;
 
-namespace FootPrintTrader.Helper;
+namespace FootPrintTrader.Services.Export;
 
 public static class FootprintHtmlExporter
 {
@@ -70,6 +72,6 @@ if (data.bars && data.bars.length) {{
                 return candidate;
         }
 
-        throw new DirectoryNotFoundException($"wwwroot not found: {string.Join(", ", candidates)}");
+        return candidates[0];
     }
 }

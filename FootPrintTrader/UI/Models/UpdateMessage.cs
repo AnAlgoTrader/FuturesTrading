@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace FootPrintTrader.Model;
+namespace FootPrintTrader.UI.Models;
 
 public class UpdateMessage
 {
@@ -8,7 +8,7 @@ public class UpdateMessage
     public JsonElement Data { get; set; }
 }
 
-public class UpdateMessageType
+public static class UpdateMessageType
 {
     public const string FOOTPRINT_SNAPSHOT = "FOOTPRINT_SNAPSHOT";
     public const string MARKET_DATA = "MARKET_DATA";

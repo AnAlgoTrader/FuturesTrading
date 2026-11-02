@@ -2,15 +2,15 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using FootPrintTrader.Model;
+using FootPrintTrader.Configuration;
 using Ib.Csharp.Api.Client.Implementation;
 using IBApi;
 
-namespace FootPrintTrader.Helper;
+namespace FootPrintTrader.Services.MarketData;
 
-public class ContractHelper
+public class ContractResolver
 {
-    public static async Task<ContractDetails> GetContract(IbClient client, MarketProfile market, string symbol)
+    public static async Task<ContractDetails> ResolveContractAsync(IbClient client, MarketProfile market, string symbol)
     {
         var isTrade = string.Equals(symbol, market.TradeSymbol, StringComparison.OrdinalIgnoreCase);
         var multiplier = isTrade ? market.TradeMultiplier : market.DataMultiplier;
@@ -26,6 +26,7 @@ public class ContractHelper
             Multiplier = multiplier.ToString(CultureInfo.InvariantCulture),
             TradingClass = tradingClass
         });
+
         return contractDataList.OrderBy(x => x.Contract.LastTradeDate).FirstOrDefault(x =>
             DateTime.ParseExact(x.Contract.LastTradeDate, "yyyyMMdd", CultureInfo.InvariantCulture) > DateTime.Now)!;
     }

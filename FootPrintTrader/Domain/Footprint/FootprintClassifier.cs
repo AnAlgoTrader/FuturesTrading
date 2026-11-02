@@ -1,30 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 
-namespace FootPrintTrader.Helper;
-
-using System.Diagnostics;
-
-public readonly record struct FootprintLevel(double Price, decimal BidVolume, decimal AskVolume)
-{
-    public decimal Total => BidVolume + AskVolume;
-    public decimal Delta => AskVolume - BidVolume;
-}
-
-public sealed record FootprintBarData(
-    int TradeCount, long StartTime, long EndTime,
-    double Open, double High, double Low, double Close,
-    FootprintLevel[] Levels)          // ascending price
-{
-    public decimal Delta => Levels.Sum(l => l.Delta);
-    public decimal Volume => Levels.Sum(l => l.Total);
-}
-
-public sealed record FootprintSnapshot(
-    FootprintBarData[] Completed,     // capped history, oldest first
-    FootprintBarData Current);       // in-progress bar (maybe null)
+namespace FootPrintTrader.Domain.Footprint;
 
 public sealed class FootprintClassifier
 {
@@ -66,7 +46,7 @@ public sealed class FootprintClassifier
     public event Action<FootprintBarData> BarCompleted;
 
     public FootprintClassifier(double tickSize, int tradesPerBar, int maxHistory = 200,
-                               TimeSpan? maxHold = null, bool quotesFirstOnTie = true)
+                              TimeSpan? maxHold = null, bool quotesFirstOnTie = true)
     {
         _tickSize = tickSize;
         _tradesPerBar = tradesPerBar;
@@ -74,8 +54,6 @@ public sealed class FootprintClassifier
         _maxHoldTs = (long)((maxHold ?? TimeSpan.FromMilliseconds(50)).TotalSeconds * Stopwatch.Frequency);
         _quotesFirstOnTie = quotesFirstOnTie;
     }
-
-    // ---- Call from your two callbacks (any thread) ----
 
     public void OnQuote(long time, double bid, double ask)
     {
@@ -97,8 +75,6 @@ public sealed class FootprintClassifier
         DrainCompleted();
     }
 
-    // ---- Call from your UI timer (every 1 s) ----
-
     public FootprintSnapshot GetSnapshot()
     {
         FootprintSnapshot snap;
@@ -111,8 +87,6 @@ public sealed class FootprintClassifier
         DrainCompleted();
         return snap;
     }
-
-    // ---- Internals (all under lock) ----
 
     private void DrainCompleted()
     {

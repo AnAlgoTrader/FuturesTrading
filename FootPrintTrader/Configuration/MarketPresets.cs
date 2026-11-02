@@ -1,4 +1,4 @@
-namespace FootPrintTrader.Model;
+namespace FootPrintTrader.Configuration;
 
 public static class MarketPresets
 {

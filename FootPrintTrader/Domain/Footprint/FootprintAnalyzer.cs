@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
-using FootPrintTrader.Model;
+using FootPrintTrader.Configuration;
 
-namespace FootPrintTrader.Helper;
+namespace FootPrintTrader.Domain.Footprint;
 
 public class OrderFlowContext
 {
@@ -22,25 +22,22 @@ public class OrderFlowContext
     public string DeltaDivergence { get; init; } = "None";
 }
 
-public static class FootprintAnalyzer
+public class FootprintAnalyzer
 {
-    // ============================================================
-    // STATE
-    // ============================================================
-    private static readonly Lock _syncLock = new();
-    private static readonly HashSet<long> _processedBars = new();
-    private static OrderFlowContext _lastContext;
-    private static decimal _sessionCumulativeDelta;
+    private readonly Lock _syncLock = new();
+    private readonly HashSet<long> _processedBars = new();
+    private OrderFlowContext _lastContext;
+    private decimal _sessionCumulativeDelta;
 
     // Rolling window of completed bars (price extremes + cumulative delta at close) for divergence.
-    private static readonly List<DivergencePoint> _divergenceWindow = new();
-    private static string _divergence = "None";
-    private static double _divergencePrice;
-    private static long _divergenceBarStart;
+    private readonly List<DivergencePoint> _divergenceWindow = new();
+    private string _divergence = "None";
+    private double _divergencePrice;
+    private long _divergenceBarStart;
 
     private readonly record struct DivergencePoint(double High, double Low, decimal Cvd, decimal Delta, long Start);
 
-    public static OrderFlowContext AnalyzeContext(FootprintSnapshot snapshot, double tickSize, double currentPrice, MarketProfile settings)
+    public OrderFlowContext AnalyzeContext(FootprintSnapshot snapshot, double tickSize, double currentPrice, MarketProfile settings)
     {
         if (snapshot == null)
             return _lastContext ?? new OrderFlowContext();
@@ -139,14 +136,7 @@ public static class FootprintAnalyzer
         return result;
     }
 
-    // ============================================================
-    // DELTA DIVERGENCE (windowed CVD vs price, confirmed at bar close)
-    // Bearish: new price high on a lower cumulative-delta high.
-    // Bullish: new price low on a higher cumulative-delta low.
-    // The CVD move must be >= settings.DivergenceMinCvdGapRatio of the prior extreme's
-    // |CVD| — direction alone (a 1-contract shortfall) is noise.
-    // ============================================================
-    private static void ComputeDivergence(double tickSize, MarketProfile settings)
+    private void ComputeDivergence(double tickSize, MarketProfile settings)
     {
         _divergence = "None";
         _divergencePrice = 0;

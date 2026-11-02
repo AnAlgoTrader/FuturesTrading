@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using FootPrintTrader.Model;
+using FootPrintTrader.Configuration;
 
-namespace FootPrintTrader.Helper;
+namespace FootPrintTrader.Domain.Footprint;
 
 public enum FootprintSignalType
 {
@@ -26,10 +26,6 @@ public class DetectedFootprintSignal
 
 public static class FootprintSignalDetector
 {
-    public const string UpColor = "#2fcf93";
-    public const string DownColor = "#f0647b";
-    public const string WarnColor = "#f2b705";
-
     /// <summary>
     /// Scans completed footprint bars in chronological order and detects the 5 signals
     /// specified in the Footprint Signal Detector specification.
@@ -222,51 +218,6 @@ public static class FootprintSignalDetector
         }
 
         return result;
-    }
-
-    /// <summary>
-    /// Formats detected signals into a FootprintBarTag for rendering in the candle header and footer cells.
-    /// </summary>
-    public static FootprintBarTag CreateTag(IReadOnlyList<DetectedFootprintSignal> signals)
-    {
-        if (signals == null || signals.Count == 0) return null;
-
-        var text = string.Join(" · ", signals.Select(s => s.Acronym));
-
-        var hasBullish = signals.Any(s => s.Tone == "bullish");
-        var hasBearish = signals.Any(s => s.Tone == "bearish");
-        var hasPhase = signals.Any(s => s.Tone == "phase");
-
-        string color;
-        string bg;
-        string border;
-
-        if (hasBullish && !hasBearish)
-        {
-            color = UpColor;
-            bg = "rgba(47, 207, 147, 0.22)";
-            border = "rgba(47, 207, 147, 0.75)";
-        }
-        else if (hasBearish && !hasBullish)
-        {
-            color = DownColor;
-            bg = "rgba(240, 100, 123, 0.22)";
-            border = "rgba(240, 100, 123, 0.75)";
-        }
-        else if (hasPhase && !hasBullish && !hasBearish)
-        {
-            color = WarnColor;
-            bg = "rgba(242, 183, 5, 0.22)";
-            border = "rgba(242, 183, 5, 0.75)";
-        }
-        else
-        {
-            color = "#e4e8f0";
-            bg = "rgba(138, 147, 166, 0.22)";
-            border = "rgba(138, 147, 166, 0.70)";
-        }
-
-        return new FootprintBarTag(text, color, bg, border);
     }
 
     /// <summary>
