@@ -152,7 +152,7 @@ html, body {
 
 #chain-table {
     width: 100%;
-    min-width: 1140px;
+    min-width: 1240px;
     border-collapse: separate;
     border-spacing: 0;
 }
@@ -191,6 +191,12 @@ html, body {
     border-right: 1px solid var(--border);
 }
 
+#chain-table th.trade-col {
+    text-align: center;
+    background: #121620;
+    border-left: 1px solid var(--border);
+}
+
 #chain-table tbody td {
     padding: 5px 10px;
     text-align: right;
@@ -216,6 +222,58 @@ html, body {
     font-weight: 600;
     background: #151a24;
     border-right: 1px solid var(--border);
+}
+
+#chain-table tbody td.trade-col {
+    text-align: center;
+    padding: 3px 8px;
+    border-left: 1px solid var(--border);
+}
+
+.trade-actions {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+}
+
+.trade-btn {
+    min-width: 38px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    background: transparent;
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.trade-buy {
+    color: var(--up);
+    background: rgba(47, 207, 147, 0.12);
+    border-color: rgba(47, 207, 147, 0.45);
+}
+
+.trade-buy:hover {
+    background: rgba(47, 207, 147, 0.28);
+    border-color: var(--up);
+}
+
+.trade-sell {
+    color: var(--down);
+    background: rgba(240, 100, 123, 0.12);
+    border-color: rgba(240, 100, 123, 0.45);
+}
+
+.trade-sell:hover {
+    background: rgba(240, 100, 123, 0.28);
+    border-color: var(--down);
+}
+
+.trade-btn:active {
+    transform: translateY(1px);
 }
 
 #chain-table tbody td.val-up {

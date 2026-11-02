@@ -74,6 +74,8 @@ function renderChain(data) {
         appendCell(tr, fmtGreek(row.putGamma, 4), putItm, 'itm-put');
         appendCell(tr, fmtOpenInterest(row.putOpenInterest), putItm, 'itm-put');
 
+        tr.appendChild(createTradeCell(strike));
+
         if (strike === atmStrike) tr.classList.add('atm');
 
         fragment.appendChild(tr);
@@ -99,6 +101,28 @@ function appendCell(tr, text, itm, itmClass, rawValue, extraClass) {
     else if (value < 0) td.classList.add('val-down');
 
     tr.appendChild(td);
+}
+
+function createTradeCell(strike) {
+    const td = document.createElement('td');
+    td.className = 'trade-col';
+
+    const actions = document.createElement('div');
+    actions.className = 'trade-actions';
+
+    for (const side of ['buy', 'sell']) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `trade-btn trade-${side}`;
+        btn.textContent = side.toUpperCase();
+        btn.dataset.side = side;
+        btn.dataset.strike = strike.toFixed(2);
+        btn.title = `${side === 'buy' ? 'Buy' : 'Sell'} ${strike.toFixed(2)} (not wired yet)`;
+        actions.appendChild(btn);
+    }
+
+    td.appendChild(actions);
+    return td;
 }
 
 function showError(message) {
