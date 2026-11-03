@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using FootPrintTrader.Configuration;
 
 namespace FootPrintTrader.Domain.Footprint;

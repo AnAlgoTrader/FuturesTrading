@@ -47,7 +47,7 @@ public class FootprintAnalyzer
 
         // Use live bar for real-time live metrics (delta, POC, volume), fallback to last completed
         var bar = current ?? completed.LastOrDefault();
-        FootprintBarData prevBar = current != null
+        var prevBar = current != null
             ? completed.LastOrDefault()
             : (completed.Length > 1 ? completed[^2] : null);
 
