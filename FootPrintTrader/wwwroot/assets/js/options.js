@@ -148,29 +148,37 @@ function stageSpread(side, strike) {
 
     // Find row for the short strike
     const shortRow = latestChainData.rows.find(r => Math.abs(toNumber(r.strike) - shortStrike) < 0.01);
+    if (!shortRow) return;
 
-    // Default width is 5 points (or closest strike in chain)
-    let longStrike = isBullish ? shortStrike - 5 : shortStrike + 5;
-    let longRow = latestChainData.rows.find(r => Math.abs(toNumber(r.strike) - longStrike) < 0.01);
-
-    if (!longRow) {
-        // Fallback: pick the closest strike in the target direction
-        const candidateRows = isBullish
-            ? latestChainData.rows.filter(r => toNumber(r.strike) < shortStrike - 0.01)
-            : latestChainData.rows.filter(r => toNumber(r.strike) > shortStrike + 0.01);
-
-        if (candidateRows.length > 0) {
-            longRow = candidateRows.reduce((prev, curr) =>
-                Math.abs(toNumber(curr.strike) - shortStrike) < Math.abs(toNumber(prev.strike) - shortStrike) ? curr : prev
-            );
-            longStrike = toNumber(longRow.strike);
+    // Minimum spread possible: always the immediate adjacent strike in the target direction
+    let longRow = null;
+    if (isBullish) {
+        // Bull Put Spread: long leg is the immediate lower strike
+        const lowerRows = latestChainData.rows.filter(r => toNumber(r.strike) < shortStrike - 0.01);
+        if (lowerRows.length === 0) {
+            showError(`Cannot stage Bull Put Spread: no lower strike available for ${shortStrike}`);
+            return;
         }
+        // Highest strike strictly below shortStrike
+        longRow = lowerRows.reduce((max, r) => toNumber(r.strike) > toNumber(max.strike) ? r : max);
+    } else {
+        // Bear Call Spread: long leg is the immediate higher strike
+        const higherRows = latestChainData.rows.filter(r => toNumber(r.strike) > shortStrike + 0.01);
+        if (higherRows.length === 0) {
+            showError(`Cannot stage Bear Call Spread: no higher strike available for ${shortStrike}`);
+            return;
+        }
+        // Lowest strike strictly above shortStrike
+        longRow = higherRows.reduce((min, r) => toNumber(r.strike) < toNumber(min.strike) ? r : min);
     }
+
+    const longStrike = toNumber(longRow.strike);
 
     currentStagedSpread = {
         side,
         strategy: isBullish ? 'BULL PUT' : 'BEAR CALL',
         tone: isBullish ? 'bullish' : 'bearish',
+        posSize: currentStagedSpread ? (currentStagedSpread.posSize || 0) : 0,
         shortStrike,
         shortType,
         longStrike,
@@ -188,6 +196,7 @@ function refreshStagedSpreadPrices() {
 function renderSpreadTable() {
     const row = document.getElementById('spread-row');
     const stratEl = document.getElementById('sp-strategy');
+    const spSizeEl = document.getElementById('sp-size');
     const shortLegEl = document.getElementById('sp-short-leg');
     const shortBidEl = document.getElementById('sp-short-bid');
     const shortAskEl = document.getElementById('sp-short-ask');
@@ -202,6 +211,7 @@ function renderSpreadTable() {
     if (!currentStagedSpread) {
         if (row) row.className = 'empty';
         if (stratEl) stratEl.innerHTML = '<span class="spread-badge badge-empty">NO SPREAD</span>';
+        if (spSizeEl) spSizeEl.innerHTML = '<span class="dim">-</span>';
         if (shortLegEl) shortLegEl.innerHTML = '<span class="dim">-</span>';
         if (shortBidEl) shortBidEl.innerHTML = '<span class="dim">-</span>';
         if (shortAskEl) shortAskEl.innerHTML = '<span class="dim">-</span>';
@@ -215,7 +225,7 @@ function renderSpreadTable() {
         return;
     }
 
-    const { strategy, tone, shortStrike, shortType, longStrike, longType } = currentStagedSpread;
+    const { strategy, tone, posSize = 0, shortStrike, shortType, longStrike, longType } = currentStagedSpread;
     const isPut = shortType === 'PUT';
 
     const shortRow = latestChainData?.rows?.find(r => Math.abs(toNumber(r.strike) - shortStrike) < 0.01);
@@ -232,10 +242,14 @@ function renderSpreadTable() {
     const credit = (shortBid > 0 && longAsk > 0) ? (shortBid - longAsk) : (shortMid - longMid);
 
     const width = Math.abs(shortStrike - longStrike);
+    const totalCredit = credit > 0 ? (credit * 100) : 0;
     const risk = Math.max(0, width - Math.max(0, credit)) * 100;
 
     if (row) row.className = `active ${tone}`;
     if (stratEl) stratEl.innerHTML = `<span class="spread-badge badge-${tone}">${strategy}</span>`;
+
+    if (spSizeEl) spSizeEl.textContent = posSize.toString();
+
     if (shortLegEl) shortLegEl.textContent = `${shortStrike.toFixed(0)} ${shortType[0]}`;
     if (shortBidEl) shortBidEl.textContent = fmtPrice(shortBid);
     if (shortAskEl) shortAskEl.textContent = fmtPrice(shortAsk);
@@ -246,7 +260,7 @@ function renderSpreadTable() {
     if (netCreditEl) {
         if (credit > 0) {
             netCreditEl.textContent = `+$${credit.toFixed(2)}`;
-            netCreditEl.title = `Est. $${(credit * 100).toFixed(0)} per contract (Short Bid ${fmtPrice(shortBid)} - Long Ask ${fmtPrice(longAsk)})`;
+            netCreditEl.title = `Est. $${totalCredit.toFixed(0)} per contract (Short Bid ${fmtPrice(shortBid)} - Long Ask ${fmtPrice(longAsk)})`;
         } else if (credit !== 0) {
             netCreditEl.textContent = `$${credit.toFixed(2)}`;
             netCreditEl.title = '';
@@ -258,7 +272,7 @@ function renderSpreadTable() {
     if (maxRiskEl) {
         if (risk > 0) {
             maxRiskEl.textContent = `$${risk.toFixed(0)}`;
-            maxRiskEl.title = `${width.toFixed(1)} pt spread - $${credit > 0 ? (credit * 100).toFixed(0) : '0'} credit`;
+            maxRiskEl.title = `${width.toFixed(1)} pt spread - $${totalCredit.toFixed(0)} credit per contract`;
         } else {
             maxRiskEl.innerHTML = '<span class="dim">-</span>';
         }
