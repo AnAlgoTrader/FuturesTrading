@@ -16,4 +16,6 @@ public static class UpdateMessageType
     public const string POSITION_UPDATE = "POSITION_UPDATE";
     public const string OPTIONS_CHAIN = "OPTIONS_CHAIN";
     public const string OPTIONS_ERROR = "OPTIONS_ERROR";
+    public const string OPTIONS_SPREAD_QUOTE = "OPTIONS_SPREAD_QUOTE";
+    public const string OPTIONS_SPREAD_STATUS = "OPTIONS_SPREAD_STATUS";
 }

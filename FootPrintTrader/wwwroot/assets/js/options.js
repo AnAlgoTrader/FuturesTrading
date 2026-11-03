@@ -3,6 +3,14 @@
 
 let latestChainData = null;
 let currentStagedSpread = null;
+let liveSpreadQuote = null;
+let spreadSubscriptionState = 'Idle';
+
+function sendToHost(message) {
+    if (window.external && window.external.sendMessage) {
+        window.external.sendMessage(typeof message === 'string' ? message : JSON.stringify(message));
+    }
+}
 
 function receiveFromBackground(message) {
     try {
@@ -11,10 +19,64 @@ function receiveFromBackground(message) {
             renderChain(Data);
         } else if (Type === 'OPTIONS_ERROR') {
             showError(Data && Data.message);
+        } else if (Type === 'OPTIONS_SPREAD_QUOTE') {
+            applySpreadQuote(Data);
+        } else if (Type === 'OPTIONS_SPREAD_STATUS') {
+            applySpreadStatus(Data);
         }
     } catch (err) {
         console.error('Failed to parse background message:', err);
     }
+}
+
+function applySpreadQuote(data) {
+    if (!currentStagedSpread || !data) return;
+
+    // Ignore quotes that belong to a spread we already replaced.
+    if (Math.abs(toNumber(data.shortStrike) - currentStagedSpread.shortStrike) > 0.01) return;
+    if (Math.abs(toNumber(data.longStrike) - currentStagedSpread.longStrike) > 0.01) return;
+
+    liveSpreadQuote = data;
+    renderSpreadTable();
+}
+
+function applySpreadStatus(data) {
+    if (!data) return;
+
+    if (data.state) spreadSubscriptionState = data.state;
+
+    switch (data.state) {
+        case 'Subscribing':
+            setLiveTag('warn', 'CONNECTING');
+            break;
+        case 'Live':
+            setLiveTag('live', 'LIVE');
+            break;
+        case 'Delayed':
+            setLiveTag('warn', 'DELAYED');
+            break;
+        case 'Error':
+            liveSpreadQuote = null;
+            setLiveTag('error', 'NO DATA');
+            showError(data.message);
+            break;
+        case 'Cleared':
+            liveSpreadQuote = null;
+            setLiveTag('idle', 'CBOE');
+            break;
+    }
+}
+
+function setLiveTag(state, text) {
+    const tag = document.getElementById('opt-live-tag');
+    const label = document.getElementById('opt-live-text');
+    if (label) label.textContent = text;
+    if (!tag) return;
+
+    tag.classList.remove('live-warn', 'live-error', 'live-idle');
+    if (state === 'warn') tag.classList.add('live-warn');
+    else if (state === 'error') tag.classList.add('live-error');
+    else if (state === 'idle') tag.classList.add('live-idle');
 }
 
 function renderChain(data) {
@@ -174,6 +236,18 @@ function stageSpread(side, strike) {
 
     const longStrike = toNumber(longRow.strike);
 
+    const isSameSpread = !!currentStagedSpread
+        && Math.abs(currentStagedSpread.shortStrike - shortStrike) < 0.01
+        && Math.abs(currentStagedSpread.longStrike - longStrike) < 0.01
+        && currentStagedSpread.shortType === shortType
+        && currentStagedSpread.longType === longType;
+
+    if (isSameSpread && spreadSubscriptionState !== 'Error') {
+        // Already streaming this exact spread; keep the live values on screen.
+        renderSpreadTable();
+        return;
+    }
+
     currentStagedSpread = {
         side,
         strategy: isBullish ? 'BULL PUT' : 'BEAR CALL',
@@ -185,7 +259,20 @@ function stageSpread(side, strike) {
         longType
     };
 
+    liveSpreadQuote = null;
+    spreadSubscriptionState = 'Subscribing';
+    setLiveTag('warn', 'CONNECTING');
     renderSpreadTable();
+
+    // Ask the host to stream live IB quotes for the two legs of this spread.
+    sendToHost({
+        action: 'stageSpread',
+        strategy: currentStagedSpread.strategy,
+        shortStrike,
+        longStrike,
+        shortRight: shortType[0],
+        longRight: longType[0]
+    });
 }
 
 function refreshStagedSpreadPrices() {
@@ -231,10 +318,20 @@ function renderSpreadTable() {
     const shortRow = latestChainData?.rows?.find(r => Math.abs(toNumber(r.strike) - shortStrike) < 0.01);
     const longRow = latestChainData?.rows?.find(r => Math.abs(toNumber(r.strike) - longStrike) < 0.01);
 
-    const shortBid = shortRow ? toNumber(isPut ? shortRow.putBid : shortRow.callBid) : 0;
-    const shortAsk = shortRow ? toNumber(isPut ? shortRow.putAsk : shortRow.callAsk) : 0;
-    const longBid = longRow ? toNumber(isPut ? longRow.putBid : longRow.callBid) : 0;
-    const longAsk = longRow ? toNumber(isPut ? longRow.putAsk : longRow.callAsk) : 0;
+    const hasLive = !!liveSpreadQuote
+        && Math.abs(toNumber(liveSpreadQuote.shortStrike) - shortStrike) < 0.01
+        && Math.abs(toNumber(liveSpreadQuote.longStrike) - longStrike) < 0.01
+        && (toNumber(liveSpreadQuote.shortBid) > 0 || toNumber(liveSpreadQuote.shortAsk) > 0)
+        && (toNumber(liveSpreadQuote.longBid) > 0 || toNumber(liveSpreadQuote.longAsk) > 0);
+
+    const shortBid = hasLive ? toNumber(liveSpreadQuote.shortBid)
+        : (shortRow ? toNumber(isPut ? shortRow.putBid : shortRow.callBid) : 0);
+    const shortAsk = hasLive ? toNumber(liveSpreadQuote.shortAsk)
+        : (shortRow ? toNumber(isPut ? shortRow.putAsk : shortRow.callAsk) : 0);
+    const longBid = hasLive ? toNumber(liveSpreadQuote.longBid)
+        : (longRow ? toNumber(isPut ? longRow.putBid : longRow.callBid) : 0);
+    const longAsk = hasLive ? toNumber(liveSpreadQuote.longAsk)
+        : (longRow ? toNumber(isPut ? longRow.putAsk : longRow.callAsk) : 0);
 
     // Natural credit = Short Bid - Long Ask; Mid credit = Short Mid - Long Mid
     const shortMid = (shortBid > 0 && shortAsk > 0) ? (shortBid + shortAsk) / 2 : (shortBid || shortAsk);
@@ -260,7 +357,7 @@ function renderSpreadTable() {
     if (netCreditEl) {
         if (credit > 0) {
             netCreditEl.textContent = `+$${credit.toFixed(2)}`;
-            netCreditEl.title = `Est. $${totalCredit.toFixed(0)} per contract (Short Bid ${fmtPrice(shortBid)} - Long Ask ${fmtPrice(longAsk)})`;
+            netCreditEl.title = `${hasLive ? 'Live' : 'Cboe'} $${totalCredit.toFixed(0)} per contract (Short Bid ${fmtPrice(shortBid)} - Long Ask ${fmtPrice(longAsk)})`;
         } else if (credit !== 0) {
             netCreditEl.textContent = `$${credit.toFixed(2)}`;
             netCreditEl.title = '';
@@ -286,8 +383,14 @@ function renderSpreadTable() {
 }
 
 function clearSpread() {
+    const hadSpread = !!currentStagedSpread;
     currentStagedSpread = null;
+    liveSpreadQuote = null;
+    spreadSubscriptionState = 'Idle';
     renderSpreadTable();
+    setLiveTag('idle', 'CBOE');
+
+    if (hadSpread) sendToHost({ action: 'clearSpread' });
 }
 
 // Bind clear button

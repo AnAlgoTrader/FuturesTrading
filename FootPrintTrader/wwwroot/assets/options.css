@@ -262,6 +262,38 @@ html, body {
     animation: pulse-dot 2s infinite ease-in-out;
 }
 
+.live-tag.live-idle {
+    color: var(--muted);
+    background: rgba(138, 147, 166, 0.12);
+    border-color: rgba(138, 147, 166, 0.3);
+}
+
+.live-tag.live-idle .live-dot {
+    background: var(--muted);
+    animation: none;
+}
+
+.live-tag.live-warn {
+    color: var(--warn);
+    background: rgba(242, 183, 5, 0.12);
+    border-color: rgba(242, 183, 5, 0.35);
+}
+
+.live-tag.live-warn .live-dot {
+    background: var(--warn);
+}
+
+.live-tag.live-error {
+    color: var(--down);
+    background: rgba(240, 100, 123, 0.12);
+    border-color: rgba(240, 100, 123, 0.35);
+}
+
+.live-tag.live-error .live-dot {
+    background: var(--down);
+    animation: none;
+}
+
 @keyframes pulse-dot {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.4; transform: scale(0.85); }

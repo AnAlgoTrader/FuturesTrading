@@ -12,11 +12,18 @@ public class WindowManager
     private PhotinoWindow _futuresWindow;
     private PhotinoWindow _optionsWindow;
 
+    private static readonly JsonSerializerOptions CommandJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     public event Action OnApplicationReady;
     public event Action OnBuyRequested;
     public event Action OnSellRequested;
     public event Action OnCloseTradeRequested;
     public event Action OnOptionsReady;
+    public event Action<OptionsSpreadCommand> OnSpreadStaged;
+    public event Action OnSpreadCleared;
 
     public event Action OnFuturesWindowClosing;
     public event Action OnOptionsWindowClosing;
@@ -130,6 +137,29 @@ public class WindowManager
         if (message == "optionsReady")
         {
             OnOptionsReady?.Invoke();
+            return;
+        }
+
+        OptionsSpreadCommand command;
+        try
+        {
+            command = JsonSerializer.Deserialize<OptionsSpreadCommand>(message, CommandJsonOptions);
+        }
+        catch (JsonException)
+        {
+            return;
+        }
+
+        if (command == null) return;
+
+        switch (command.Action)
+        {
+            case "stageSpread":
+                OnSpreadStaged?.Invoke(command);
+                break;
+            case "clearSpread":
+                OnSpreadCleared?.Invoke();
+                break;
         }
     }
 }

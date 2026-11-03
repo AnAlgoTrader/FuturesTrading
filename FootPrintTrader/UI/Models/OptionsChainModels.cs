@@ -41,3 +41,45 @@ public class OptionsErrorUpdate
 {
     public string Message { get; set; } = "";
 }
+
+/// <summary>
+/// Command sent by the options window when a spread is staged or cleared.
+/// The window owns the staging state; this tells the host which contracts to stream.
+/// </summary>
+public class OptionsSpreadCommand
+{
+    public string Action { get; set; } = "";        // "stageSpread" or "clearSpread"
+    public string Strategy { get; set; } = "";      // "BULL PUT" or "BEAR CALL"
+    public double ShortStrike { get; set; }
+    public double LongStrike { get; set; }
+    public string ShortRight { get; set; } = "";    // "P" or "C"
+    public string LongRight { get; set; } = "";     // "P" or "C"
+}
+
+/// <summary>
+/// Live bid/ask for the two legs of the currently staged spread.
+/// A zero value means that side has not been received yet.
+/// </summary>
+public class OptionsSpreadQuoteUpdate
+{
+    public string Strategy { get; set; } = "";
+    public double ShortStrike { get; set; }
+    public double LongStrike { get; set; }
+    public double ShortBid { get; set; }
+    public double ShortAsk { get; set; }
+    public double LongBid { get; set; }
+    public double LongAsk { get; set; }
+    public string UpdatedAt { get; set; } = "";
+}
+
+/// <summary>
+/// Subscription lifecycle for the staged spread: Subscribed, Live, Delayed, Cleared, Error.
+/// </summary>
+public class OptionsSpreadStatusUpdate
+{
+    public string State { get; set; } = "";
+    public string Message { get; set; } = "";
+    public string Strategy { get; set; } = "";
+    public double ShortStrike { get; set; }
+    public double LongStrike { get; set; }
+}

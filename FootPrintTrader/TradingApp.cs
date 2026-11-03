@@ -73,6 +73,12 @@ public class TradingApp
         _optionsService.OnOptionsError += msg =>
             _windowManager.SendOptionsUpdate(UpdateMessageType.OPTIONS_ERROR, new OptionsErrorUpdate { Message = msg });
 
+        _optionsService.OnSpreadQuoteUpdated += quote =>
+            _windowManager.SendOptionsUpdate(UpdateMessageType.OPTIONS_SPREAD_QUOTE, quote);
+
+        _optionsService.OnSpreadStatusChanged += status =>
+            _windowManager.SendOptionsUpdate(UpdateMessageType.OPTIONS_SPREAD_STATUS, status);
+
         _windowManager.OnApplicationReady += () =>
         {
             _windowManager.SendFuturesUpdate(UpdateMessageType.MARKET_INFO, new MarketInfo
@@ -102,10 +108,16 @@ public class TradingApp
             _ = _optionsService.FetchOptionsChainAsync();
         };
 
+        _windowManager.OnSpreadStaged += command => _optionsService.StageSpread(command);
+        _windowManager.OnSpreadCleared += () => _optionsService.ClearSpread();
+
+        _windowManager.OnOptionsWindowClosing += () => _optionsService.ClearSpread();
+
         _windowManager.OnFuturesWindowClosing += () =>
         {
             _futuresTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             _optionsTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _optionsService.ClearSpread();
             WriteSnapshot();
         };
 
@@ -121,6 +133,7 @@ public class TradingApp
     private async Task InitAndSubscribeAsync()
     {
         await _orderManager.ReadCurrentState();
+        _optionsService.AttachClient(_marketData.Client);
         await _marketData.StartAsync();
 
         SendPositionUpdate();
