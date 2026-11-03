@@ -47,23 +47,28 @@ public class OrderManager
     {
         get
         {
-            _lock.WaitAsync();
+            _lock.Wait();
             try
             {
-                return new PositionSummary
-                {
-                    NetQuantity = _position.NetQuantity,
-                    Direction = _position.Direction,
-                    Quantity = _position.Quantity,
-                    AveragePrice = _position.AveragePrice,
-                    ChartEntryPrice = _position.ChartEntryPrice
-                };
+                return SnapshotPositionInternal();
             }
             finally
             {
                 _lock.Release();
             }
         }
+    }
+
+    private PositionSummary SnapshotPositionInternal()
+    {
+        return new PositionSummary
+        {
+            NetQuantity = _position.NetQuantity,
+            Direction = _position.Direction,
+            Quantity = _position.Quantity,
+            AveragePrice = _position.AveragePrice,
+            ChartEntryPrice = _position.ChartEntryPrice
+        };
     }
 
     public OrderManager(Logger logger)
@@ -76,6 +81,7 @@ public class OrderManager
 
     public async Task PersistOrder(Order order)
     {
+        IReadOnlyList<OrderPersistence> snapshot;
         await _lock.WaitAsync();
         try
         {
@@ -89,39 +95,54 @@ public class OrderManager
                 Status = "Unknown"
             });
             await SaveActiveOrdersInternal();
-            OnOrdersChanged?.Invoke(ActiveOrders);
+            snapshot = _activeOrders.ToList();
         }
         finally
         {
             _lock.Release();
         }
+
+        OnOrdersChanged?.Invoke(snapshot);
     }
 
     public async Task ReadCurrentState()
     {
+        IReadOnlyList<OrderPersistence> ordersSnapshot;
+        PositionSummary positionSnapshot;
+
         await _lock.WaitAsync();
         try
         {
             Directory.CreateDirectory(_dataDirectory);
             _activeOrders = await ReadOrdersInternal();
             _position = await ReadPositionInternal();
-            OnOrdersChanged?.Invoke(ActiveOrders);
-            OnPositionChanged?.Invoke(Position);
+
+            ordersSnapshot = _activeOrders.ToList();
+            positionSnapshot = SnapshotPositionInternal();
         }
         catch (Exception ex)
         {
             _logger?.WriteLine($"[ORDER] ReadCurrentState ERROR: {ex}");
             _activeOrders = new List<OrderPersistence>();
             _position = new PositionSummary();
+
+            ordersSnapshot = _activeOrders.ToList();
+            positionSnapshot = SnapshotPositionInternal();
         }
         finally
         {
             _lock.Release();
         }
+
+        OnOrdersChanged?.Invoke(ordersSnapshot);
+        OnPositionChanged?.Invoke(positionSnapshot);
     }
 
     public async Task UpdateOrderStatus(OrderStatus status)
     {
+        IReadOnlyList<OrderPersistence> ordersSnapshot = null;
+        PositionSummary positionSnapshot = null;
+
         await _lock.WaitAsync();
         try
         {
@@ -144,14 +165,20 @@ public class OrderManager
 
                 _activeOrders.Remove(order);
                 await SaveActiveOrdersInternal();
-                OnOrdersChanged?.Invoke(ActiveOrders);
-                OnPositionChanged?.Invoke(Position);
+
+                ordersSnapshot = _activeOrders.ToList();
+                positionSnapshot = SnapshotPositionInternal();
             }
         }
         finally
         {
             _lock.Release();
         }
+
+        if (ordersSnapshot == null) return;
+
+        OnOrdersChanged?.Invoke(ordersSnapshot);
+        OnPositionChanged?.Invoke(positionSnapshot);
     }
 
     private void ApplyFillInternal(string action, decimal filledQty, double fillPrice)
