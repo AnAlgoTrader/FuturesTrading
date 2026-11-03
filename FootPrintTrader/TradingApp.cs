@@ -19,7 +19,6 @@ public class TradingApp
     private const string DataDirectory = "/home/oce/LocalDB/logs/footprint";
 
     private readonly MarketProfile _market;
-    private readonly Logger _logger;
     private readonly FootprintClassifier _classifier;
     private readonly FootprintAnalyzer _analyzer;
     private readonly MarketDataService _marketData;
@@ -35,15 +34,15 @@ public class TradingApp
     public TradingApp(MarketProfile market = null)
     {
         _market = market ?? MarketPresets.EsMes;
-        _logger = new Logger(DataDirectory);
+        var logger = new Logger(DataDirectory);
         _classifier = new FootprintClassifier(tickSize: _market.TickSize, tradesPerBar: _market.TradesPerBar);
         _analyzer = new FootprintAnalyzer();
 
-        _marketData = new MarketDataService(_market, _classifier, _logger);
-        _orderManager = new OrderManager(_logger);
-        _tradeExecution = new TradeExecutionService(_marketData, _orderManager, _market, _logger);
-        _optionsService = new OptionsService(_logger);
-        _snapshotService = new SnapshotService(DataDirectory, _market, _logger, _analyzer);
+        _marketData = new MarketDataService(_market, _classifier, logger);
+        _orderManager = new OrderManager(logger);
+        _tradeExecution = new TradeExecutionService(_marketData, _orderManager, _market, logger);
+        _optionsService = new OptionsService(logger);
+        _snapshotService = new SnapshotService(DataDirectory, _market, logger, _analyzer);
         _windowManager = new WindowManager();
 
         WireEvents();
