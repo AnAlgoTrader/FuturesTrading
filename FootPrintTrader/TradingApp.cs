@@ -16,7 +16,7 @@ namespace FootPrintTrader;
 
 public class TradingApp
 {
-    private static readonly string DataDirectory = "/home/oce/LocalDB/logs/footprint";
+    private const string DataDirectory = "/home/oce/LocalDB/logs/footprint";
 
     private readonly MarketProfile _market;
     private readonly Logger _logger;

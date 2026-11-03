@@ -31,9 +31,14 @@ public class OrderManager
     {
         get
         {
-            lock (_lock)
+            _lock.Wait();
+            try
             {
                 return _activeOrders.ToList();
+            }
+            finally
+            {
+                _lock.Release();
             }
         }
     }
@@ -42,7 +47,8 @@ public class OrderManager
     {
         get
         {
-            lock (_lock)
+            _lock.WaitAsync();
+            try
             {
                 return new PositionSummary
                 {
@@ -52,6 +58,10 @@ public class OrderManager
                     AveragePrice = _position.AveragePrice,
                     ChartEntryPrice = _position.ChartEntryPrice
                 };
+            }
+            finally
+            {
+                _lock.Release();
             }
         }
     }
@@ -215,6 +225,7 @@ public class OrderManager
             if (!string.IsNullOrWhiteSpace(json))
                 return JsonSerializer.Deserialize<List<OrderPersistence>>(json) ?? new List<OrderPersistence>();
         }
+
         return new List<OrderPersistence>();
     }
 
@@ -226,6 +237,7 @@ public class OrderManager
             if (!string.IsNullOrWhiteSpace(json))
                 return JsonSerializer.Deserialize<PositionSummary>(json) ?? new PositionSummary();
         }
+
         return new PositionSummary();
     }
 

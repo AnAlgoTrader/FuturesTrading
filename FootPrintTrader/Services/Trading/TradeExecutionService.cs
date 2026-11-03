@@ -28,7 +28,7 @@ public class TradeExecutionService
         _logger = logger;
     }
 
-    public async Task SubmitOrderAsync(string action, decimal quantity, double price)
+    private async Task SubmitOrderAsync(string action, decimal quantity, double price)
     {
         var tradeContract = _marketData.TradeContract;
         if (tradeContract == null)
