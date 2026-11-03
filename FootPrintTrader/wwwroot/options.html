@@ -22,6 +22,44 @@
                 <span id="opt-symbol">-</span> &bull; <span id="opt-expiry">-</span>
             </div>
         </div>
+
+        <!-- Staged Credit Spread Table -->
+        <div class="spread-panel" id="spread-panel">
+            <table class="spread-table" id="spread-table">
+                <thead>
+                    <tr>
+                        <th class="col-strategy">Strategy</th>
+                        <th class="col-leg">Short Leg (Sell)</th>
+                        <th class="col-price">Short Bid</th>
+                        <th class="col-price">Short Ask</th>
+                        <th class="col-leg">Long Leg (Buy)</th>
+                        <th class="col-price">Long Bid</th>
+                        <th class="col-price">Long Ask</th>
+                        <th class="col-credit">Net Credit</th>
+                        <th class="col-risk">Max Risk</th>
+                        <th class="col-action">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr id="spread-row" class="empty">
+                        <td class="col-strategy" id="sp-strategy"><span class="spread-badge badge-empty">NO SPREAD</span></td>
+                        <td class="col-leg" id="sp-short-leg"><span class="dim">-</span></td>
+                        <td class="col-price" id="sp-short-bid"><span class="dim">-</span></td>
+                        <td class="col-price" id="sp-short-ask"><span class="dim">-</span></td>
+                        <td class="col-leg" id="sp-long-leg"><span class="dim">-</span></td>
+                        <td class="col-price" id="sp-long-bid"><span class="dim">-</span></td>
+                        <td class="col-price" id="sp-long-ask"><span class="dim">-</span></td>
+                        <td class="col-credit" id="sp-net-credit"><span class="dim">-</span></td>
+                        <td class="col-risk" id="sp-max-risk"><span class="dim">-</span></td>
+                        <td class="col-action" id="sp-action">
+                            <button type="button" class="btn-spread-trade" id="btn-spread-trade" disabled title="Trade Spread (Next phase)">TRADE</button>
+                            <button type="button" class="btn-spread-clear" id="btn-spread-clear" onclick="clearSpread()" disabled title="Clear staged spread">&times;</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
         <div class="header-metrics">
             <div class="header-metric">
                 <span class="header-label">Spot</span>
