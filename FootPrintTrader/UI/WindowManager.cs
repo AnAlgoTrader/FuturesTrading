@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Text.Json;
+using System.Threading;
 using FootPrintTrader.UI.Models;
 using FootPrintTrader.UI.Rendering;
 using Photino.NET;
@@ -11,6 +12,7 @@ public class WindowManager
 {
     private PhotinoWindow _futuresWindow;
     private PhotinoWindow _optionsWindow;
+    private int _isClosing;
 
     private static readonly JsonSerializerOptions CommandJsonOptions = new()
     {
@@ -44,8 +46,12 @@ public class WindowManager
 
         _futuresWindow.WindowClosing += (_, _) =>
         {
-            OnFuturesWindowClosing?.Invoke();
-            _optionsWindow?.Close();
+            if (Interlocked.Exchange(ref _isClosing, 1) == 0)
+            {
+                OnFuturesWindowClosing?.Invoke();
+                OnOptionsWindowClosing?.Invoke();
+                try { _optionsWindow?.Close(); } catch { }
+            }
             return false;
         };
     }
@@ -70,7 +76,12 @@ public class WindowManager
 
         _optionsWindow.WindowClosing += (_, _) =>
         {
-            OnOptionsWindowClosing?.Invoke();
+            if (Interlocked.Exchange(ref _isClosing, 1) == 0)
+            {
+                OnFuturesWindowClosing?.Invoke();
+                OnOptionsWindowClosing?.Invoke();
+                try { _futuresWindow?.Close(); } catch { }
+            }
             _optionsWindow = null;
             return false;
         };
