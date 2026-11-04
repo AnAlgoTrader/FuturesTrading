@@ -290,7 +290,6 @@ function renderSpreadTable() {
     const longAskEl = document.getElementById('sp-long-ask');
     const netCreditEl = document.getElementById('sp-net-credit');
     const maxRiskEl = document.getElementById('sp-max-risk');
-    const btnClear = document.getElementById('btn-spread-clear');
     const btnTrade = document.getElementById('btn-spread-trade');
 
     if (!currentStagedSpread) {
@@ -304,7 +303,6 @@ function renderSpreadTable() {
         if (longAskEl) longAskEl.innerHTML = '<span class="dim">-</span>';
         if (netCreditEl) netCreditEl.innerHTML = '<span class="dim">-</span>';
         if (maxRiskEl) maxRiskEl.innerHTML = '<span class="dim">-</span>';
-        if (btnClear) btnClear.disabled = true;
         if (btnTrade) btnTrade.disabled = true;
         return;
     }
@@ -370,29 +368,11 @@ function renderSpreadTable() {
         }
     }
 
-    if (btnClear) btnClear.disabled = false;
     if (btnTrade) {
         btnTrade.disabled = true; // Staging only in this phase
         btnTrade.title = "Spread staging complete. IBKR data request & trade execution in next phase.";
     }
 }
-
-function clearSpread() {
-    const hadSpread = !!currentStagedSpread;
-    currentStagedSpread = null;
-    liveSpreadQuote = null;
-    spreadSubscriptionState = 'Idle';
-    renderSpreadTable();
-    setLiveTag('idle', 'CBOE');
-
-    if (hadSpread) sendToHost({ action: 'clearSpread' });
-}
-
-// Bind clear button
-document.addEventListener('DOMContentLoaded', () => {
-    const btnClear = document.getElementById('btn-spread-clear');
-    if (btnClear) btnClear.addEventListener('click', clearSpread);
-});
 
 function showError(message) {
     const text = message || 'Options chain unavailable.';

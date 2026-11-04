@@ -158,31 +158,6 @@ html, body {
     background: transparent;
 }
 
-.btn-spread-clear {
-    padding: 0 4px;
-    height: 18px;
-    min-width: 18px;
-    border-radius: 3px;
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 16px;
-    cursor: pointer;
-    transition: all 0.12s ease;
-}
-
-.btn-spread-clear:not(:disabled):hover {
-    color: var(--down);
-    border-color: var(--down);
-    background: rgba(240, 100, 123, 0.12);
-}
-
-.btn-spread-clear:disabled {
-    opacity: 0.25;
-    cursor: not-allowed;
-}
-
 .title-block {
     min-width: 0;
 }

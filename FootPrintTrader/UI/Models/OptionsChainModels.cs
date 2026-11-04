@@ -48,7 +48,7 @@ public class OptionsErrorUpdate
 /// </summary>
 public class OptionsSpreadCommand
 {
-    public string Action { get; set; } = "";        // "stageSpread" or "clearSpread"
+    public string Action { get; set; } = "";        // "stageSpread"
     public string Strategy { get; set; } = "";      // "BULL PUT" or "BEAR CALL"
     public double ShortStrike { get; set; }
     public double LongStrike { get; set; }
