@@ -23,6 +23,7 @@ public class WindowManager
     public event Action OnCloseTradeRequested;
     public event Action OnOptionsReady;
     public event Action<OptionsSpreadCommand> OnSpreadStaged;
+    public event Action<OptionsSpreadCommand> OnSpreadTradeRequested;
 
     public event Action OnFuturesWindowClosing;
     public event Action OnOptionsWindowClosing;
@@ -155,6 +156,9 @@ public class WindowManager
         {
             case "stageSpread":
                 OnSpreadStaged?.Invoke(command);
+                break;
+            case "tradeSpread":
+                OnSpreadTradeRequested?.Invoke(command);
                 break;
         }
     }

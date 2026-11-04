@@ -109,6 +109,7 @@ public class TradingApp
         };
 
         _windowManager.OnSpreadStaged += command => _optionsService.StageSpread(command);
+        _windowManager.OnSpreadTradeRequested += command => _ = _optionsService.TradeSpreadAsync(command);
 
         _windowManager.OnOptionsWindowClosing += () => _optionsService.ClearSpread();
 

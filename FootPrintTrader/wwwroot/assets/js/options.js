@@ -369,9 +369,22 @@ function renderSpreadTable() {
     }
 
     if (btnTrade) {
-        btnTrade.disabled = true; // Staging only in this phase
-        btnTrade.title = "Spread staging complete. IBKR data request & trade execution in next phase.";
+        btnTrade.disabled = false;
+        btnTrade.title = `Trade ${strategy} (${shortStrike}/${longStrike})`;
     }
+}
+
+function executeSpreadTrade() {
+    if (!currentStagedSpread) return;
+
+    sendToHost({
+        action: 'tradeSpread',
+        strategy: currentStagedSpread.strategy,
+        shortStrike: currentStagedSpread.shortStrike,
+        longStrike: currentStagedSpread.longStrike,
+        shortRight: currentStagedSpread.shortType[0],
+        longRight: currentStagedSpread.longType[0]
+    });
 }
 
 function showError(message) {

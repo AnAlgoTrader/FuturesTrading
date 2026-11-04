@@ -37,6 +37,8 @@ public class OptionsService
 
     // Currently staged spread and its live subscription.
     private OptionsSpreadCommand _activeSpread;
+    private ContractDetails _shortContract;
+    private ContractDetails _longContract;
     private int _shortRequestId = -1;
     private int _longRequestId = -1;
     private int _nextRequestId = FirstSpreadRequestId;
@@ -176,6 +178,8 @@ public class OptionsService
                     LongRight = longRight
                 };
                 activeSpread = _activeSpread;
+                _shortContract = shortContract;
+                _longContract = longContract;
                 _shortRequestId = shortRequestId;
                 _longRequestId = longRequestId;
                 _lastShortBid = _lastShortAsk = _lastLongBid = _lastLongAsk = 0;
@@ -205,6 +209,7 @@ public class OptionsService
         {
             _client.SubscribeToMarketData(shortRequestId, shortContract);
             _client.SubscribeToMarketData(longRequestId, longContract);
+            _ = ResolveContractIdsAsync(shortContract, longContract);
         }
         catch (Exception ex)
         {
@@ -229,6 +234,8 @@ public class OptionsService
             cleared = _activeSpread;
 
             _activeSpread = null;
+            _shortContract = null;
+            _longContract = null;
             _shortRequestId = -1;
             _longRequestId = -1;
             _lastShortBid = _lastShortAsk = _lastLongBid = _lastLongAsk = 0;
@@ -245,6 +252,114 @@ public class OptionsService
         {
             _logger?.WriteLine($"[OPTIONS] Spread unsubscribe {cleared.Strategy} {cleared.ShortStrike}/{cleared.LongStrike}");
             PublishStatus("Cleared", "", cleared);
+        }
+    }
+
+    /// <summary>
+    /// Fires the credit spread order to IBKR as a fire-and-forget order.
+    /// </summary>
+    public async Task TradeSpreadAsync(OptionsSpreadCommand command)
+    {
+        if (_client == null)
+        {
+            _logger?.WriteLine("[TRADE] TradeSpread REJECTED: IB client is not connected.");
+            return;
+        }
+
+        ContractDetails shortContract;
+        ContractDetails longContract;
+        double shortBid;
+        double longAsk;
+
+        lock (_sync)
+        {
+            shortContract = _shortContract;
+            longContract = _longContract;
+            shortBid = _lastShortBid;
+            longAsk = _lastLongAsk;
+        }
+
+        if (shortContract == null || longContract == null)
+        {
+            _logger?.WriteLine("[TRADE] TradeSpread REJECTED: No staged spread contracts.");
+            return;
+        }
+
+        if (shortContract.Contract.ConId <= 0 || longContract.Contract.ConId <= 0)
+        {
+            await ResolveContractIdsAsync(shortContract, longContract);
+        }
+
+        if (shortContract.Contract.ConId <= 0 || longContract.Contract.ConId <= 0)
+        {
+            _logger?.WriteLine($"[TRADE] TradeSpread REJECTED: Could not resolve contract IDs (Short ConId: {shortContract.Contract.ConId}, Long ConId: {longContract.Contract.ConId}).");
+            return;
+        }
+
+        // Fallback to chain prices if live quotes are 0
+        if (shortBid <= 0 || longAsk <= 0)
+        {
+            var chain = _lastOptionsChain;
+            if (chain?.Rows != null)
+            {
+                var isPut = string.Equals(command.ShortRight, "P", StringComparison.OrdinalIgnoreCase);
+                var shortRow = chain.Rows.FirstOrDefault(r => Math.Abs(r.Strike - command.ShortStrike) < 0.01);
+                var longRow = chain.Rows.FirstOrDefault(r => Math.Abs(r.Strike - command.LongStrike) < 0.01);
+
+                if (shortBid <= 0 && shortRow != null)
+                    shortBid = isPut ? shortRow.PutBid : shortRow.CallBid;
+                if (longAsk <= 0 && longRow != null)
+                    longAsk = isPut ? longRow.PutAsk : longRow.CallAsk;
+            }
+        }
+
+        var underlying = new Contract
+        {
+            Symbol = _underlyingSymbol,
+            SecType = "IND",
+            Currency = "USD",
+            Exchange = "SMART"
+        };
+
+        _logger?.WriteLine($"[TRADE] Firing credit spread order: {command.Strategy} Short Strike:{command.ShortStrike} (ConId:{shortContract.Contract.ConId}, Bid:{shortBid:F2}) / Long Strike:{command.LongStrike} (ConId:{longContract.Contract.ConId}, Ask:{longAsk:F2})");
+
+        // Fire and forget
+        _client.PlaceCreditSpreadOrder(
+            underlying,
+            shortContract.Contract.ConId,
+            longContract.Contract.ConId,
+            1m,
+            shortBid,
+            longAsk);
+
+        PublishStatus("Live", $"Spread order placed @ ${(shortBid - longAsk):F2} credit.", _activeSpread);
+    }
+
+    private async Task ResolveContractIdsAsync(ContractDetails shortDetails, ContractDetails longDetails)
+    {
+        try
+        {
+            if (shortDetails?.Contract != null && shortDetails.Contract.ConId <= 0)
+            {
+                var shortData = await _client.GetContractData(shortDetails.Contract, throwOnFailure: false);
+                if (shortData?.Count > 0)
+                {
+                    shortDetails.Contract.ConId = shortData[0].Contract.ConId;
+                }
+            }
+
+            if (longDetails?.Contract != null && longDetails.Contract.ConId <= 0)
+            {
+                var longData = await _client.GetContractData(longDetails.Contract, throwOnFailure: false);
+                if (longData?.Count > 0)
+                {
+                    longDetails.Contract.ConId = longData[0].Contract.ConId;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.WriteLine($"[OPTIONS] Resolve contract ConId error: {ex.Message}");
         }
     }
 
