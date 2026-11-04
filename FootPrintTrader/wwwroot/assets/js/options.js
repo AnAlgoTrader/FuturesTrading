@@ -252,7 +252,6 @@ function stageSpread(side, strike) {
         side,
         strategy: isBullish ? 'BULL PUT' : 'BEAR CALL',
         tone: isBullish ? 'bullish' : 'bearish',
-        posSize: currentStagedSpread ? (currentStagedSpread.posSize || 0) : 0,
         shortStrike,
         shortType,
         longStrike,
@@ -283,7 +282,6 @@ function refreshStagedSpreadPrices() {
 function renderSpreadTable() {
     const row = document.getElementById('spread-row');
     const stratEl = document.getElementById('sp-strategy');
-    const spSizeEl = document.getElementById('sp-size');
     const shortLegEl = document.getElementById('sp-short-leg');
     const shortBidEl = document.getElementById('sp-short-bid');
     const shortAskEl = document.getElementById('sp-short-ask');
@@ -298,7 +296,6 @@ function renderSpreadTable() {
     if (!currentStagedSpread) {
         if (row) row.className = 'empty';
         if (stratEl) stratEl.innerHTML = '<span class="spread-badge badge-empty">NO SPREAD</span>';
-        if (spSizeEl) spSizeEl.innerHTML = '<span class="dim">-</span>';
         if (shortLegEl) shortLegEl.innerHTML = '<span class="dim">-</span>';
         if (shortBidEl) shortBidEl.innerHTML = '<span class="dim">-</span>';
         if (shortAskEl) shortAskEl.innerHTML = '<span class="dim">-</span>';
@@ -312,7 +309,7 @@ function renderSpreadTable() {
         return;
     }
 
-    const { strategy, tone, posSize = 0, shortStrike, shortType, longStrike, longType } = currentStagedSpread;
+    const { strategy, tone, shortStrike, shortType, longStrike, longType } = currentStagedSpread;
     const isPut = shortType === 'PUT';
 
     const shortRow = latestChainData?.rows?.find(r => Math.abs(toNumber(r.strike) - shortStrike) < 0.01);
@@ -344,8 +341,6 @@ function renderSpreadTable() {
 
     if (row) row.className = `active ${tone}`;
     if (stratEl) stratEl.innerHTML = `<span class="spread-badge badge-${tone}">${strategy}</span>`;
-
-    if (spSizeEl) spSizeEl.textContent = posSize.toString();
 
     if (shortLegEl) shortLegEl.textContent = `${shortStrike.toFixed(0)} ${shortType[0]}`;
     if (shortBidEl) shortBidEl.textContent = fmtPrice(shortBid);

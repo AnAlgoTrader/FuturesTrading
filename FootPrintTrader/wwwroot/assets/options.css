@@ -125,12 +125,6 @@ html, body {
     color: var(--down);
 }
 
-.spread-table td.col-size {
-    font-weight: 700;
-    color: #fff;
-    min-width: 44px;
-}
-
 .col-action {
     display: flex;
     align-items: center;
