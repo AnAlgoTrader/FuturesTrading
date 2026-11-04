@@ -349,10 +349,10 @@ function renderSpreadTable() {
 
     if (netCreditEl) {
         if (credit > 0) {
-            netCreditEl.textContent = `+$${credit.toFixed(2)}`;
+            netCreditEl.textContent = `+$${totalCredit.toFixed(0)}`;
             netCreditEl.title = `${hasLive ? 'Live' : 'Cboe'} $${totalCredit.toFixed(0)} per contract (Short Bid ${fmtPrice(shortBid)} - Long Ask ${fmtPrice(longAsk)})`;
         } else if (credit !== 0) {
-            netCreditEl.textContent = `$${credit.toFixed(2)}`;
+            netCreditEl.textContent = `$${(credit * 100).toFixed(0)}`;
             netCreditEl.title = '';
         } else {
             netCreditEl.innerHTML = '<span class="dim">-</span>';
