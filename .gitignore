@@ -19,3 +19,4 @@ sweep_results.txt
 /Common/bin
 /Common/obj
 *.user
+FootPrintTrader/cboeData.json
