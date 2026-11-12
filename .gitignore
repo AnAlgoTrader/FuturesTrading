@@ -20,3 +20,4 @@ sweep_results.txt
 /Common/obj
 *.user
 FootPrintTrader/cboeData.json
+FootPrintTrader/classifier_stats.txt

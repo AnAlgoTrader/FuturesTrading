@@ -1,5 +1,4 @@
-﻿
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ib.Csharp.Api.Client", "..\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client.csproj", "{B0AE1954-67E6-4AD6-937D-237D7FC55C93}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FootPrintTrader", "FootPrintTrader\FootPrintTrader.csproj", "{AC47B5CA-965F-4A2B-BF2F-412B09FEB432}"

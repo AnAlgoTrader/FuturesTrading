@@ -176,8 +176,6 @@ public class TradingApp
     private void OptionsTimerCallback(object state)
     {
         _ = _optionsService.FetchOptionsChainAsync();
-        // File.AppendAllText("./classifier_stats.txt",
-        //     $"{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} {_classifier.GetStats()}{Environment.NewLine}");
     }
 
     private void SendPositionUpdate()
