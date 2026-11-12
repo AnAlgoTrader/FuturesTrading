@@ -92,14 +92,14 @@ public class FootprintAnalyzer
 
         // Multi-bar / Session Structure
         var liveDelta = current?.Delta ?? 0m;
-        var cumulativeDelta = (double)(_sessionCumulativeDelta + liveDelta);
+        double cumulativeDelta;
 
         lock (_syncLock)
         {
             // Register newly completed bars
             foreach (var compBar in completed)
             {
-                if (_processedBars.Add(compBar.StartTime))
+                if (_processedBars.Add(compBar.Id))
                 {
                     _sessionCumulativeDelta += compBar.Delta;
 
@@ -110,12 +110,16 @@ public class FootprintAnalyzer
                 }
             }
 
+            // Session CVD = all registered completed bars + the live bar (computed AFTER registering,
+            // otherwise the update in which a bar closes misses that bar's delta).
+            cumulativeDelta = (double)(_sessionCumulativeDelta + liveDelta);
+
             // Recompute CVD-vs-price divergence from the confirmed completed-bar window.
             ComputeDivergence(tickSize, settings);
 
             if (completed.Length > 0)
             {
-                var oldestInWindow = completed.Min(c => c.StartTime);
+                var oldestInWindow = completed.Min(c => c.Id);
                 _processedBars.RemoveWhere(t => t < oldestInWindow);
             }
         }

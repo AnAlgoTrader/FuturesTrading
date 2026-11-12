@@ -21,6 +21,7 @@ public class DetectedFootprintSignal
     public string Tone { get; init; } = "neutral"; // "bullish", "bearish", "phase"
     public bool IsFast { get; init; }
     public long BarStartTime { get; init; }
+    public long BarId { get; init; }
 }
 
 public static class FootprintSignalDetector
@@ -28,7 +29,7 @@ public static class FootprintSignalDetector
     /// <summary>
     /// Scans completed footprint bars in chronological order and detects the 5 signals
     /// specified in the Footprint Signal Detector specification.
-    /// Returns a dictionary mapping BarStartTime to the list of detected signals for that bar.
+    /// Returns a dictionary mapping FootprintBarData.Id to the list of detected signals for that bar.
     /// </summary>
     public static Dictionary<long, List<DetectedFootprintSignal>> DetectSignals(
         FootprintBarData[] completed,
@@ -52,7 +53,9 @@ public static class FootprintSignalDetector
             var b = completed[i];
             runningCvd += b.Delta;
             cvdArray[i] = runningCvd;
-            durations[i] = Math.Max(1.0, b.EndTime - b.StartTime);
+            durations[i] = b.DurationSeconds > 0
+                ? Math.Max(0.001, b.DurationSeconds)            // local arrival clock, sub-ms
+                : Math.Max(1.0, b.EndTime - b.StartTime);       // fallback: IBKR 1-second timestamps
             buyImbalances[i] = CountBuyImbalances(b, tickSize, settings.ImbalanceMinVolume, settings.ImbalanceRatio);
         }
 
@@ -89,7 +92,8 @@ public static class FootprintSignalDetector
                             Acronym = "SAB",
                             Name = "Sell Absorption",
                             Tone = "bullish",
-                            BarStartTime = bar.StartTime
+                            BarStartTime = bar.StartTime,
+                            BarId = bar.Id
                         });
                         lastFired[FootprintSignalType.SellAbsorption] = i;
                     }
@@ -107,7 +111,8 @@ public static class FootprintSignalDetector
                             Acronym = "BAB",
                             Name = "Buy Absorption",
                             Tone = "bearish",
-                            BarStartTime = bar.StartTime
+                            BarStartTime = bar.StartTime,
+                            BarId = bar.Id
                         });
                         lastFired[FootprintSignalType.BuyAbsorption] = i;
                     }
@@ -136,7 +141,8 @@ public static class FootprintSignalDetector
                             Acronym = "CDIV",
                             Name = "CVD Divergence",
                             Tone = "bearish",
-                            BarStartTime = bar.StartTime
+                            BarStartTime = bar.StartTime,
+                            BarId = bar.Id
                         });
                         lastFired[FootprintSignalType.CvdDivergence] = i;
                     }
@@ -181,7 +187,8 @@ public static class FootprintSignalDetector
                             Name = isFast ? "Breakout Confirmation (FAST)" : "Breakout Confirmation",
                             Tone = "bullish",
                             IsFast = isFast,
-                            BarStartTime = bar.StartTime
+                            BarStartTime = bar.StartTime,
+                            BarId = bar.Id
                         });
                         lastFired[FootprintSignalType.BreakoutConfirmation] = i;
                     }
@@ -203,7 +210,8 @@ public static class FootprintSignalDetector
                             Acronym = "SLW",
                             Name = "Slowdown",
                             Tone = "phase",
-                            BarStartTime = bar.StartTime
+                            BarStartTime = bar.StartTime,
+                            BarId = bar.Id
                         });
                         lastFired[FootprintSignalType.Slowdown] = i;
                     }
@@ -212,7 +220,7 @@ public static class FootprintSignalDetector
 
             if (signals.Count > 0)
             {
-                result[bar.StartTime] = signals;
+                result[bar.Id] = signals;
             }
         }
 
@@ -221,7 +229,7 @@ public static class FootprintSignalDetector
 
     /// <summary>
     /// Counts diagonal buy imbalances for a bar:
-    /// For each price row, ask volume >= minVolume and ask volume >= 3 * bid volume one tick lower.
+    /// For each price row, ask volume >= minVolume and ask volume >= ratio * bid volume one tick lower.
     /// </summary>
     public static int CountBuyImbalances(FootprintBarData bar, double tickSize, decimal minVolume, decimal ratio)
     {
