@@ -58,7 +58,7 @@ public static class FootprintRenderBuilder
         foreach (var bar in snapshot.Completed)
         {
             var renderBar = ConvertBar(bar);
-            if (signalsMap.TryGetValue(bar.StartTime, out var signals))
+            if (signalsMap.TryGetValue(bar.Id, out var signals))
             {
                 var tag = CreateTag(signals);
                 renderBar.Header = tag;
