@@ -36,7 +36,7 @@ public class TradingApp
     {
         _market = market ?? MarketPresets.EsMes;
         var logger = new Logger(DataDirectory);
-        _classifier = new FootprintClassifier(tickSize: _market.TickSize, tradesPerBar: _market.TradesPerBar);
+        _classifier = new FootprintClassifier(tickSize: _market.TickSize, barIntervalSeconds: _market.BarIntervalSeconds);
         _analyzer = new FootprintAnalyzer();
 
         _marketData = new MarketDataService(_market, _classifier, logger);
@@ -89,7 +89,7 @@ public class TradingApp
                 TradeSymbol = _market.TradeSymbol,
                 Exchange = _market.Exchange,
                 PriceDecimals = _market.PriceDecimals,
-                TradesPerBar = _market.TradesPerBar,
+                BarIntervalSeconds = _market.BarIntervalSeconds,
                 CurrencySign = _market.CurrencySign ?? "$"
             });
 

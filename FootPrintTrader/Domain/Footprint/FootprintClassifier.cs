@@ -35,9 +35,10 @@ public readonly record struct ClassifierStats(
 }
 
 /// <summary>
-/// Builds tick-count footprint bars. Each trade is classified against the last valid quote that was
-/// RECEIVED before it (arrival order), with no waiting and no re-ordering by IBKR's 1-second timestamps.
-/// IBKR timestamps are only used for the bar's StartTime/EndTime.
+/// Builds time-bucket footprint bars (one minute by default; see <c>barIntervalSeconds</c>).
+/// Each trade is classified against the last valid quote that was RECEIVED before it (arrival order),
+/// with no waiting and no re-ordering by IBKR's 1-second timestamps. IBKR timestamps determine the
+/// bar's minute bucket and its StartTime/EndTime.
 ///
 /// Requirement: OnQuote and OnTrade must be called in the order the callbacks arrive from IBKR
 /// (ideally from the same thread / the same message loop).
@@ -57,7 +58,7 @@ public sealed class FootprintClassifier
 
     private readonly Lock _lock = new();
     private readonly double _tickSize;
-    private readonly int _tradesPerBar;
+    private readonly long _barIntervalSeconds;
     private readonly int _maxHistory;
     private readonly bool _usePrevQuoteRule;
     private readonly long _prevQuoteWindowTs;
@@ -83,26 +84,28 @@ public sealed class FootprintClassifier
     private long _nextBarId = 1;
     private long _start, _end;
     private long _startArrival, _endArrival;
+    private long _barBucket = long.MinValue;
     private double _open, _high, _low, _close;
 
     /// <summary>
-    /// Raised when a bar reaches tradesPerBar. Invoked OUTSIDE the internal lock,
-    /// on the thread that called OnTrade. Handlers may safely call back into this class.
-    /// Exceptions propagate to the caller.
+    /// Raised when a bar's time bucket is left (the first trade of a new interval completes it).
+    /// Invoked OUTSIDE the internal lock, on the thread that called OnTrade. Handlers may safely
+    /// call back into this class. Exceptions propagate to the caller.
     /// </summary>
     public event Action<FootprintBarData> BarCompleted;
 
+    /// <param name="barIntervalSeconds">Bar duration in seconds (60 = one-minute bars).</param>
     /// <param name="usePrevQuoteRule">
     /// If a trade prints strictly inside the current spread but at/through the previous quote, and the
     /// current quote changed within <paramref name="prevQuoteWindow"/> before the trade, treat the trade as
     /// having hit the previous quote (the quote update that the trade caused arrived first).
     /// </param>
     /// <param name="prevQuoteWindow">Default 50 ms.</param>
-    public FootprintClassifier(double tickSize, int tradesPerBar, int maxHistory = 200,
+    public FootprintClassifier(double tickSize, int barIntervalSeconds, int maxHistory = 200,
                                bool usePrevQuoteRule = true, TimeSpan? prevQuoteWindow = null)
     {
         _tickSize = tickSize;
-        _tradesPerBar = tradesPerBar;
+        _barIntervalSeconds = Math.Max(1, barIntervalSeconds);
         _maxHistory = maxHistory;
         _usePrevQuoteRule = usePrevQuoteRule;
         _prevQuoteWindowTs = (long)((prevQuoteWindow ?? TimeSpan.FromMilliseconds(50)).TotalSeconds * Stopwatch.Frequency);
@@ -253,6 +256,13 @@ public sealed class FootprintClassifier
 
     private void AddTrade(long time, double price, decimal size, long arrival, Side side)
     {
+        var bucket = BucketFor(time);
+
+        // A trade in a later interval closes the bar in progress. Late trades that fall into an
+        // earlier bucket are kept in the current bar so bar time never runs backwards.
+        if (_count > 0 && bucket > _barBucket)
+            CompleteBar();
+
         if (_count == 0)
         {
             _start = time;
@@ -260,6 +270,7 @@ public sealed class FootprintClassifier
             _open = price;
             _high = double.MinValue;
             _low = double.MaxValue;
+            _barBucket = bucket;
         }
         _end = time;
         _endArrival = arrival;
@@ -271,18 +282,25 @@ public sealed class FootprintClassifier
         long ticks = (long)Math.Round(price / _tickSize, MidpointRounding.AwayFromZero);
         if (!_levels.TryGetValue(ticks, out var lvl)) _levels[ticks] = lvl = new Level();
         if (side == Side.AggressiveBuy) lvl.Ask += size; else lvl.Bid += size;
+    }
 
-        if (_count >= _tradesPerBar)
-        {
-            var bar = BuildBar();
-            _completed.Add(bar);
-            if (_completed.Count > _maxHistory) _completed.RemoveAt(0);
+    private long BucketFor(long time)
+    {
+        // IBKR tick timestamps are Unix seconds. Fall back to the local clock if a tick has no time.
+        var seconds = time > 0 ? time : DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return seconds / _barIntervalSeconds;
+    }
 
-            _levels = new Dictionary<long, Level>();
-            _count = 0;
-            _nextBarId++;
-            _completedQueue.Enqueue(bar);
-        }
+    private void CompleteBar()
+    {
+        var bar = BuildBar();
+        _completed.Add(bar);
+        if (_completed.Count > _maxHistory) _completed.RemoveAt(0);
+
+        _levels = new Dictionary<long, Level>();
+        _count = 0;
+        _nextBarId++;
+        _completedQueue.Enqueue(bar);
     }
 
     private FootprintBarData BuildBar()

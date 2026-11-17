@@ -45,7 +45,7 @@ public class SnapshotService
                 _market.TickSize,
                 _market.DataSymbol,
                 _market.TradeSymbol,
-                _market.TradesPerBar,
+                _market.BarIntervalSeconds,
                 DateTime.Now);
             var dataPath = Path.Combine(_dataDirectory, $"footprint-data-{stamp}.json");
             File.WriteAllText(dataPath, JsonSerializer.Serialize(dataPayload, FootprintRenderBuilder.JsonOptions));

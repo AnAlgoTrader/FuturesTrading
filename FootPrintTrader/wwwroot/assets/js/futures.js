@@ -18,6 +18,21 @@ const handlers = {
 let lastSignature = null;
 let priceDecimals = 2;
 let currencySign = '$';
+let barIntervalSeconds = 60;
+
+function formatBarInterval(seconds) {
+    const value = Number(seconds);
+    if (!Number.isFinite(value) || value <= 0) return '-';
+    if (value % 60 === 0) return `${value / 60}-Min`;
+    return `${value}s`;
+}
+
+function updateBarInterval(seconds) {
+    if (!Number.isFinite(Number(seconds)) || Number(seconds) <= 0) return;
+    barIntervalSeconds = Number(seconds);
+    const el = document.getElementById('bar-interval');
+    if (el) el.textContent = formatBarInterval(barIntervalSeconds);
+}
 
 function marketInfo(data) {
     if (!data) return;
@@ -32,8 +47,7 @@ function marketInfo(data) {
         symbolEl.textContent = symbol + exchange;
     }
 
-    const bucketEl = document.getElementById('bucket-size');
-    if (bucketEl && data.tradesPerBar) bucketEl.textContent = data.tradesPerBar;
+    updateBarInterval(data.barIntervalSeconds);
 
     const posSymbolEl = document.getElementById('pos-symbol');
     if (posSymbolEl && data.tradeSymbol) posSymbolEl.textContent = data.tradeSymbol;
@@ -137,8 +151,7 @@ function positionUpdate(data) {
 function footprintSnapshot(data) {
     if (!window.footprint || !Array.isArray(data.bars) || !data.bars.length) return;
 
-    const bucketEl = document.getElementById('bucket-size');
-    if (bucketEl && data.tradesPerBar) bucketEl.textContent = data.tradesPerBar;
+    updateBarInterval(data.barIntervalSeconds);
 
     // Update the rich Order Flow side panel
     if (data.context) {

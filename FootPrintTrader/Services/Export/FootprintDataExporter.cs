@@ -9,7 +9,7 @@ public class FootprintDataExport
     public string Symbol { get; set; } = "";
     public string TradeSymbol { get; set; } = "";
     public double TickSize { get; set; }
-    public int TradesPerBar { get; set; }
+    public int BarIntervalSeconds { get; set; }
     public DateTime ExportedAt { get; set; }
     public List<FootprintDataBar> Completed { get; set; } = new();
     public FootprintDataBar Current { get; set; }
@@ -50,7 +50,7 @@ public static class FootprintDataExporter
         double tickSize,
         string symbol,
         string tradeSymbol,
-        int tradesPerBar,
+        int barIntervalSeconds,
         DateTime exportedAt)
     {
         var result = new FootprintDataExport
@@ -58,7 +58,7 @@ public static class FootprintDataExporter
             Symbol = symbol,
             TradeSymbol = tradeSymbol,
             TickSize = tickSize,
-            TradesPerBar = tradesPerBar,
+            BarIntervalSeconds = barIntervalSeconds,
             ExportedAt = exportedAt
         };
 

@@ -26,6 +26,6 @@ public class MarketInfo
     public string TradeSymbol { get; set; } = "";
     public string Exchange { get; set; } = "";
     public int PriceDecimals { get; set; }
-    public int TradesPerBar { get; set; }
+    public int BarIntervalSeconds { get; set; }
     public string CurrencySign { get; set; } = "$";
 }

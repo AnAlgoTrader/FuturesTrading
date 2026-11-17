@@ -62,7 +62,7 @@ public class FootprintRenderSnapshot
 {
     public double RowSize { get; set; }
     public int PriceDecimals { get; set; }
-    public int TradesPerBar { get; set; }
+    public int BarIntervalSeconds { get; set; }
     public string[] FooterLabels { get; set; } = { "Delta", "Vol", "Secs" };
     public Dictionary<string, string> Colors { get; set; } = new();
     public List<FootprintRenderBar> Bars { get; set; } = new();

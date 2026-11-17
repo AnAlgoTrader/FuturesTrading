@@ -40,7 +40,7 @@ public static class FootprintRenderBuilder
         {
             RowSize = tickSize,
             PriceDecimals = market.PriceDecimals,
-            TradesPerBar = market.TradesPerBar,
+            BarIntervalSeconds = market.BarIntervalSeconds,
             Colors = new Dictionary<string, string>
             {
                 ["background"] = "#0f131a",
