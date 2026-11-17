@@ -21,3 +21,5 @@ sweep_results.txt
 *.user
 FootPrintTrader/cboeData.json
 FootPrintTrader/classifier_stats.txt
+/SupportingData/bin
+/SupportingData/obj
