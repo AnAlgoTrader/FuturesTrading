@@ -19,6 +19,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client\Ib.Csharp.Api.Client.csproj" />
+        <ProjectReference Include="..\SupportingData\SupportingData.csproj" />
     </ItemGroup>
 
 </Project>
