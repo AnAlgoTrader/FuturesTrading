@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using Ib.Csharp.Api.Client.Implementation;
 using Ib.Csharp.Api.Client.Implementation.Model;
+using SupportingData.Helper;
 
 namespace SupportingData;
 
@@ -33,9 +34,7 @@ internal class Program
             if (bar.Volume != 0)
                 output.AppendLine($"{bar.Time},{bar.Open},{bar.High},{bar.Low},{bar.Close},{bar.Volume}");
         }
-
-        var fileName = "/home/oce/LocalDB/logs/footprint/lastMonthVolume.csv";
-        await File.WriteAllTextAsync(fileName, output.ToString());
-        Console.WriteLine($"Historical data saved in {fileName}");
+        await File.WriteAllTextAsync(SupportingDataHelper.LastMonthVolumeFile, output.ToString());
+        Console.WriteLine($"Historical data saved in {SupportingDataHelper.LastMonthVolumeFile}");
     }
 }
