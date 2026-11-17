@@ -52,6 +52,23 @@ public class SupportingDataHelper
         return candles;
     }
 
+    /// <summary>
+    /// Reads the supporting data CSV and averages the volume at each time of day
+    /// (minute precision) across all days.
+    /// </summary>
+    public IReadOnlyList<AverageVolumePerMinute> GetAverageVolumePerMinute()
+    {
+        return GetCandleSupportingData()
+            .GroupBy(c => new TimeOnly(c.Time.Hour, c.Time.Minute))
+            .Select(group => new AverageVolumePerMinute
+            {
+                Time = group.Key,
+                AverageVolume = group.Average(c => c.Volume)
+            })
+            .OrderBy(result => result.Time)
+            .ToList();
+    }
+
     private static DateTime ToMadridTime(long utcTimestamp)
     {
         var utcTime = DateTimeOffset.FromUnixTimeSeconds(utcTimestamp).UtcDateTime;
