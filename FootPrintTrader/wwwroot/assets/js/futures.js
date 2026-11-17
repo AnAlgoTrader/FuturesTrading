@@ -208,6 +208,11 @@ function updateSidePanel(ctx, tickSize) {
     }
 
     if (mVol) mVol.textContent = fmtNum(ctx.currentVolume);
+    const mRvol = document.getElementById('m-rvol');
+    if (mRvol) {
+        mRvol.textContent = ctx.relativeVolume || '-';
+        mRvol.className = `metric-val${ctx.relativeVolumeHigh ? ' val-warn' : ''}`;
+    }
     if (mPoc) mPoc.textContent = Number(ctx.pocPrice).toFixed(dec);
     if (mPocZone) mPocZone.textContent = ctx.pocPosition || '-';
     if (mPocShift) {

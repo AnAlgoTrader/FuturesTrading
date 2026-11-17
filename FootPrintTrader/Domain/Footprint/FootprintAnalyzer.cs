@@ -17,6 +17,10 @@ public class OrderFlowContext
     public string PocPosition { get; init; } = "-";
     public string PocMigration { get; init; } = "-";
 
+    // Live-bar relative volume, mirroring the footer metric.
+    public string RelativeVolume { get; set; } = "-";
+    public bool RelativeVolumeHigh { get; set; }
+
     // Multi-bar / Session Structure
     public double CumulativeDelta { get; init; }
     public string DeltaDivergence { get; init; } = "None";

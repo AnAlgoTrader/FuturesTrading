@@ -77,6 +77,14 @@ public static class FootprintRenderBuilder
         if (analyzer != null)
         {
             result.Context = analyzer.AnalyzeContext(snapshot, tickSize, currentPrice, market);
+
+            var contextBar = snapshot.Current ?? snapshot.Completed.LastOrDefault();
+            if (contextBar != null)
+            {
+                var rvol = RelativeVolumeFooter(contextBar, market.BarIntervalSeconds, averageVolumeByTime);
+                result.Context.RelativeVolume = rvol.Text;
+                result.Context.RelativeVolumeHigh = rvol.Color == WarnColor;
+            }
         }
 
         return result;
