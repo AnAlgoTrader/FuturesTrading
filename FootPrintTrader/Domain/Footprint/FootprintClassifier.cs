@@ -83,7 +83,6 @@ public sealed class FootprintClassifier
     private int _count;
     private long _nextBarId = 1;
     private long _start, _end;
-    private long _startArrival, _endArrival;
     private long _barBucket = long.MinValue;
     private double _open, _high, _low, _close;
 
@@ -164,7 +163,7 @@ public sealed class FootprintClassifier
             else
             {
                 var arrival = Stopwatch.GetTimestamp();
-                AddTrade(time, price, size, arrival, Classify(price, arrival));
+                AddTrade(time, price, size, Classify(price, arrival));
             }
         }
         DrainCompleted();
@@ -254,7 +253,7 @@ public sealed class FootprintClassifier
         return side;
     }
 
-    private void AddTrade(long time, double price, decimal size, long arrival, Side side)
+    private void AddTrade(long time, double price, decimal size, Side side)
     {
         var bucket = BucketFor(time);
 
@@ -266,14 +265,12 @@ public sealed class FootprintClassifier
         if (_count == 0)
         {
             _start = time;
-            _startArrival = arrival;
             _open = price;
             _high = double.MinValue;
             _low = double.MaxValue;
             _barBucket = bucket;
         }
         _end = time;
-        _endArrival = arrival;
         _close = price;
         if (price > _high) _high = price;
         if (price < _low) _low = price;
@@ -310,10 +307,7 @@ public sealed class FootprintClassifier
             .Select(kv => new FootprintLevel(kv.Key * _tickSize, kv.Value.Bid, kv.Value.Ask))
             .ToArray();
 
-        // Duration from LOCAL arrival times (sub-millisecond), not IBKR's 1-second timestamps.
-        var duration = (_endArrival - _startArrival) / (double)Stopwatch.Frequency;
-
         return new FootprintBarData(_count, _start, _end, _open, _high, _low, _close, levels,
-                                    Id: _nextBarId, DurationSeconds: duration);
+                                    Id: _nextBarId);
     }
 }

@@ -12,9 +12,9 @@ public sealed record FootprintBarData(
     int TradeCount, long StartTime, long EndTime,
     double Open, double High, double Low, double Close,
     FootprintLevel[] Levels,          // ascending price
-    long Id = 0,                      // unique, monotonic per classifier. Use this as the bar key, NOT StartTime
-                                      // (two bars can start in the same IBKR second).
-    double DurationSeconds = 0)       // first-to-last trade, from local arrival clock (sub-ms resolution)
+    // Id: unique, monotonic per classifier. Use this as the bar key, NOT StartTime
+    // (two bars can start in the same IBKR second).
+    long Id = 0)
 {
     public decimal Delta => Levels.Sum(l => l.Delta);
     public decimal Volume => Levels.Sum(l => l.Total);

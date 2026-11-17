@@ -199,8 +199,7 @@ public static class FootprintRenderBuilder
                     Text = delta.ToString(CultureInfo.InvariantCulture),
                     Color = delta > 0 ? UpColor : delta < 0 ? DownColor : null
                 },
-                new() { Text = bar.Volume.ToString(CultureInfo.InvariantCulture) },
-                new() { Text = Math.Max(0, bar.EndTime - bar.StartTime).ToString(CultureInfo.InvariantCulture) + "s" }
+                new() { Text = bar.Volume.ToString(CultureInfo.InvariantCulture) }
             }
         };
     }
