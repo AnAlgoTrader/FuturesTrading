@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using FootPrintTrader.Configuration;
@@ -12,6 +14,7 @@ using FootPrintTrader.Services.Trading;
 using FootPrintTrader.UI;
 using FootPrintTrader.UI.Models;
 using FootPrintTrader.UI.Rendering;
+using SupportingData.Helper;
 
 namespace FootPrintTrader;
 
@@ -28,6 +31,7 @@ public class TradingApp
     private readonly OptionsService _optionsService;
     private readonly SnapshotService _snapshotService;
     private readonly WindowManager _windowManager;
+    private readonly IReadOnlyDictionary<TimeOnly, double> _averageVolumeByTime;
 
     private Timer _futuresTimer;
     private Timer _optionsTimer;
@@ -36,6 +40,7 @@ public class TradingApp
     {
         _market = market ?? MarketPresets.EsMes;
         var logger = new Logger(DataDirectory);
+        _averageVolumeByTime = LoadAverageVolumeByTime(logger);
         _classifier = new FootprintClassifier(tickSize: _market.TickSize, barIntervalSeconds: _market.BarIntervalSeconds);
         _analyzer = new FootprintAnalyzer();
 
@@ -43,10 +48,30 @@ public class TradingApp
         _orderManager = new OrderManager(logger);
         _tradeExecution = new TradeExecutionService(_marketData, _orderManager, _market, logger);
         _optionsService = new OptionsService(logger);
-        _snapshotService = new SnapshotService(DataDirectory, _market, logger, _analyzer);
+        _snapshotService = new SnapshotService(DataDirectory, _market, logger, _analyzer, _averageVolumeByTime);
         _windowManager = new WindowManager();
 
         WireEvents();
+    }
+
+    /// <summary>
+    /// Loads the per-minute average volume baseline once at startup. The CSV is produced by
+    /// the SupportingData project; if it is missing or malformed the app still runs without it.
+    /// </summary>
+    private static IReadOnlyDictionary<TimeOnly, double> LoadAverageVolumeByTime(Logger logger)
+    {
+        try
+        {
+            var averages = new SupportingDataHelper().GetAverageVolumePerMinute();
+            var lookup = averages.ToDictionary(a => a.Time, a => a.AverageVolume);
+            logger?.WriteLine($"[VOLUME] Loaded average volume for {lookup.Count} minutes of the day.");
+            return lookup;
+        }
+        catch (Exception ex)
+        {
+            logger?.WriteLine($"[VOLUME] Average volume baseline unavailable: {ex.Message}");
+            return new Dictionary<TimeOnly, double>();
+        }
     }
 
     private void WireEvents()
@@ -149,7 +174,7 @@ public class TradingApp
         {
             _windowManager.SendFuturesUpdate(
                 UpdateMessageType.FOOTPRINT_SNAPSHOT,
-                FootprintRenderBuilder.Build(snap, _market.TickSize, _marketData.CurrentPrice, _market, _analyzer));
+                FootprintRenderBuilder.Build(snap, _market.TickSize, _marketData.CurrentPrice, _market, _analyzer, _averageVolumeByTime));
 
             if (_marketData.Bid <= 0 && _marketData.Ask <= 0)
             {

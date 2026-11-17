@@ -34,7 +34,8 @@ public static class FootprintRenderBuilder
         double tickSize,
         double currentPrice,
         MarketProfile market,
-        FootprintAnalyzer analyzer = null)
+        FootprintAnalyzer analyzer = null,
+        IReadOnlyDictionary<TimeOnly, double> averageVolumeByTime = null)
     {
         var result = new FootprintRenderSnapshot
         {
@@ -57,7 +58,7 @@ public static class FootprintRenderBuilder
 
         foreach (var bar in snapshot.Completed)
         {
-            var renderBar = ConvertBar(bar);
+            var renderBar = ConvertBar(bar, market.BarIntervalSeconds, averageVolumeByTime);
             if (signalsMap.TryGetValue(bar.Id, out var signals))
             {
                 var tag = CreateTag(signals);
@@ -68,7 +69,7 @@ public static class FootprintRenderBuilder
         }
 
         if (snapshot.Current != null)
-            result.Bars.Add(ConvertBar(snapshot.Current));
+            result.Bars.Add(ConvertBar(snapshot.Current, market.BarIntervalSeconds, averageVolumeByTime));
 
         if (currentPrice > 0 && result.Bars.Count > 0)
             MarkCurrentPrice(result.Bars[^1], currentPrice, tickSize);
@@ -136,7 +137,10 @@ public static class FootprintRenderBuilder
         }
     }
 
-    private static FootprintRenderBar ConvertBar(FootprintBarData bar)
+    private static FootprintRenderBar ConvertBar(
+        FootprintBarData bar,
+        int barIntervalSeconds,
+        IReadOnlyDictionary<TimeOnly, double> averageVolumeByTime)
     {
         var levels = bar.Levels;
         var maxSide = levels.Length == 0
@@ -199,8 +203,44 @@ public static class FootprintRenderBuilder
                     Text = delta.ToString(CultureInfo.InvariantCulture),
                     Color = delta > 0 ? UpColor : delta < 0 ? DownColor : null
                 },
-                new() { Text = bar.Volume.ToString(CultureInfo.InvariantCulture) }
+                new() { Text = bar.Volume.ToString(CultureInfo.InvariantCulture) },
+                RelativeVolumeFooter(bar, barIntervalSeconds, averageVolumeByTime)
             }
+        };
+    }
+
+    /// <summary>
+    /// Relative volume: this bar's volume divided by the average volume for the same
+    /// minute(s) of the day. Returns "-" when the baseline does not cover the bar.
+    /// </summary>
+    private static FootprintRenderFooter RelativeVolumeFooter(
+        FootprintBarData bar,
+        int barIntervalSeconds,
+        IReadOnlyDictionary<TimeOnly, double> averageVolumeByTime)
+    {
+        if (averageVolumeByTime == null || averageVolumeByTime.Count == 0 || bar.StartTime <= 0)
+            return new FootprintRenderFooter { Text = "-" };
+
+        // Bar times are shown in the machine's local (Madrid) time and the baseline is keyed by
+        // Madrid wall-clock minute, so no timezone conversion is needed.
+        var start = DateTimeOffset.FromUnixTimeSeconds(bar.StartTime).ToLocalTime().DateTime;
+        var minutes = Math.Max(1, (int)Math.Ceiling(Math.Max(1, barIntervalSeconds) / 60.0));
+
+        double expectedVolume = 0;
+        for (var i = 0; i < minutes; i++)
+        {
+            var timeOfDay = TimeOnly.FromDateTime(start.AddMinutes(i));
+            if (!averageVolumeByTime.TryGetValue(timeOfDay, out var average) || average <= 0)
+                return new FootprintRenderFooter { Text = "-" };
+
+            expectedVolume += average;
+        }
+
+        var ratio = (double)bar.Volume / expectedVolume;
+        return new FootprintRenderFooter
+        {
+            Text = ratio.ToString("0.0", CultureInfo.InvariantCulture) + "x",
+            Color = ratio >= 1.5 ? WarnColor : null
         };
     }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Threading;
@@ -15,14 +16,21 @@ public class SnapshotService
     private readonly MarketProfile _market;
     private readonly Logger _logger;
     private readonly FootprintAnalyzer _analyzer;
+    private readonly IReadOnlyDictionary<TimeOnly, double> _averageVolumeByTime;
     private int _snapshotWritten;
 
-    public SnapshotService(string dataDirectory, MarketProfile market, Logger logger, FootprintAnalyzer analyzer)
+    public SnapshotService(
+        string dataDirectory,
+        MarketProfile market,
+        Logger logger,
+        FootprintAnalyzer analyzer,
+        IReadOnlyDictionary<TimeOnly, double> averageVolumeByTime = null)
     {
         _dataDirectory = dataDirectory;
         _market = market;
         _logger = logger;
         _analyzer = analyzer;
+        _averageVolumeByTime = averageVolumeByTime;
     }
 
     public void WriteSnapshot(FootprintSnapshot snapshot, double currentPrice)
@@ -35,7 +43,8 @@ public class SnapshotService
 
             Directory.CreateDirectory(_dataDirectory);
             var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-            var payload = FootprintRenderBuilder.Build(snapshot, _market.TickSize, currentPrice, _market, _analyzer);
+            var payload = FootprintRenderBuilder.Build(
+                snapshot, _market.TickSize, currentPrice, _market, _analyzer, _averageVolumeByTime);
 
             var jsonPath = Path.Combine(_dataDirectory, $"footprint-{stamp}.json");
             File.WriteAllText(jsonPath, JsonSerializer.Serialize(payload, FootprintRenderBuilder.JsonOptions));
