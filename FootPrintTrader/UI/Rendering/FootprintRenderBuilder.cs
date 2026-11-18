@@ -196,7 +196,9 @@ public static class FootprintRenderBuilder
         var delta = bar.Delta;
         return new FootprintRenderBar
         {
-            Id = bar.StartTime.ToString(CultureInfo.InvariantCulture),
+            // Must match the key used by FootprintSignalDetector (the classifier's unique bar id).
+            // StartTime is not unique: two bars can start in the same IBKR second.
+            Id = bar.Id.ToString(CultureInfo.InvariantCulture),
             Label = FormatTime(bar.StartTime),
             Open = bar.Open,
             High = bar.High,

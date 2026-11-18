@@ -25,20 +25,26 @@ public static class MarketPresets
 
         Signals = new SignalSettings
         {
-            MinDeltaAbsorption = 250m,
             SwingLookback = 10,
             ToleranceTicks = 1,
             CvdDivergenceLookback = 15,
             BreakoutLookback = 10,
-            MinDeltaBreakout = 100m,
             MinBuyImbalancesBreakout = 3,
             ImbalanceRatio = 3.0m,
-            ImbalanceMinVolume = 10m,
             FastThresholdRatio = 0.70,
             SlowdownThresholdRatio = 1.50,
             SpeedMedianWindow = 20,
             SpeedMinBars = 8,
-            RepeatControlBars = 3
+            RepeatControlBars = 3,
+
+            // All size/volatility thresholds are relative to the session's rolling baselines.
+            DeltaFloorRatio = 2.0,
+            AbsorptionWickRatio = 0.20,
+            ExtremeVolumeRatio = 0.001,
+            ExhaustionVolumeRatio = 1.2,
+            ExhaustionRangeRatio = 0.8,
+            BreakoutMinVolumeRatio = 0.8,
+            FadeWindowBars = 3
         },
 
         OrderQuantity = 1m,

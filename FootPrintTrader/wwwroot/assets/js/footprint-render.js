@@ -118,11 +118,11 @@
 
           if (!textCol || !bgCol || !borderCol) {
             const u = text.toUpperCase();
-            if (u.includes('SAB') || u.includes('BRK')) {
+            if (u.includes('SAB') || u.includes('SXH') || u.includes('BRK') || u.includes('FBD') || u.includes('DIV▲')) {
               textCol = textCol || col.up;
               bgCol = bgCol || 'rgba(47, 207, 147, 0.22)';
               borderCol = borderCol || 'rgba(47, 207, 147, 0.75)';
-            } else if (u.includes('BAB') || u.includes('CDIV')) {
+            } else if (u.includes('BAB') || u.includes('BXH') || u.includes('BRD') || u.includes('FBO') || u.includes('CDIV')) {
               textCol = textCol || col.down;
               bgCol = bgCol || 'rgba(240, 100, 123, 0.22)';
               borderCol = borderCol || 'rgba(240, 100, 123, 0.75)';
