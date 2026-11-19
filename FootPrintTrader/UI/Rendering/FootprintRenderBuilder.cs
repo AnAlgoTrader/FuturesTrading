@@ -199,7 +199,7 @@ public static class FootprintRenderBuilder
             // Must match the key used by FootprintSignalDetector (the classifier's unique bar id).
             // StartTime is not unique: two bars can start in the same IBKR second.
             Id = bar.Id.ToString(CultureInfo.InvariantCulture),
-            Label = FormatTime(bar.StartTime),
+            Label = FormatTime(bar.StartTime, barIntervalSeconds),
             Open = bar.Open,
             High = bar.High,
             Low = bar.Low,
@@ -221,7 +221,9 @@ public static class FootprintRenderBuilder
 
     /// <summary>
     /// Relative volume: this bar's volume divided by the average volume for the same
-    /// minute(s) of the day. Returns "-" when the baseline does not cover the bar.
+    /// time of day. The SupportingData baseline is built from 30-second candles and
+    /// keyed per minute, so one baseline value represents a single 30-second bucket.
+    /// Returns "-" when the baseline does not cover the bar.
     /// </summary>
     private static FootprintRenderFooter RelativeVolumeFooter(
         FootprintBarData bar,
@@ -231,15 +233,22 @@ public static class FootprintRenderBuilder
         if (averageVolumeByTime == null || averageVolumeByTime.Count == 0 || bar.StartTime <= 0)
             return new FootprintRenderFooter { Text = "-" };
 
-        // Bar times are shown in the machine's local (Madrid) time and the baseline is keyed by
-        // Madrid wall-clock minute, so no timezone conversion is needed.
-        var start = DateTimeOffset.FromUnixTimeSeconds(bar.StartTime).ToLocalTime().DateTime;
-        var minutes = Math.Max(1, (int)Math.Ceiling(Math.Max(1, barIntervalSeconds) / 60.0));
+        const int baselineBucketSeconds = 30;
+        var interval = Math.Max(1, barIntervalSeconds);
+        var alignedStart = bar.StartTime - (bar.StartTime % baselineBucketSeconds);
+        var buckets = (int)Math.Ceiling(interval / (double)baselineBucketSeconds);
 
+        // Bar times are shown in the machine's local (Madrid) time and the baseline is keyed by
+        // Madrid wall-clock minute, so no timezone conversion is needed. Flooring the bar's
+        // start to a 30-second boundary matches the classifier's bucket and avoids a lookup
+        // miss on the first trade's seconds (e.g. 09:30:03 vs a 09:30 baseline key).
         double expectedVolume = 0;
-        for (var i = 0; i < minutes; i++)
+        for (var i = 0; i < buckets; i++)
         {
-            var timeOfDay = TimeOnly.FromDateTime(start.AddMinutes(i));
+            var bucketTime = DateTimeOffset
+                .FromUnixTimeSeconds(alignedStart + i * baselineBucketSeconds)
+                .ToLocalTime().DateTime;
+            var timeOfDay = new TimeOnly(bucketTime.Hour, bucketTime.Minute);
             if (!averageVolumeByTime.TryGetValue(timeOfDay, out var average) || average <= 0)
                 return new FootprintRenderFooter { Text = "-" };
 
@@ -254,11 +263,12 @@ public static class FootprintRenderBuilder
         };
     }
 
-    public static string FormatTime(long unixSeconds)
+    public static string FormatTime(long unixSeconds, int barIntervalSeconds = 60)
     {
         if (unixSeconds <= 0 || unixSeconds > 4102444800) return "";
+        var format = barIntervalSeconds < 60 ? "HH:mm:ss" : "HH:mm";
         return DateTimeOffset.FromUnixTimeSeconds(unixSeconds)
             .ToLocalTime()
-            .ToString("HH:mm", CultureInfo.InvariantCulture);
+            .ToString(format, CultureInfo.InvariantCulture);
     }
 }

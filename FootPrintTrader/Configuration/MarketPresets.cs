@@ -19,7 +19,7 @@ public static class MarketPresets
         TickSize = 0.25,
         PriceDecimals = 2,
 
-        BarIntervalSeconds = 60,
+        BarIntervalSeconds = 30,
         DivergenceWindowBars = 20,
         DivergenceMinCvdGapRatio = 0.10,
 
