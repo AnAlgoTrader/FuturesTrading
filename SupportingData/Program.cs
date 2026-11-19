@@ -23,7 +23,10 @@ internal class Program
             DateTime.ParseExact(x.Contract.LastTradeDate, "yyyyMMdd",
                 System.Globalization.CultureInfo.InvariantCulture) > DateTime.Now);
 
-        var historicalDataList = await client.GetHistoricalData(1020, contract!.Contract, $"1 {nameof(Duration.M)}", $"1 {nameof(BarSize.min)}", "TRADES", 600000, false);
+        const string duration = $"1 {nameof(Duration.M)}";
+        const string barSize = $"30 {nameof(BarSize.secs)}";
+        Console.WriteLine($"Getting data for {duration} every {barSize}");
+        var historicalDataList = await client.GetHistoricalData(1020, contract!.Contract, duration, barSize, "TRADES", 600000, false);
         
         var output = new StringBuilder();
         const string headers = "Date, Open, High, Low, Close, Volume";
