@@ -98,7 +98,6 @@ public static class FootprintRenderBuilder
 
         var hasBullish = signals.Any(s => s.Tone == "bullish");
         var hasBearish = signals.Any(s => s.Tone == "bearish");
-        var hasPhase = signals.Any(s => s.Tone == "phase");
 
         string color;
         string bg;
@@ -115,12 +114,6 @@ public static class FootprintRenderBuilder
             color = DownColor;
             bg = "rgba(240, 100, 123, 0.22)";
             border = "rgba(240, 100, 123, 0.75)";
-        }
-        else if (hasPhase && !hasBullish && !hasBearish)
-        {
-            color = WarnColor;
-            bg = "rgba(242, 183, 5, 0.22)";
-            border = "rgba(242, 183, 5, 0.75)";
         }
         else
         {

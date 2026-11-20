@@ -14,21 +14,13 @@ public enum FootprintSignalType
     BreakoutConfirmation,  // BRK - bullish: close above prior range on delta
     BreakdownConfirmation, // BRD - bearish: close below prior range on delta
     FailedBreakout,        // FBO - bearish: up breakout re-enters the prior range
-    FailedBreakdown,       // FBD - bullish: down breakout re-enters the prior range
-    CvdDivergence,         // CDIV - bearish (reserved; the analyzer reports this)
-    Slowdown,              // SLW - phase (reserved)
-    CvdBullishDivergence   // CDIV^ - bullish (reserved)
+    FailedBreakdown        // FBD - bullish: down breakout re-enters the prior range
 }
 
 public class DetectedFootprintSignal
 {
-    public FootprintSignalType Type { get; init; }
     public string Acronym { get; init; } = "";
-    public string Name { get; init; } = "";
-    public string Tone { get; init; } = "neutral"; // "bullish", "bearish", "phase"
-    public bool IsFast { get; init; }
-    public long BarStartTime { get; init; }
-    public long BarId { get; init; }
+    public string Tone { get; init; } = "neutral"; // "bullish" or "bearish"
 }
 
 /// <summary>
@@ -91,7 +83,7 @@ public static class FootprintSignalDetector
 
         var lastEmitted = new Dictionary<FootprintSignalType, int>();
 
-        void Emit(int i, FootprintSignalType type, string acronym, string name, string tone)
+        void Emit(int i, FootprintSignalType type, string acronym, string tone)
         {
             if (lastEmitted.TryGetValue(type, out var last) &&
                 i - last < Math.Max(1, settings.RepeatControlBars))
@@ -103,12 +95,8 @@ public static class FootprintSignalDetector
 
             list.Add(new DetectedFootprintSignal
             {
-                Type = type,
                 Acronym = acronym,
-                Name = name,
-                Tone = tone,
-                BarStartTime = bar.StartTime,
-                BarId = bar.Id
+                Tone = tone
             });
             lastEmitted[type] = i;
         }
@@ -129,32 +117,32 @@ public static class FootprintSignalDetector
                 lowerWickRatio >= settings.AbsorptionWickRatio &&
                 HasExtremeImbalance(bar, bar.Low, tickSize, settings, aggressiveOnBid: true))
             {
-                Emit(i, FootprintSignalType.SellAbsorption, "SAB", "Sell Absorption", "bullish");
+                Emit(i, FootprintSignalType.SellAbsorption, "SAB", "bullish");
             }
 
             if (bar.Delta >= deltaFloor &&
                 upperWickRatio >= settings.AbsorptionWickRatio &&
                 HasExtremeImbalance(bar, bar.High, tickSize, settings, aggressiveOnBid: false))
             {
-                Emit(i, FootprintSignalType.BuyAbsorption, "BAB", "Buy Absorption", "bearish");
+                Emit(i, FootprintSignalType.BuyAbsorption, "BAB", "bearish");
             }
 
             if (IsExhaustion(completed, i, settings, medRange[i], bullish: true))
-                Emit(i, FootprintSignalType.SellExhaustion, "SXH", "Sell Exhaustion", "bullish");
+                Emit(i, FootprintSignalType.SellExhaustion, "SXH", "bullish");
             if (IsExhaustion(completed, i, settings, medRange[i], bullish: false))
-                Emit(i, FootprintSignalType.BuyExhaustion, "BXH", "Buy Exhaustion", "bearish");
+                Emit(i, FootprintSignalType.BuyExhaustion, "BXH", "bearish");
 
             if (breakoutDirection[i] > 0)
-                Emit(i, FootprintSignalType.BreakoutConfirmation, "BRK", "Breakout", "bullish");
+                Emit(i, FootprintSignalType.BreakoutConfirmation, "BRK", "bullish");
             else if (breakoutDirection[i] < 0)
-                Emit(i, FootprintSignalType.BreakdownConfirmation, "BRD", "Breakdown", "bearish");
+                Emit(i, FootprintSignalType.BreakdownConfirmation, "BRD", "bearish");
 
             if (fadeSource[i] >= 0)
             {
                 if (fadeDirection[i] > 0)
-                    Emit(i, FootprintSignalType.FailedBreakout, "FBO", "Failed Breakout", "bearish");
+                    Emit(i, FootprintSignalType.FailedBreakout, "FBO", "bearish");
                 else
-                    Emit(i, FootprintSignalType.FailedBreakdown, "FBD", "Failed Breakdown", "bullish");
+                    Emit(i, FootprintSignalType.FailedBreakdown, "FBD", "bullish");
             }
         }
 

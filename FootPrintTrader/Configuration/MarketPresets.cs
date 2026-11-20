@@ -25,14 +25,8 @@ public static class MarketPresets
 
         Signals = new SignalSettings
         {
-            SwingLookback = 10,
-            ToleranceTicks = 1,
-            CvdDivergenceLookback = 15,
             BreakoutLookback = 10,
-            MinBuyImbalancesBreakout = 3,
             ImbalanceRatio = 3.0m,
-            FastThresholdRatio = 0.70,
-            SlowdownThresholdRatio = 1.50,
             SpeedMedianWindow = 20,
             SpeedMinBars = 8,
             RepeatControlBars = 3,

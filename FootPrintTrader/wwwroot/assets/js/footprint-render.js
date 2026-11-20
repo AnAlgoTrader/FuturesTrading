@@ -118,18 +118,14 @@
 
           if (!textCol || !bgCol || !borderCol) {
             const u = text.toUpperCase();
-            if (u.includes('SAB') || u.includes('SXH') || u.includes('BRK') || u.includes('FBD') || u.includes('DIV▲')) {
+            if (u.includes('SAB') || u.includes('SXH') || u.includes('BRK') || u.includes('FBD')) {
               textCol = textCol || col.up;
               bgCol = bgCol || 'rgba(47, 207, 147, 0.22)';
               borderCol = borderCol || 'rgba(47, 207, 147, 0.75)';
-            } else if (u.includes('BAB') || u.includes('BXH') || u.includes('BRD') || u.includes('FBO') || u.includes('CDIV')) {
+            } else if (u.includes('BAB') || u.includes('BXH') || u.includes('BRD') || u.includes('FBO')) {
               textCol = textCol || col.down;
               bgCol = bgCol || 'rgba(240, 100, 123, 0.22)';
               borderCol = borderCol || 'rgba(240, 100, 123, 0.75)';
-            } else if (u.includes('SLW') || u.includes('SLOW')) {
-              textCol = textCol || (custom.warn || '#f2b705');
-              bgCol = bgCol || 'rgba(242, 183, 5, 0.22)';
-              borderCol = borderCol || 'rgba(242, 183, 5, 0.75)';
             } else {
               textCol = textCol || col.text;
               bgCol = bgCol || 'rgba(138, 147, 166, 0.18)';

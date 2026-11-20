@@ -3,9 +3,6 @@ namespace FootPrintTrader.Configuration;
 public class SignalSettings
 {
     // Structure / lookbacks
-    public int SwingLookback { get; set; } = 10;
-    public int ToleranceTicks { get; set; } = 1;
-    public int CvdDivergenceLookback { get; set; } = 15;
     public int BreakoutLookback { get; set; } = 10;
 
     // Rolling baselines. The detector uses these instead of absolute size limits so
@@ -39,9 +36,4 @@ public class SignalSettings
 
     /// <summary>Bars after a breakout in which a re-entry into the prior range is a fade.</summary>
     public int FadeWindowBars { get; set; } = 3;
-
-    // Reserved for the slowdown / speed phase logic.
-    public double FastThresholdRatio { get; set; } = 0.70;
-    public double SlowdownThresholdRatio { get; set; } = 1.50;
-    public int MinBuyImbalancesBreakout { get; set; } = 3;
 }
