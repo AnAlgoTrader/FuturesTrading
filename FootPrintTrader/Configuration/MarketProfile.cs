@@ -26,7 +26,7 @@ public class MarketProfile
     public int PriceDecimals { get; set; }
 
     // Footprint analysis
-    public int BarIntervalSeconds { get; set; } = 60;
+    public int BarIntervalSeconds { get; set; } = 30;
 
     // Divergence
     public int DivergenceWindowBars { get; set; }

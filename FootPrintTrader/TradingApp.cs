@@ -40,7 +40,7 @@ public class TradingApp
     {
         _market = market ?? MarketPresets.EsMes;
         var logger = new Logger(DataDirectory);
-        _averageVolumeByTime = LoadAverageVolumeByTime(logger);
+        _averageVolumeByTime = LoadAverageVolumeByTimeframe(logger);
         _classifier = new FootprintClassifier(tickSize: _market.TickSize, barIntervalSeconds: _market.BarIntervalSeconds);
         _analyzer = new FootprintAnalyzer();
 
@@ -55,16 +55,16 @@ public class TradingApp
     }
 
     /// <summary>
-    /// Loads the per-minute average volume baseline once at startup. The CSV is produced by
+    /// Loads the average volume baseline once at startup. The CSV is produced by
     /// the SupportingData project; if it is missing or malformed the app still runs without it.
     /// </summary>
-    private static IReadOnlyDictionary<TimeOnly, double> LoadAverageVolumeByTime(Logger logger)
+    private static IReadOnlyDictionary<TimeOnly, double> LoadAverageVolumeByTimeframe(Logger logger)
     {
         try
         {
-            var averages = new SupportingDataHelper().GetAverageVolumePerMinute();
+            var averages = new SupportingDataHelper().GetAverageVolumePerTimeframe();
             var lookup = averages.ToDictionary(a => a.Time, a => a.AverageVolume);
-            logger?.WriteLine($"[VOLUME] Loaded average volume for {lookup.Count} minutes of the day.");
+            logger?.WriteLine($"[VOLUME] Loaded average volume for {lookup.Count} time buckets of the day.");
             return lookup;
         }
         catch (Exception ex)

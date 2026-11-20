@@ -53,14 +53,13 @@ public class SupportingDataHelper
     }
 
     /// <summary>
-    /// Reads the supporting data CSV and averages the volume at each time of day
-    /// (minute precision) across all days.
+    /// Reads the supporting data CSV and averages the volume at each time of day across all days.
     /// </summary>
-    public IReadOnlyList<AverageVolumePerMinute> GetAverageVolumePerMinute()
+    public IReadOnlyList<AverageVolumePerTimeframe> GetAverageVolumePerTimeframe()
     {
         return GetCandleSupportingData()
             .GroupBy(c => new TimeOnly(c.Time.Hour, c.Time.Minute))
-            .Select(group => new AverageVolumePerMinute
+            .Select(group => new AverageVolumePerTimeframe
             {
                 Time = group.Key,
                 AverageVolume = group.Average(c => c.Volume)

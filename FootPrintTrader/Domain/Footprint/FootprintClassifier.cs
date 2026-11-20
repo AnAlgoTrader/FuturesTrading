@@ -35,10 +35,10 @@ public readonly record struct ClassifierStats(
 }
 
 /// <summary>
-/// Builds time-bucket footprint bars (one minute by default; see <c>barIntervalSeconds</c>).
+/// Builds time-bucket footprint bars from tick-by-tick data.
 /// Each trade is classified against the last valid quote that was RECEIVED before it (arrival order),
 /// with no waiting and no re-ordering by IBKR's 1-second timestamps. IBKR timestamps determine the
-/// bar's minute bucket and its StartTime/EndTime.
+/// bar bucket and its StartTime/EndTime.
 ///
 /// Requirement: OnQuote and OnTrade must be called in the order the callbacks arrive from IBKR
 /// (ideally from the same thread / the same message loop).
@@ -93,7 +93,7 @@ public sealed class FootprintClassifier
     /// </summary>
     public event Action<FootprintBarData> BarCompleted;
 
-    /// <param name="barIntervalSeconds">Bar duration in seconds (60 = one-minute bars).</param>
+    /// <param name="barIntervalSeconds">Bar duration in seconds.</param>
     /// <param name="usePrevQuoteRule">
     /// If a trade prints strictly inside the current spread but at/through the previous quote, and the
     /// current quote changed within <paramref name="prevQuoteWindow"/> before the trade, treat the trade as

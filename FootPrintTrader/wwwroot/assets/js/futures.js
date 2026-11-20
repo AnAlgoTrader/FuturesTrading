@@ -18,7 +18,7 @@ const handlers = {
 let lastSignature = null;
 let priceDecimals = 2;
 let currencySign = '$';
-let barIntervalSeconds = 60;
+let barIntervalSeconds = 30;
 
 function formatBarInterval(seconds) {
     const value = Number(seconds);

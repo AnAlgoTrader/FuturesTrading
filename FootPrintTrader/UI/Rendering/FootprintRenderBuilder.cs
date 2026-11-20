@@ -221,9 +221,7 @@ public static class FootprintRenderBuilder
 
     /// <summary>
     /// Relative volume: this bar's volume divided by the average volume for the same
-    /// time of day. The SupportingData baseline is built from 30-second candles and
-    /// keyed per minute, so one baseline value represents a single 30-second bucket.
-    /// Returns "-" when the baseline does not cover the bar.
+    /// time of day. Returns "-" when the baseline does not cover the bar.
     /// </summary>
     private static FootprintRenderFooter RelativeVolumeFooter(
         FootprintBarData bar,
@@ -238,10 +236,9 @@ public static class FootprintRenderBuilder
         var alignedStart = bar.StartTime - (bar.StartTime % baselineBucketSeconds);
         var buckets = (int)Math.Ceiling(interval / (double)baselineBucketSeconds);
 
-        // Bar times are shown in the machine's local (Madrid) time and the baseline is keyed by
-        // Madrid wall-clock minute, so no timezone conversion is needed. Flooring the bar's
-        // start to a 30-second boundary matches the classifier's bucket and avoids a lookup
-        // miss on the first trade's seconds (e.g. 09:30:03 vs a 09:30 baseline key).
+        // Baseline keys use the same local wall-clock time as the chart labels, so no
+        // timezone conversion is needed. Align to a bucket boundary to avoid a lookup
+        // miss on the first trade's seconds.
         double expectedVolume = 0;
         for (var i = 0; i < buckets; i++)
         {
@@ -263,7 +260,7 @@ public static class FootprintRenderBuilder
         };
     }
 
-    public static string FormatTime(long unixSeconds, int barIntervalSeconds = 60)
+    public static string FormatTime(long unixSeconds, int barIntervalSeconds = 30)
     {
         if (unixSeconds <= 0 || unixSeconds > 4102444800) return "";
         var format = barIntervalSeconds < 60 ? "HH:mm:ss" : "HH:mm";

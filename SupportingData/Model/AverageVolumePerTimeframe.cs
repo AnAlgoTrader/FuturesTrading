@@ -1,6 +1,6 @@
 namespace SupportingData.Model;
 
-public class AverageVolumePerMinute
+public class AverageVolumePerTimeframe
 {
     public TimeOnly Time { get; set; }
     public double AverageVolume { get; set; }
